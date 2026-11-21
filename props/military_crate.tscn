@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/polyhaven/old_military_crate/old_military_crate_1k.gltf" id="1_model"]
+
+[sub_resource type="BoxShape3D" id="Shape_main"]
+size = Vector3(1.82, 0.3, 0.98)
+
+[node name="MilitaryCrate" type="StaticBody3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, -0.18)
+shape = SubResource("Shape_main")

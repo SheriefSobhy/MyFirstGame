@@ -1,0 +1,249 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://hud.tscn" id="3_hud"]
+[ext_resource type="Texture2D" path="res://assets/hdri/lonely_road_afternoon_puresky_1k.hdr" id="4_hdri"]
+[ext_resource type="Material" path="res://materials/concrete_floor.tres" id="5_floor"]
+[ext_resource type="Material" path="res://materials/brick_wall.tres" id="6_brick"]
+[ext_resource type="Material" path="res://materials/concrete_wall.tres" id="7_concrete"]
+[ext_resource type="Material" path="res://materials/container_red.tres" id="8_cont_red"]
+[ext_resource type="Material" path="res://materials/container_blue.tres" id="9_cont_blue"]
+[ext_resource type="Material" path="res://materials/metal_crate.tres" id="10_crate"]
+[ext_resource type="PackedScene" path="res://props/barrel_red.tscn" id="11_barrel_red"]
+[ext_resource type="PackedScene" path="res://props/barrel_rust.tscn" id="12_barrel_rust"]
+[ext_resource type="PackedScene" path="res://props/wood_crate.tscn" id="13_wood_crate"]
+[ext_resource type="PackedScene" path="res://props/military_crate.tscn" id="14_mil_crate"]
+[ext_resource type="PackedScene" path="res://props/jerrycan.tscn" id="15_jerrycan"]
+[ext_resource type="AudioStream" path="res://assets/sounds/wind_loop.ogg" id="16_wind"]
+[ext_resource type="NavigationMesh" path="res://level_navmesh.res" id="17_navmesh"]
+
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_hdri"]
+panorama = ExtResource("4_hdri")
+
+[sub_resource type="Sky" id="Sky_main"]
+sky_material = SubResource("PanoramaSkyMaterial_hdri")
+
+[sub_resource type="Environment" id="Environment_main"]
+background_mode = 2
+sky = SubResource("Sky_main")
+ambient_light_source = 3
+ambient_light_energy = 0.5
+reflected_light_source = 2
+tonemap_mode = 2
+tonemap_exposure = 0.9
+tonemap_white = 6.0
+glow_enabled = true
+glow_intensity = 0.5
+glow_bloom = 0.05
+glow_hdr_threshold = 1.1
+fog_enabled = true
+fog_light_color = Color(0.86, 0.74, 0.62, 1)
+fog_sun_scatter = 0.25
+fog_density = 0.006
+fog_sky_affect = 0.15
+adjustment_enabled = true
+adjustment_contrast = 1.1
+adjustment_saturation = 1.15
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_main")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.809, -0.142, 0.57, 0, 0.97, 0.242, -0.588, 0.196, -0.785, 0, 10, 0)
+light_color = Color(1, 0.82, 0.62, 1)
+light_energy = 1.6
+shadow_enabled = true
+shadow_blur = 1.5
+directional_shadow_mode = 1
+directional_shadow_max_distance = 45.0
+
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+navigation_mesh = ExtResource("17_navmesh")
+
+[node name="Level" type="Node3D" parent="NavigationRegion3D"]
+
+[node name="Floor" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+use_collision = true
+size = Vector3(42, 1, 42)
+material = ExtResource("5_floor")
+
+[node name="WallNorth" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -20.5)
+use_collision = true
+size = Vector3(42, 4, 1)
+material = ExtResource("6_brick")
+
+[node name="WallSouth" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 20.5)
+use_collision = true
+size = Vector3(42, 4, 1)
+material = ExtResource("6_brick")
+
+[node name="WallEast" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.5, 2, 0)
+use_collision = true
+size = Vector3(1, 4, 40)
+material = ExtResource("6_brick")
+
+[node name="WallWest" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20.5, 2, 0)
+use_collision = true
+size = Vector3(1, 4, 40)
+material = ExtResource("6_brick")
+
+[node name="WarehouseA" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 3, -10)
+use_collision = true
+size = Vector3(10, 6, 8)
+material = ExtResource("6_brick")
+
+[node name="WarehouseB" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 2.5, 9)
+use_collision = true
+size = Vector3(8, 5, 10)
+material = ExtResource("7_concrete")
+
+[node name="ContainerRed" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.3, -4)
+use_collision = true
+size = Vector3(6.1, 2.6, 2.44)
+material = ExtResource("8_cont_red")
+
+[node name="ContainerBlue" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -6, 1.3, 6)
+use_collision = true
+size = Vector3(6.1, 2.6, 2.44)
+material = ExtResource("9_cont_blue")
+
+[node name="ContainerBlue2" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(0.94, 0, 0.342, 0, 1, 0, -0.342, 0, 0.94, -13.5, 1.3, 13.5)
+use_collision = true
+size = Vector3(6.1, 2.6, 2.44)
+material = ExtResource("8_cont_red")
+
+[node name="Ramp" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(0.937, 0.35, 0, -0.35, 0.937, 0, 0, 0, 1, 8.52, 1.165, -4)
+use_collision = true
+size = Vector3(7.4, 0.3, 2.4)
+material = ExtResource("7_concrete")
+
+[node name="BarrierA" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.5, 4)
+use_collision = true
+size = Vector3(3, 1, 0.5)
+material = ExtResource("7_concrete")
+
+[node name="BarrierB" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -10, 0.5, -2)
+use_collision = true
+size = Vector3(3, 1, 0.5)
+material = ExtResource("7_concrete")
+
+[node name="MetalCrate1" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.6, 2)
+use_collision = true
+size = Vector3(1.2, 1.2, 1.2)
+material = ExtResource("10_crate")
+
+[node name="MetalCrate2" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(0.966, 0, 0.259, 0, 1, 0, -0.259, 0, 0.966, -0.7, 0.6, 2.3)
+use_collision = true
+size = Vector3(1.2, 1.2, 1.2)
+material = ExtResource("10_crate")
+
+[node name="MetalCrate3" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4, 1.8, 2.15)
+use_collision = true
+size = Vector3(1.2, 1.2, 1.2)
+material = ExtResource("10_crate")
+
+[node name="MetalCrate4" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.6, -12)
+use_collision = true
+size = Vector3(1.2, 1.2, 1.2)
+material = ExtResource("10_crate")
+
+[node name="MetalCrate5" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(0.94, 0, -0.342, 0, 1, 0, 0.342, 0, 0.94, 11.3, 0.6, -11.7)
+use_collision = true
+size = Vector3(1.2, 1.2, 1.2)
+material = ExtResource("10_crate")
+
+[node name="BarrelRed1" parent="NavigationRegion3D/Level" instance=ExtResource("11_barrel_red")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 8)
+
+[node name="BarrelRed2" parent="NavigationRegion3D/Level" instance=ExtResource("11_barrel_red")]
+transform = Transform3D(0.5, 0, 0.866, 0, 1, 0, -0.866, 0, 0.5, 4.7, 0, 8.5)
+
+[node name="BarrelRed3" parent="NavigationRegion3D/Level" instance=ExtResource("11_barrel_red")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, -3)
+
+[node name="BarrelRust1" parent="NavigationRegion3D/Level" instance=ExtResource("12_barrel_rust")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 2)
+
+[node name="BarrelRust2" parent="NavigationRegion3D/Level" instance=ExtResource("12_barrel_rust")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -3, 0, -12)
+
+[node name="BarrelRust3" parent="NavigationRegion3D/Level" instance=ExtResource("12_barrel_rust")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, -14)
+
+[node name="BarrelRust4" parent="NavigationRegion3D/Level" instance=ExtResource("12_barrel_rust")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4, 0, 10.4)
+
+[node name="WoodCrate1" parent="NavigationRegion3D/Level" instance=ExtResource("13_wood_crate")]
+transform = Transform3D(0.866, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866, -15, 0, -4)
+
+[node name="WoodCrate2" parent="NavigationRegion3D/Level" instance=ExtResource("13_wood_crate")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 0)
+
+[node name="MilitaryCrate1" parent="NavigationRegion3D/Level" instance=ExtResource("14_mil_crate")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -9)
+
+[node name="MilitaryCrate2" parent="NavigationRegion3D/Level" instance=ExtResource("14_mil_crate")]
+transform = Transform3D(0.966, 0, -0.259, 0, 1, 0, 0.259, 0, 0.966, -1.4, 2.4, 2.15)
+
+[node name="Jerrycan1" parent="NavigationRegion3D/Level" instance=ExtResource("15_jerrycan")]
+transform = Transform3D(0.707, 0, 0.707, 0, 1, 0, -0.707, 0, 0.707, 4.3, 0, 7.2)
+
+[node name="Jerrycan2" parent="NavigationRegion3D/Level" instance=ExtResource("15_jerrycan")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.6, 0, 3)
+
+[node name="Jerrycan3" parent="NavigationRegion3D/Level" instance=ExtResource("15_jerrycan")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -6.5, 0, -5.5)
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 14)
+
+[node name="Enemies" type="Node3D" parent="."]
+
+[node name="SpawnPoints" type="Node3D" parent="."]
+
+[node name="SpawnNW" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 0.1, -17)
+
+[node name="SpawnNE" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0.1, -17)
+
+[node name="SpawnN" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -17)
+
+[node name="SpawnW" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17, 0.1, 0)
+
+[node name="SpawnE" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 0.1, 0)
+
+[node name="SpawnTimer" type="Timer" parent="."]
+wait_time = 3.0
+autostart = true
+
+[node name="Wind" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("16_wind")
+volume_db = -14.0
+
+[node name="HUD" parent="." instance=ExtResource("3_hud")]
