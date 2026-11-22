@@ -35,8 +35,10 @@ func _ready() -> void:
 		var bus := AudioServer.bus_count - 1
 		AudioServer.set_bus_name(bus, MUSIC_BUS)
 		AudioServer.set_bus_send(bus, &"Master")
-	# Phones start on Medium (the old phone settings), computers on High.
-	quality = Quality.MEDIUM if DisplayServer.is_touchscreen_available() else Quality.HIGH
+	# The Android app and phones start on Medium (the old phone settings),
+	# computers on High.
+	var phone := OS.has_feature("android") or DisplayServer.is_touchscreen_available()
+	quality = Quality.MEDIUM if phone else Quality.HIGH
 	_load()
 	_apply_audio()
 
