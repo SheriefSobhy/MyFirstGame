@@ -5,7 +5,7 @@ extends Node3D
 const ENEMY_SCENE := preload("res://enemy.tscn")
 const START_ENEMIES := 5
 const MAX_ENEMIES := 12      # cap so the arena (and phones) don't overflow
-const SPAWN_SPREAD := 2.0    # random offset around a spawn point
+const SPAWN_SPREAD := 1.0    # random offset around a spawn point
 const PHONE_MAX_ENEMIES := 8
 const PHONE_RENDER_SCALE := 0.6  # 3D resolution on phones (1.0 = full)
 const BULLET_HOLE_SCENE := preload("res://effects/bullet_hole.tscn")

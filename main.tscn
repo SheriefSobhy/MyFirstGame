@@ -53,13 +53,13 @@ script = ExtResource("1_main")
 environment = SubResource("Environment_main")
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
-transform = Transform3D(-0.809, -0.142, 0.57, 0, 0.97, 0.242, -0.588, 0.196, -0.785, 0, 10, 0)
+transform = Transform3D(-0.809, -0.294, 0.5089, 0, 0.8662, 0.5, -0.588, 0.4045, -0.7009, 0, 10, 0)
 light_color = Color(1, 0.82, 0.62, 1)
 light_energy = 1.6
 shadow_enabled = true
 shadow_blur = 1.5
 directional_shadow_mode = 1
-directional_shadow_max_distance = 45.0
+directional_shadow_max_distance = 30.0
 
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
 navigation_mesh = ExtResource("17_navmesh")
@@ -69,77 +69,59 @@ navigation_mesh = ExtResource("17_navmesh")
 [node name="Floor" type="CSGBox3D" parent="NavigationRegion3D/Level"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 use_collision = true
-size = Vector3(42, 1, 42)
+size = Vector3(26, 1, 26)
 material = ExtResource("5_floor")
 
 [node name="WallNorth" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -20.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -12.5)
 use_collision = true
-size = Vector3(42, 4, 1)
+size = Vector3(26, 4, 1)
 material = ExtResource("6_brick")
 
 [node name="WallSouth" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 20.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 12.5)
 use_collision = true
-size = Vector3(42, 4, 1)
+size = Vector3(26, 4, 1)
 material = ExtResource("6_brick")
 
 [node name="WallEast" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.5, 2, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5, 2, 0)
 use_collision = true
-size = Vector3(1, 4, 40)
+size = Vector3(1, 4, 24)
 material = ExtResource("6_brick")
 
 [node name="WallWest" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20.5, 2, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.5, 2, 0)
 use_collision = true
-size = Vector3(1, 4, 40)
+size = Vector3(1, 4, 24)
 material = ExtResource("6_brick")
 
-[node name="WarehouseA" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 3, -10)
+[node name="Warehouse" type="CSGBox3D" parent="NavigationRegion3D/Level"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 3, -9)
 use_collision = true
-size = Vector3(10, 6, 8)
+size = Vector3(8, 6, 5)
 material = ExtResource("6_brick")
-
-[node name="WarehouseB" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 2.5, 9)
-use_collision = true
-size = Vector3(8, 5, 10)
-material = ExtResource("7_concrete")
 
 [node name="ContainerRed" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.3, -4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1.3, -4)
 use_collision = true
 size = Vector3(6.1, 2.6, 2.44)
 material = ExtResource("8_cont_red")
 
 [node name="ContainerBlue" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -6, 1.3, 6)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -6, 1.3, 3)
 use_collision = true
 size = Vector3(6.1, 2.6, 2.44)
 material = ExtResource("9_cont_blue")
 
-[node name="ContainerBlue2" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(0.94, 0, 0.342, 0, 1, 0, -0.342, 0, 0.94, -13.5, 1.3, 13.5)
-use_collision = true
-size = Vector3(6.1, 2.6, 2.44)
-material = ExtResource("8_cont_red")
-
-[node name="Ramp" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(0.937, 0.35, 0, -0.35, 0.937, 0, 0, 0, 1, 8.52, 1.165, -4)
-use_collision = true
-size = Vector3(7.4, 0.3, 2.4)
-material = ExtResource("7_concrete")
-
 [node name="BarrierA" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.5, 4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.5, 3.5)
 use_collision = true
 size = Vector3(3, 1, 0.5)
 material = ExtResource("7_concrete")
 
 [node name="BarrierB" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -10, 0.5, -2)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -9, 0.5, -3)
 use_collision = true
 size = Vector3(3, 1, 0.5)
 material = ExtResource("7_concrete")
@@ -163,13 +145,13 @@ size = Vector3(1.2, 1.2, 1.2)
 material = ExtResource("10_crate")
 
 [node name="MetalCrate4" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.6, -12)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0.6, -7)
 use_collision = true
 size = Vector3(1.2, 1.2, 1.2)
 material = ExtResource("10_crate")
 
 [node name="MetalCrate5" type="CSGBox3D" parent="NavigationRegion3D/Level"]
-transform = Transform3D(0.94, 0, -0.342, 0, 1, 0, 0.342, 0, 0.94, 11.3, 0.6, -11.7)
+transform = Transform3D(0.94, 0, -0.342, 0, 1, 0, 0.342, 0, 0.94, 10.3, 0.6, -6.7)
 use_collision = true
 size = Vector3(1.2, 1.2, 1.2)
 material = ExtResource("10_crate")
@@ -181,28 +163,28 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 8)
 transform = Transform3D(0.5, 0, 0.866, 0, 1, 0, -0.866, 0, 0.5, 4.7, 0, 8.5)
 
 [node name="BarrelRed3" parent="NavigationRegion3D/Level" instance=ExtResource("11_barrel_red")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, -3)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 0, -4)
 
 [node name="BarrelRust1" parent="NavigationRegion3D/Level" instance=ExtResource("12_barrel_rust")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.5, 0, 7.5)
 
 [node name="BarrelRust2" parent="NavigationRegion3D/Level" instance=ExtResource("12_barrel_rust")]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -3, 0, -12)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 11.2, 0, -11.2)
 
 [node name="BarrelRust3" parent="NavigationRegion3D/Level" instance=ExtResource("12_barrel_rust")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, -14)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, -11)
 
 [node name="BarrelRust4" parent="NavigationRegion3D/Level" instance=ExtResource("12_barrel_rust")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4, 0, 10.4)
 
 [node name="WoodCrate1" parent="NavigationRegion3D/Level" instance=ExtResource("13_wood_crate")]
-transform = Transform3D(0.866, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866, -15, 0, -4)
+transform = Transform3D(0.866, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866, -11, 0, 3.5)
 
 [node name="WoodCrate2" parent="NavigationRegion3D/Level" instance=ExtResource("13_wood_crate")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.5, 0, 4)
 
 [node name="MilitaryCrate1" parent="NavigationRegion3D/Level" instance=ExtResource("14_mil_crate")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -9)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -8.5)
 
 [node name="MilitaryCrate2" parent="NavigationRegion3D/Level" instance=ExtResource("14_mil_crate")]
 transform = Transform3D(0.966, 0, -0.259, 0, 1, 0, 0.259, 0, 0.966, -1.4, 2.4, 2.15)
@@ -211,32 +193,32 @@ transform = Transform3D(0.966, 0, -0.259, 0, 1, 0, 0.259, 0, 0.966, -1.4, 2.4, 2
 transform = Transform3D(0.707, 0, 0.707, 0, 1, 0, -0.707, 0, 0.707, 4.3, 0, 7.2)
 
 [node name="Jerrycan2" parent="NavigationRegion3D/Level" instance=ExtResource("15_jerrycan")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.6, 0, 3)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.4, 0, 4.8)
 
 [node name="Jerrycan3" parent="NavigationRegion3D/Level" instance=ExtResource("15_jerrycan")]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -6.5, 0, -5.5)
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 14)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
 
 [node name="Enemies" type="Node3D" parent="."]
 
 [node name="SpawnPoints" type="Node3D" parent="."]
 
 [node name="SpawnNW" type="Marker3D" parent="SpawnPoints"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 0.1, -17)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.1, -10.5)
 
 [node name="SpawnNE" type="Marker3D" parent="SpawnPoints"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0.1, -17)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.1, -10)
 
 [node name="SpawnN" type="Marker3D" parent="SpawnPoints"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -17)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.1, -10.5)
 
 [node name="SpawnW" type="Marker3D" parent="SpawnPoints"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17, 0.1, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.5, 0.1, -1)
 
 [node name="SpawnE" type="Marker3D" parent="SpawnPoints"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 0.1, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.5, 0.1, 0.5)
 
 [node name="SpawnTimer" type="Timer" parent="."]
 wait_time = 3.0

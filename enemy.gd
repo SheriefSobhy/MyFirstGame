@@ -7,7 +7,10 @@ signal died
 enum State { CHASE, ATTACK, HIT, DEAD }
 
 const MAX_HP := 3
-const WALK_SPEED := 2.3
+const WALK_SPEED := 1.4           # metres per second (slow, shambling walk)
+## The walk animation was made for about 2.3 m/s; slowing it down to match
+## keeps the feet from sliding over the ground.
+const WALK_ANIM_SPEED := WALK_SPEED / 2.3
 const TURN_SPEED := 8.0           # how fast the enemy turns to face its direction
 const ATTACK_RANGE := 1.4         # start punching within this distance
 const ATTACK_DAMAGE := 10
@@ -54,7 +57,7 @@ func _ready() -> void:
 	# The imported walk/idle animations don't loop by default.
 	anim.get_animation(ANIM_WALK).loop_mode = Animation.LOOP_LINEAR
 	anim.get_animation(ANIM_IDLE).loop_mode = Animation.LOOP_LINEAR
-	anim.play(ANIM_WALK)
+	anim.play(ANIM_WALK, -1, WALK_ANIM_SPEED)
 	anim.seek(randf() * 1.0)  # so a group of enemies doesn't walk in sync
 	_growl_timer = randf_range(1.0, 6.0)
 
@@ -163,7 +166,7 @@ func _set_state(new_state: State) -> void:
 	_state_time = 0.0
 	match new_state:
 		State.CHASE:
-			anim.play(ANIM_WALK, 0.2)
+			anim.play(ANIM_WALK, 0.2, WALK_ANIM_SPEED)
 		State.ATTACK:
 			_attack_landed = false
 			_play_from_start(ANIM_ATTACK, 0.1)
