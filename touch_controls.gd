@@ -2,8 +2,9 @@ extends Control
 ## On-screen touch controls, drawn with simple shapes (no images).
 ##  - Anywhere outside the buttons: drag to look around.
 ##  - Left half: a virtual joystick, only while the player's MOVEMENT_ENABLED is on
-##    (walking is switched off for now, so the whole screen is for aiming).
-##  - Buttons: Shoot (hold for auto fire), Jump, Reload.
+##    (with walking switched off, the whole screen is for aiming).
+##  - Buttons: Shoot (hold for auto fire), Jump, Reload, Switch (next weapon)
+##    and Aim (scope on/off; only shown for weapons with a scope).
 ## Each finger is tracked by its touch index, so you can move, look and
 ## shoot at the same time. Only shown on touch screen devices.
 
@@ -20,6 +21,8 @@ const BUTTONS := {
 	"shoot": {"offset": Vector2(-150, -190), "radius": 75.0, "label": "SHOOT"},
 	"jump": {"offset": Vector2(-310, -120), "radius": 55.0, "label": "JUMP"},
 	"reload": {"offset": Vector2(-120, -370), "radius": 50.0, "label": "RELOAD"},
+	"switch": {"offset": Vector2(-300, -280), "radius": 48.0, "label": "SWITCH"},
+	"aim": {"offset": Vector2(-270, -440), "radius": 48.0, "label": "AIM"},
 }
 
 ## Show the controls even without a touch screen (handy for testing on PC).
@@ -70,6 +73,10 @@ func _touch_down(index: int, pos: Vector2) -> void:
 			player.request_jump()
 		"reload":
 			player.start_reload()
+		"switch":
+			player.next_weapon(1)
+		"aim":
+			player.toggle_aim()
 		_:
 			if _movement_enabled() and pos.x < size.x * 0.5:
 				if not _fingers.has("joy"):
@@ -142,9 +149,15 @@ func _movement_enabled() -> bool:
 # Returns the name of the button under pos, or "" if none.
 func _button_at(pos: Vector2) -> String:
 	for button_name in BUTTONS:
-		if pos.distance_to(_button_center(button_name)) <= BUTTONS[button_name].radius:
+		if _button_shown(button_name) \
+				and pos.distance_to(_button_center(button_name)) <= BUTTONS[button_name].radius:
 			return button_name
 	return ""
+
+
+# The Aim button only exists for weapons with a scope (the sniper).
+func _button_shown(button_name: String) -> bool:
+	return button_name != "aim" or (player != null and player.can_aim())
 
 
 func _button_center(button_name: String) -> Vector2:
@@ -164,9 +177,12 @@ func _draw() -> void:
 
 	# Buttons.
 	for button_name in BUTTONS:
+		if not _button_shown(button_name):
+			continue
 		var b: Dictionary = BUTTONS[button_name]
 		var c := _button_center(button_name)
-		var held: bool = button_name == "shoot" and _fingers.has("shoot")
+		var held: bool = (button_name == "shoot" and _fingers.has("shoot")) \
+				or (button_name == "aim" and player.is_scoped())
 		draw_circle(c, b.radius, COLOR_PRESSED if held else COLOR_FILL)
 		draw_arc(c, b.radius, 0.0, TAU, 48, COLOR_LINE, 2.0)
 		draw_string(font, Vector2(c.x - b.radius, c.y + FONT_SIZE * 0.35), b.label,

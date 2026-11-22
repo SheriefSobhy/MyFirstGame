@@ -1,13 +1,15 @@
 extends Node3D
-## First-person arms holding the pistol, made from Quaternius' CC0 SWAT
+## First-person arms holding the current gun, made from Quaternius' CC0 SWAT
 ## character. On load (once, nothing runs per frame):
 ## 1. Only the arm triangles of the body mesh are kept, and the head, legs
 ##    and feet are hidden, so the torso never shows up in front of the camera.
-## 2. A small two-bone IK solve puts both hands on the pistol grip and curls
-##    the fingers. The pose is set once; the arms then follow the weapon's
-##    sway/recoil/reload because they're children of WeaponRecoil.
+## 2. A small two-bone IK solve puts both hands on the gun and curls the
+##    fingers. This runs again only when the weapon changes (see grip()); the
+##    arms follow the weapon's sway/recoil/reload because they're children
+##    of WeaponRecoil.
 ## The hand targets and poles are in this node's space (= WeaponRecoil space,
-## where the pistol grip is at the origin). Tweak them in the inspector.
+## where the gun grip is at the origin). The left_hand_* exports are the
+## pistol pose; other guns' left-hand spots are in weapon_stats.gd.
 
 const ARM_BONES := ["UpperArm", "LowerArm", "Hand", "Index", "Middle", "Ring", "Pinky", "Thumb"]
 const FINGERS := ["Index", "Middle", "Ring", "Pinky"]
@@ -35,13 +37,20 @@ func _ready() -> void:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		else:
 			mi.visible = false
-	# The view model is right in front of the camera, so the sun turned its
-	# shadow into a huge blob on the floor. FPS view models don't cast shadows.
-	for mi: MeshInstance3D in get_parent().get_node("Pistol").find_children("*", "MeshInstance3D", true, false):
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	grip(Vector3.ZERO, left_hand_pos, left_hand_forward, left_hand_back)
+
+
+## Re-poses both arms. The player calls this on every weapon switch with the
+## values from weapon_stats.gd:
+##  - arms_offset moves the whole arm rig (the arms only reach ~35 cm, so for
+##    long guns the rig slides forward to reach the handguard);
+##  - left_pos is where the left hand holds the gun (WeaponRecoil space).
+## The right hand always stays on the grip.
+func grip(arms_offset: Vector3, left_pos: Vector3, left_forward: Vector3, left_back: Vector3) -> void:
+	position = arms_offset
 	skel.reset_bone_poses()
-	_solve_arm("R", right_hand_pos, right_hand_forward, right_hand_back, right_elbow_pole)
-	_solve_arm("L", left_hand_pos, left_hand_forward, left_hand_back, left_elbow_pole)
+	_solve_arm("R", right_hand_pos - arms_offset, right_hand_forward, right_hand_back, right_elbow_pole)
+	_solve_arm("L", left_pos - arms_offset, left_forward, left_back, left_elbow_pole)
 
 
 # Keeps only triangles whose vertices are mostly skinned to arm/hand bones.

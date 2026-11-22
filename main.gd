@@ -37,14 +37,20 @@ func _ready() -> void:
 	# Player -> HUD
 	player.health_changed.connect(hud.set_health)
 	player.ammo_changed.connect(hud.set_ammo)
+	player.weapon_changed.connect(hud.set_weapon)
+	player.scope_changed.connect(hud.set_scoped)
+	player.message.connect(hud.show_message)
 	player.died.connect(_on_player_died)
 	player.hit_taken.connect(hud.flash_damage)
 	hud.restart_requested.connect(_on_restart_requested)
 	hud.touch_controls.player = player
+	# The touch Aim button appears/disappears with the weapon.
+	player.weapon_changed.connect(func(_name: String) -> void: hud.touch_controls.queue_redraw())
+	player.scope_changed.connect(func(_on: bool) -> void: hud.touch_controls.queue_redraw())
 	spawn_timer.timeout.connect(spawn_enemy)
 
 	hud.set_health(player.health)
-	hud.set_ammo(player.ammo, player.MAX_AMMO, false)
+	player.emit_status()
 	hud.set_score(score)
 
 	if DisplayServer.is_touchscreen_available():
@@ -95,10 +101,17 @@ func _prewarm_effects() -> void:
 			particles.restart()
 	var muzzle: Node3D = player.get_node("%MuzzleFlash")
 	muzzle.visible = true
+	# All the gun models, and the sniper scope overlay (almost invisible).
+	player.show_all_view_models(true)
+	hud.scope_overlay.self_modulate.a = 0.02
+	hud.scope_overlay.visible = true
 	# Keep them for a few frames so they are really drawn, then remove them.
 	for i in 3:
 		await get_tree().process_frame
 	muzzle.visible = false
+	player.show_all_view_models(false)
+	hud.scope_overlay.visible = false
+	hud.scope_overlay.self_modulate.a = 1.0
 	for node in warm:
 		node.queue_free()
 

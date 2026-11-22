@@ -1,7 +1,6 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://player.gd" id="1_player"]
-[ext_resource type="PackedScene" path="res://assets/models/quaternius/Pistol_1.glb" id="2_pistol"]
 [ext_resource type="AudioStream" path="res://assets/sounds/gunshot_pistol.wav" id="3_shot"]
 [ext_resource type="Script" path="res://fp_arms.gd" id="4_arms"]
 [ext_resource type="PackedScene" path="res://assets/models/quaternius/Swat.glb" id="5_swat"]
@@ -50,9 +49,6 @@ current = true
 fov = 75.0
 near = 0.03
 
-[node name="RayCast3D" type="RayCast3D" parent="Head/Camera3D"]
-target_position = Vector3(0, 0, -100)
-
 [node name="WeaponSway" type="Node3D" parent="Head/Camera3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, -0.16, -0.27)
 
@@ -60,8 +56,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, -0.16, -0.27)
 
 [node name="WeaponRecoil" type="Node3D" parent="Head/Camera3D/WeaponSway/WeaponReload"]
 
-[node name="Pistol" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil" instance=ExtResource("2_pistol")]
-transform = Transform3D(0, 0, 0.085, 0, 0.085, 0, -0.085, 0, 0, 0, 0, 0)
+[node name="Gun" type="Node3D" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil"]
+unique_name_in_owner = true
 
 [node name="Arms" type="Node3D" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil"]
 script = ExtResource("4_arms")
@@ -89,9 +85,11 @@ omni_range = 6.0
 [node name="ShootSound" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("3_shot")
 volume_db = -4.0
-max_polyphony = 4
+max_polyphony = 6
 
 [node name="ReloadSound" type="AudioStreamPlayer" parent="."]
+
+[node name="CycleSound" type="AudioStreamPlayer" parent="."]
 
 [node name="FootstepSound" type="AudioStreamPlayer" parent="."]
 volume_db = -10.0

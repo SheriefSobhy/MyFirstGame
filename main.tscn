@@ -34,6 +34,7 @@
 [ext_resource type="ArrayMesh" path="res://level/generated/wires.res" id="26_4lmeg"]
 [ext_resource type="ArrayMesh" path="res://level/generated/fence_walltop.res" id="27_0cp0l"]
 [ext_resource type="ArrayMesh" path="res://level/generated/skyline_W.res" id="27_ok6jj"]
+[ext_resource type="PackedScene" path="res://pickup.tscn" id="40_pickup"]
 
 [sub_resource type="Gradient" id="Gradient_grade"]
 offsets = PackedFloat32Array(0, 0.5, 1)
@@ -604,3 +605,29 @@ stream = ExtResource("16_wind")
 volume_db = -14.0
 
 [node name="HUD" parent="." unique_id=194804351 instance=ExtResource("3_hud")]
+
+[node name="Pickups" type="Node3D" parent="."]
+
+[node name="RiflePickup" parent="Pickups" instance=ExtResource("40_pickup")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 4.5)
+kind = 0
+weapon_index = 1
+
+[node name="ShotgunPickup" parent="Pickups" instance=ExtResource("40_pickup")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 0, 7)
+kind = 0
+weapon_index = 2
+
+[node name="SniperPickup" parent="Pickups" instance=ExtResource("40_pickup")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, -3)
+kind = 0
+weapon_index = 3
+
+[node name="AmmoBox1" parent="Pickups" instance=ExtResource("40_pickup")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 0, 0.5)
+
+[node name="AmmoBox2" parent="Pickups" instance=ExtResource("40_pickup")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 0, -2)
+
+[node name="AmmoBox3" parent="Pickups" instance=ExtResource("40_pickup")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, 7.5)

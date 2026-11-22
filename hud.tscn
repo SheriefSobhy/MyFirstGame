@@ -2,6 +2,10 @@
 
 [ext_resource type="Script" path="res://hud.gd" id="1_hud"]
 [ext_resource type="PackedScene" path="res://touch_controls.tscn" id="2_touch"]
+[ext_resource type="Shader" path="res://effects/scope_overlay.gdshader" id="3_scope"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_scope"]
+shader = ExtResource("3_scope")
 
 [node name="HUD" type="CanvasLayer"]
 process_mode = 3
@@ -15,6 +19,16 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0.75, 0, 0, 0)
+
+[node name="ScopeOverlay" type="ColorRect" parent="."]
+visible = false
+material = SubResource("ShaderMaterial_scope")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="TouchControls" parent="." instance=ExtResource("2_touch")]
 
@@ -70,8 +84,42 @@ grow_vertical = 0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 6
 theme_override_font_sizes/font_size = 32
-text = "Ammo: 30 / 30"
+text = "12 / ∞"
 horizontal_alignment = 2
+
+[node name="WeaponLabel" type="Label" parent="."]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -324.0
+offset_top = -98.0
+offset_right = -24.0
+offset_bottom = -64.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 0.85, 0.45, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 24
+text = "Pistol"
+horizontal_alignment = 2
+
+[node name="MessageLabel" type="Label" parent="."]
+modulate = Color(1, 1, 1, 0)
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = 70.0
+offset_right = 250.0
+offset_bottom = 110.0
+grow_horizontal = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 28
+horizontal_alignment = 1
 
 [node name="Crosshair" type="Control" parent="."]
 layout_mode = 3
