@@ -40,7 +40,8 @@ func _process(_delta: float) -> bool:
 	var pallet_scene := _make_pallet_scene()
 
 	var main: Node3D = load(MAIN).instantiate(PackedScene.GEN_EDIT_STATE_MAIN)
-	root.add_child(main)
+	# Not added to the tree: a running scene would change itself before being
+	# saved (e.g. Timer clears `autostart` once it starts), breaking spawning.
 	var level: Node3D = main.get_node("NavigationRegion3D/Level")
 	_convert_csg(level, main)
 
@@ -82,6 +83,7 @@ func _process(_delta: float) -> bool:
 	assert(err == OK)
 	err = ResourceSaver.save(packed, MAIN)
 	print("Saved main.tscn: ", error_string(err))
+	main.free()
 	quit()
 	return true
 

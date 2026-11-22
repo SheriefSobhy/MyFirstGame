@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://blky4lnsns1vo"]
+[gd_scene format=3 uid="uid://ca0guq3tcb3hn"]
 
 [ext_resource type="Script" uid="uid://x07cwedf63qo" path="res://main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://player.tscn" id="2_player"]
@@ -226,7 +226,7 @@ shadow_blur = 1.5
 directional_shadow_mode = 1
 directional_shadow_max_distance = 30.0
 
-[node name="LightmapGI" type="LightmapGI" parent="." unique_id=1633689348]
+[node name="LightmapGI" type="LightmapGI" parent="." unique_id=1158623010]
 max_texture_size = 2048
 environment_mode = 3
 environment_custom_color = Color(0.62, 0.7, 0.85, 1)
@@ -415,161 +415,161 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.4, 0, 4.8)
 [node name="Jerrycan3" parent="NavigationRegion3D/Level" unique_id=1130355676 instance=ExtResource("15_jerrycan")]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -6.5, 0, -5.5)
 
-[node name="Clutter" type="Node3D" parent="NavigationRegion3D/Level" unique_id=1170444221]
+[node name="Clutter" type="Node3D" parent="NavigationRegion3D/Level" unique_id=473091829]
 
-[node name="Tire0" parent="NavigationRegion3D/Level/Clutter" unique_id=292112038 instance=ExtResource("15_kq58d")]
-transform = Transform3D(0.73864836, 0, 0.6740909, 0, 1, 0, -0.6740909, 0, 0.73864836, 10.884568, 0, 10.906501)
+[node name="Tire0" parent="NavigationRegion3D/Level/Clutter" unique_id=2061898183 instance=ExtResource("15_kq58d")]
+transform = Transform3D(0.94746333, 0, 0.31986436, 0, 1, 0, -0.31986436, 0, 0.94746333, 10.86947, 0, 10.875512)
 
-[node name="Tire1" parent="NavigationRegion3D/Level/Clutter" unique_id=1680987586 instance=ExtResource("15_kq58d")]
-transform = Transform3D(0.16717352, 0, 0.98592746, 0, 1, 0, -0.98592746, 0, 0.16717352, 10.921518, 0.165, 10.914419)
+[node name="Tire1" parent="NavigationRegion3D/Level/Clutter" unique_id=46083039 instance=ExtResource("15_kq58d")]
+transform = Transform3D(0.92346627, 0, -0.3836797, 0, 1, 0, 0.3836797, 0, 0.92346627, 10.868698, 0.165, 10.87281)
 
-[node name="Tire2" parent="NavigationRegion3D/Level/Clutter" unique_id=1628234342 instance=ExtResource("15_kq58d")]
-transform = Transform3D(0.81350774, 0, 0.58155406, 0, 1, 0, -0.58155406, 0, 0.81350774, 10.921684, 0.33, 10.918512)
+[node name="Tire2" parent="NavigationRegion3D/Level/Clutter" unique_id=803897692 instance=ExtResource("15_kq58d")]
+transform = Transform3D(0.9431561, 0, 0.33235, 0, 1, 0, -0.33235, 0, 0.9431561, 10.868105, 0.33, 10.870062)
 
-[node name="Tire3" parent="NavigationRegion3D/Level/Clutter" unique_id=1035511715 instance=ExtResource("15_kq58d")]
-transform = Transform3D(-0.08261599, 0, -0.99658144, 0, 1, 0, 0.99658144, 0, -0.08261599, -11.104564, 0, -5.4815903)
+[node name="Tire3" parent="NavigationRegion3D/Level/Clutter" unique_id=513433524 instance=ExtResource("15_kq58d")]
+transform = Transform3D(0.04839075, 0, 0.9988285, 0, 1, 0, -0.9988285, 0, 0.04839075, -11.11804, 0, -5.5388894)
 
-[node name="Tire4" parent="NavigationRegion3D/Level/Clutter" unique_id=534803957 instance=ExtResource("15_kq58d")]
-transform = Transform3D(-0.27559394, 0, 0.96127415, 0, 1, 0, -0.96127415, 0, -0.27559394, -11.126989, 0.165, -5.4947195)
+[node name="Tire4" parent="NavigationRegion3D/Level/Clutter" unique_id=104657943 instance=ExtResource("15_kq58d")]
+transform = Transform3D(-0.92479855, 0, 0.38045722, 0, 1, 0, -0.38045722, 0, -0.92479855, -11.072371, 0.165, -5.481786)
 
-[node name="Tire5" parent="NavigationRegion3D/Level/Clutter" unique_id=1802432581 instance=ExtResource("15_kq58d")]
-transform = Transform3D(0.87148607, 0, 0.49042028, 0, 1, 0, -0.49042028, 0, 0.87148607, -2.302152, 0, -7.288063)
+[node name="Tire5" parent="NavigationRegion3D/Level/Clutter" unique_id=1838966018 instance=ExtResource("15_kq58d")]
+transform = Transform3D(-0.89890134, 0, 0.43815103, 0, 1, 0, -0.43815103, 0, -0.89890134, -2.3385372, 0, -7.300322)
 
-[node name="Tire6" parent="NavigationRegion3D/Level/Clutter" unique_id=1783276410 instance=ExtResource("15_kq58d")]
-transform = Transform3D(-0.6187799, 0, -0.78556436, 0, 1, 0, 0.78556436, 0, -0.6187799, -2.325333, 0.165, -7.3080835)
+[node name="Tire6" parent="NavigationRegion3D/Level/Clutter" unique_id=258852981 instance=ExtResource("15_kq58d")]
+transform = Transform3D(-0.80165476, 0, -0.5977873, 0, 1, 0, 0.5977873, 0, -0.80165476, -2.2820587, 0.165, -7.3274903)
 
-[node name="Tire7" parent="NavigationRegion3D/Level/Clutter" unique_id=704631549 instance=ExtResource("15_kq58d")]
-transform = Transform3D(-0.47218964, 0, -0.881497, 0, 1, 0, 0.881497, 0, -0.47218964, 11.301849, 0, 9.926439)
+[node name="Tire7" parent="NavigationRegion3D/Level/Clutter" unique_id=1361456618 instance=ExtResource("15_kq58d")]
+transform = Transform3D(0.75499636, 0, -0.655729, 0, 1, 0, 0.655729, 0, 0.75499636, 11.262092, 0, 9.912017)
 
-[node name="Tire8" parent="NavigationRegion3D/Level/Clutter" unique_id=1130578176 instance=ExtResource("15_kq58d")]
+[node name="Tire8" parent="NavigationRegion3D/Level/Clutter" unique_id=219031956 instance=ExtResource("15_kq58d")]
 transform = Transform3D(0.8660254, 0, 0.5, 0, 1, 0, -0.5, 0, 0.8660254, 6.8, 0, -7.6)
 
-[node name="TireLeaning" parent="NavigationRegion3D/Level/Clutter" unique_id=1956088447 instance=ExtResource("15_kq58d")]
+[node name="TireLeaning" parent="NavigationRegion3D/Level/Clutter" unique_id=350952062 instance=ExtResource("15_kq58d")]
 transform = Transform3D(1, 0, 0, 0, 0.30901697, 0.95105654, 0, -0.95105654, 0.30901697, -1.5, 0, 11.62)
 
-[node name="PalletPen0" parent="NavigationRegion3D/Level/Clutter" unique_id=64000589 instance=ExtResource("16_seu75")]
-transform = Transform3D(0.07647748, 0, 0.9970713, 0, 1, 0, -0.9970713, 0, 0.07647748, 9.018915, 0, 10.998092)
+[node name="PalletPen0" parent="NavigationRegion3D/Level/Clutter" unique_id=1017922506 instance=ExtResource("16_seu75")]
+transform = Transform3D(-0.0736113, 0, 0.99728703, 0, 1, 0, -0.99728703, 0, -0.0736113, 8.997947, 0, 10.984709)
 
-[node name="PalletPen1" parent="NavigationRegion3D/Level/Clutter" unique_id=1303299361 instance=ExtResource("16_seu75")]
-transform = Transform3D(-0.009125627, 0, 0.99995834, 0, 1, 0, -0.99995834, 0, -0.009125627, 9.022385, 0.144, 11.015062)
+[node name="PalletPen1" parent="NavigationRegion3D/Level/Clutter" unique_id=2131557536 instance=ExtResource("16_seu75")]
+transform = Transform3D(-0.037742037, 0, 0.9992875, 0, 1, 0, -0.9992875, 0, -0.037742037, 8.958322, 0.144, 11.026898)
 
-[node name="PalletPen2" parent="NavigationRegion3D/Level/Clutter" unique_id=1459574889 instance=ExtResource("16_seu75")]
-transform = Transform3D(0.100184724, 0, 0.99496883, 0, 1, 0, -0.99496883, 0, 0.100184724, 9.045404, 0.288, 11.011568)
+[node name="PalletPen2" parent="NavigationRegion3D/Level/Clutter" unique_id=68857362 instance=ExtResource("16_seu75")]
+transform = Transform3D(0.08892619, 0, 0.9960382, 0, 1, 0, -0.9960382, 0, 0.08892619, 8.966144, 0.288, 10.9563)
 
-[node name="PalletPen3" parent="NavigationRegion3D/Level/Clutter" unique_id=555337943 instance=ExtResource("16_seu75")]
-transform = Transform3D(0.044870283, 0, 0.9989928, 0, 1, 0, -0.9989928, 0, 0.044870283, 9.006442, 0.432, 11.021792)
+[node name="PalletPen3" parent="NavigationRegion3D/Level/Clutter" unique_id=662858394 instance=ExtResource("16_seu75")]
+transform = Transform3D(0.070599265, 0, 0.9975048, 0, 1, 0, -0.9975048, 0, 0.070599265, 8.99988, 0.432, 11.021686)
 
-[node name="PalletYard0" parent="NavigationRegion3D/Level/Clutter" unique_id=1444175841 instance=ExtResource("16_seu75")]
-transform = Transform3D(0.9699734, 0, 0.2432112, 0, 1, 0, -0.2432112, 0, 0.9699734, -4, 0, -5.6)
+[node name="PalletYard0" parent="NavigationRegion3D/Level/Clutter" unique_id=731595932 instance=ExtResource("16_seu75")]
+transform = Transform3D(0.97568756, 0, 0.21916613, 0, 1, 0, -0.21916613, 0, 0.97568756, -4, 0, -5.6)
 
-[node name="PalletYard1" parent="NavigationRegion3D/Level/Clutter" unique_id=1447257314 instance=ExtResource("16_seu75")]
-transform = Transform3D(0.9757941, 0, 0.21869142, 0, 1, 0, -0.21869142, 0, 0.9757941, -4, 0.144, -5.6)
+[node name="PalletYard1" parent="NavigationRegion3D/Level/Clutter" unique_id=2123177118 instance=ExtResource("16_seu75")]
+transform = Transform3D(0.9788147, 0, 0.20474792, 0, 1, 0, -0.20474792, 0, 0.9788147, -4, 0.144, -5.6)
 
-[node name="PalletYard2" parent="NavigationRegion3D/Level/Clutter" unique_id=120930615 instance=ExtResource("16_seu75")]
-transform = Transform3D(0.95929676, 0, 0.2823999, 0, 1, 0, -0.2823999, 0, 0.95929676, -4, 0.288, -5.6)
+[node name="PalletYard2" parent="NavigationRegion3D/Level/Clutter" unique_id=832066647 instance=ExtResource("16_seu75")]
+transform = Transform3D(0.99051875, 0, 0.13737758, 0, 1, 0, -0.13737758, 0, 0.99051875, -4, 0.288, -5.6)
 
-[node name="PalletSingle" parent="NavigationRegion3D/Level/Clutter" unique_id=1319420757 instance=ExtResource("16_seu75")]
+[node name="PalletSingle" parent="NavigationRegion3D/Level/Clutter" unique_id=1937612113 instance=ExtResource("16_seu75")]
 transform = Transform3D(0.9975641, 0, 0.06975647, 0, 1, 0, -0.06975647, 0, 0.9975641, 1.6, 0, 10.9)
 
-[node name="PalletLeaning" parent="NavigationRegion3D/Level/Clutter" unique_id=1407351467 instance=ExtResource("16_seu75")]
+[node name="PalletLeaning" parent="NavigationRegion3D/Level/Clutter" unique_id=1543400968 instance=ExtResource("16_seu75")]
 transform = Transform3D(-9.088107e-09, 4.275619e-08, 1, 0.9781476, 0.20791166, 0, -0.20791166, 0.9781476, -4.371139e-08, 11.85, 0, -1.6)
 
-[node name="FencePen" type="StaticBody3D" parent="NavigationRegion3D/Level/Clutter" unique_id=941726874]
+[node name="FencePen" type="StaticBody3D" parent="NavigationRegion3D/Level/Clutter" unique_id=1296991202]
 collision_layer = 2
 
-[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/Level/Clutter/FencePen" unique_id=196485798]
+[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/Level/Clutter/FencePen" unique_id=1847280942]
 gi_mode = 0
 mesh = ExtResource("17_htxhm")
 
-[node name="Shape0" type="CollisionShape3D" parent="NavigationRegion3D/Level/Clutter/FencePen" unique_id=80953225]
+[node name="Shape0" type="CollisionShape3D" parent="NavigationRegion3D/Level/Clutter/FencePen" unique_id=507722622]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 7, 1.1, 10.35)
 shape = SubResource("BoxShape3D_jq2sk")
 
-[node name="Shape1" type="CollisionShape3D" parent="NavigationRegion3D/Level/Clutter/FencePen" unique_id=48156628]
+[node name="Shape1" type="CollisionShape3D" parent="NavigationRegion3D/Level/Clutter/FencePen" unique_id=1357085970]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 10.35, 1.1, 7.5)
 shape = SubResource("BoxShape3D_4k2k6")
 
-[node name="Detail" type="Node3D" parent="." unique_id=1278322381]
+[node name="Detail" type="Node3D" parent="." unique_id=1256470636]
 
-[node name="Grime" type="Node3D" parent="Detail" unique_id=885362938]
+[node name="Grime" type="Node3D" parent="Detail" unique_id=1366582773]
 
-[node name="Stains" type="MeshInstance3D" parent="Detail/Grime" unique_id=1419958354]
+[node name="Stains" type="MeshInstance3D" parent="Detail/Grime" unique_id=217947367]
 cast_shadow = 0
 gi_mode = 0
 mesh = ExtResource("18_jq2sk")
 
-[node name="Oil" type="MeshInstance3D" parent="Detail/Grime" unique_id=251796254]
+[node name="Oil" type="MeshInstance3D" parent="Detail/Grime" unique_id=1911676293]
 cast_shadow = 0
 gi_mode = 0
 mesh = ExtResource("19_4k2k6")
 
-[node name="Cracks" type="MeshInstance3D" parent="Detail/Grime" unique_id=906555039]
+[node name="Cracks" type="MeshInstance3D" parent="Detail/Grime" unique_id=887989947]
 cast_shadow = 0
 gi_mode = 0
 mesh = ExtResource("20_0rl1p")
 
-[node name="Puddles" type="MeshInstance3D" parent="Detail/Grime" unique_id=510204381]
+[node name="Puddles" type="MeshInstance3D" parent="Detail/Grime" unique_id=366529727]
 cast_shadow = 0
 gi_mode = 0
 mesh = ExtResource("21_ok6jj")
 
-[node name="Rubble" type="MeshInstance3D" parent="Detail" unique_id=1227874663]
+[node name="Rubble" type="MeshInstance3D" parent="Detail" unique_id=1257249298]
 mesh = ExtResource("22_facbu")
 
-[node name="TrashBags" type="Node3D" parent="Detail" unique_id=41121706]
+[node name="TrashBags" type="Node3D" parent="Detail" unique_id=435082528]
 
 [node name="Bag0" parent="Detail/TrashBags" unique_id=1949699889 instance=ExtResource("23_b1qrp")]
-transform = Transform3D(-1.0111454, 0, -0.39547503, 0, 1.0857327, 0, 0.39547503, 0, -1.0111454, -11.4, 0, 6.3)
+transform = Transform3D(0.19211794, 0, 0.8445386, 0, 0.86611474, 0, -0.8445386, 0, 0.19211794, -11.4, 0, 6.3)
 
-[node name="Bag1" parent="Detail/TrashBags" unique_id=1154005490 instance=ExtResource("23_b1qrp")]
-transform = Transform3D(-0.67551357, 0, 0.5555417, 0, 0.87461144, 0, -0.5555417, 0, -0.67551357, -11, 0, 6.9)
+[node name="Bag1" parent="Detail/TrashBags" unique_id=1768496725 instance=ExtResource("23_b1qrp")]
+transform = Transform3D(-0.36614254, 0, 0.95364404, 0, 1.0215172, 0, -0.95364404, 0, -0.36614254, -11, 0, 6.9)
 
-[node name="Bag2" parent="Detail/TrashBags" unique_id=1593572865 instance=ExtResource("23_b1qrp")]
-transform = Transform3D(0.54814464, 0, -1.003305, 0, 1.1432774, 0, 1.003305, 0, 0.54814464, 11.5, 0, 6.1)
+[node name="Bag2" parent="Detail/TrashBags" unique_id=183794343 instance=ExtResource("23_b1qrp")]
+transform = Transform3D(1.0333217, 0, -0.019546136, 0, 1.0335066, 0, 0.019546136, 0, 1.0333217, 11.5, 0, 6.1)
 
-[node name="Bag3" parent="Detail/TrashBags" unique_id=1005811833 instance=ExtResource("23_b1qrp")]
-transform = Transform3D(-1.0241035, 0, -0.3412259, 0, 1.079455, 0, 0.3412259, 0, -1.0241035, 1.2, 0.144, 10.8)
+[node name="Bag3" parent="Detail/TrashBags" unique_id=1979773613 instance=ExtResource("23_b1qrp")]
+transform = Transform3D(0.15814173, 0, -0.966383, 0, 0.97923684, 0, 0.966383, 0, 0.15814173, 1.2, 0.144, 10.8)
 
-[node name="Bag4" parent="Detail/TrashBags" unique_id=711279364 instance=ExtResource("23_b1qrp")]
-transform = Transform3D(0.64679897, 0, -0.8833762, 0, 1.0948527, 0, 0.8833762, 0, 0.64679897, -3.2, 0, -6.2)
+[node name="Bag4" parent="Detail/TrashBags" unique_id=1233061820 instance=ExtResource("23_b1qrp")]
+transform = Transform3D(-1.0521022, 0, -0.2279104, 0, 1.0765046, 0, 0.2279104, 0, -1.0521022, -3.2, 0, -6.2)
 
-[node name="Bag5" parent="Detail/TrashBags" unique_id=2028283058 instance=ExtResource("23_b1qrp")]
-transform = Transform3D(0.7990417, 0, -0.6878127, 0, 1.0543026, 0, 0.6878127, 0, 0.7990417, 11.4, 0, -8.4)
+[node name="Bag5" parent="Detail/TrashBags" unique_id=1845354103 instance=ExtResource("23_b1qrp")]
+transform = Transform3D(1.1451175, 0, 0.021216905, 0, 1.1453141, 0, -0.021216905, 0, 1.1451175, 11.4, 0, -8.4)
 
-[node name="Outside" type="Node3D" parent="." unique_id=432823879]
+[node name="Outside" type="Node3D" parent="." unique_id=440321410]
 
-[node name="Skyline" type="Node3D" parent="Outside" unique_id=1985001693]
+[node name="Skyline" type="Node3D" parent="Outside" unique_id=1198335729]
 
-[node name="SkylineN" type="MeshInstance3D" parent="Outside/Skyline" unique_id=618406153]
+[node name="SkylineN" type="MeshInstance3D" parent="Outside/Skyline" unique_id=1006851397]
 cast_shadow = 0
 gi_mode = 0
 mesh = ExtResource("24_jq2sk")
 
-[node name="SkylineE" type="MeshInstance3D" parent="Outside/Skyline" unique_id=1964570030]
+[node name="SkylineE" type="MeshInstance3D" parent="Outside/Skyline" unique_id=548389407]
 cast_shadow = 0
 gi_mode = 0
 mesh = ExtResource("25_4k2k6")
 
-[node name="SkylineS" type="MeshInstance3D" parent="Outside/Skyline" unique_id=1480027543]
+[node name="SkylineS" type="MeshInstance3D" parent="Outside/Skyline" unique_id=1674251172]
 cast_shadow = 0
 gi_mode = 0
 mesh = ExtResource("26_0rl1p")
 
-[node name="SkylineW" type="MeshInstance3D" parent="Outside/Skyline" unique_id=1398375198]
+[node name="SkylineW" type="MeshInstance3D" parent="Outside/Skyline" unique_id=1322525173]
 cast_shadow = 0
 gi_mode = 0
 mesh = ExtResource("27_ok6jj")
 
-[node name="ElectricPoles" type="MeshInstance3D" parent="Outside" unique_id=129113923]
+[node name="ElectricPoles" type="MeshInstance3D" parent="Outside" unique_id=631641125]
 gi_mode = 0
 mesh = ExtResource("25_h8e4i")
 
-[node name="Wires" type="MeshInstance3D" parent="Outside" unique_id=431560584]
+[node name="Wires" type="MeshInstance3D" parent="Outside" unique_id=1585098259]
 cast_shadow = 0
 gi_mode = 0
 mesh = ExtResource("26_4lmeg")
 
-[node name="WallTopFence" type="MeshInstance3D" parent="Outside" unique_id=1441147657]
+[node name="WallTopFence" type="MeshInstance3D" parent="Outside" unique_id=1996002683]
 gi_mode = 0
 mesh = ExtResource("27_0cp0l")
 
@@ -597,6 +597,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.5, 0.1, 0.5)
 
 [node name="SpawnTimer" type="Timer" parent="." unique_id=1895327106]
 wait_time = 3.0
+autostart = true
 
 [node name="Wind" type="AudioStreamPlayer" parent="." unique_id=273095188]
 stream = ExtResource("16_wind")
