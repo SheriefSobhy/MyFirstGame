@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/textures/concrete_wall_008/concrete_wall_008_diff_1k.jpg" id="1_albedo"]
+[ext_resource type="Texture2D" path="res://assets/textures/concrete_wall_008/concrete_wall_008_nor_gl_1k.jpg" id="2_normal"]
+
+[resource]
+albedo_color = Color(0.7, 0.67, 0.63, 1)
+albedo_texture = ExtResource("1_albedo")
+roughness = 0.95
+normal_enabled = true
+normal_texture = ExtResource("2_normal")
+uv1_scale = Vector3(0.8, 0.8, 0.8)
+uv1_triplanar = true

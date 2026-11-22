@@ -1,15 +1,24 @@
-[gd_resource type="StandardMaterial3D" format=3]
+[gd_resource type="ShaderMaterial" format=3]
 
+[ext_resource type="Shader" path="res://materials/level_surface.gdshader" id="5_shader"]
 [ext_resource type="Texture2D" path="res://assets/textures/factory_brick/factory_brick_diff_1k.jpg" id="1_albedo"]
 [ext_resource type="Texture2D" path="res://assets/textures/factory_brick/factory_brick_nor_gl_1k.jpg" id="2_normal"]
 [ext_resource type="Texture2D" path="res://assets/textures/factory_brick/factory_brick_rough_1k.jpg" id="3_rough"]
+[ext_resource type="Texture2D" path="res://assets/textures/generated/noise_rgb.png" id="4_noise"]
+[ext_resource type="Texture2D" path="res://assets/textures/concrete_wall_008/concrete_wall_008_diff_1k.jpg" id="6_patch"]
 
 [resource]
-albedo_color = Color(1, 1, 1, 1)
-albedo_texture = ExtResource("1_albedo")
-roughness_texture = ExtResource("3_rough")
-normal_enabled = true
-normal_texture = ExtResource("2_normal")
-uv1_scale = Vector3(0.3, 0.3, 0.3)
-uv1_triplanar = true
-uv1_world_triplanar = true
+shader = ExtResource("5_shader")
+shader_parameter/albedo_tex = ExtResource("1_albedo")
+shader_parameter/normal_tex = ExtResource("2_normal")
+shader_parameter/roughness_tex = ExtResource("3_rough")
+shader_parameter/noise_tex = ExtResource("4_noise")
+shader_parameter/patch_tex = ExtResource("6_patch")
+shader_parameter/uv_scale = 0.3
+shader_parameter/macro_strength = 0.22
+shader_parameter/patch_amount = 0.85
+shader_parameter/patch_scale = 0.3
+shader_parameter/patch_tint = Color(0.78, 0.74, 0.68, 1)
+shader_parameter/streak_strength = 0.2
+shader_parameter/dirt_height = 0.9
+shader_parameter/dirt_strength = 0.7

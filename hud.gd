@@ -1,5 +1,5 @@
 extends CanvasLayer
-## On-screen HUD: health, score, ammo, crosshair and the Game Over screen.
+## On-screen HUD: health, score, ammo, FPS, crosshair and the Game Over screen.
 ## This layer keeps running while the game is paused so the Restart button works.
 
 signal restart_requested
@@ -10,9 +10,11 @@ signal restart_requested
 @onready var crosshair: Control = $Crosshair
 @onready var touch_controls: Control = $TouchControls
 @onready var damage_flash: ColorRect = $DamageFlash
+@onready var fps_label: Label = $FpsLabel
 
 var _last_health := -1
 var _flash_tween: Tween
+var _fps_timer := 0.0
 @onready var game_over_panel: Control = $GameOverPanel
 @onready var final_score_label: Label = $GameOverPanel/Box/FinalScoreLabel
 @onready var restart_button: Button = $GameOverPanel/Box/RestartButton
@@ -21,6 +23,14 @@ var _flash_tween: Tween
 func _ready() -> void:
 	game_over_panel.visible = false
 	restart_button.pressed.connect(restart_requested.emit)
+
+
+# Frames per second, refreshed twice a second so the number is readable.
+func _process(delta: float) -> void:
+	_fps_timer -= delta
+	if _fps_timer <= 0.0:
+		_fps_timer = 0.5
+		fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 
 
 func set_health(value: int) -> void:

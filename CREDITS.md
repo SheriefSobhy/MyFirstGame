@@ -15,7 +15,10 @@ All at 1K resolution: albedo (`_diff`), normal (`_nor_gl`) and roughness (`_roug
 | Factory Brick | Perimeter walls, warehouse A | https://polyhaven.com/a/factory_brick |
 | Concrete Wall 008 | Warehouse B, ramp, barriers | https://polyhaven.com/a/concrete_wall_008 |
 | Rusty Corrugated Iron | Shipping containers | https://polyhaven.com/a/rusty_corrugated_iron |
-| Rusty Metal 02 | Metal crates | https://polyhaven.com/a/rusty_metal_02 |
+| Rusty Metal 02 | Metal crates, pole transformers | https://polyhaven.com/a/rusty_metal_02 |
+| Rough Wood | Pallets and electricity poles (generated meshes) | https://polyhaven.com/a/rough_wood |
+
+Concrete Wall 008 is also used for plaster patches on the brick walls and for the rubble.
 
 ## Models: Poly Haven (https://polyhaven.com)
 
@@ -28,6 +31,8 @@ glTF at 1K. Their textures are limited to 512 px on import.
 | Wooden Crate 02 | https://polyhaven.com/a/wooden_crate_02 |
 | Old Military Crate | https://polyhaven.com/a/old_military_crate |
 | Metal Jerrycan | https://polyhaven.com/a/metal_jerrycan |
+| Old Tyre (tyre stacks) | https://polyhaven.com/a/old_tyre |
+| Trashbag | https://polyhaven.com/a/trashbag |
 
 ## Models: Quaternius (https://quaternius.com)
 
@@ -38,6 +43,12 @@ https://github.com/trebeljahr/quaternius-showcase, whose LICENSES.md lists each 
 | --- | --- | --- |
 | `Character.glb`: enemy soldier with Walk, Punch, HitRecieve and Death animations | Cyberpunk Game Kit | https://quaternius.com/packs/cyberpunkgamekit.html |
 | `Pistol_1.glb`: player pistol | Survival Pack | https://quaternius.com/packs/survival.html |
+| `Swat.glb`: first-person arms. Only the arms are kept and posed onto the pistol in `fp_arms.gd` | Ultimate Modular Men Pack | https://quaternius.com/packs/ultimatemodularcharacters.html |
+| `buildings/Building2_Small`, `Building3_Big`, `Building3_Small`, `Building4`: skyline | Buildings Pack | https://quaternius.com/packs/buildings.html |
+| `buildings/3Story_Slim_Mat`, `4Story_Mat`, `6Story_Stack_Mat`: skyline | Ultimate Buildings Pack | https://quaternius.com/packs/ultimatetexturedbuildings.html |
+| `props/Rock1-3`, `Rock5`: concrete rubble, re-textured with Concrete Wall 008 | Modular Dungeon Pack | https://quaternius.com/packs/medievaldungeon.html |
+
+The skyline buildings are merged into four meshes by `tools/build_level.gd`, with their material colours stored as vertex colours.
 
 ## Sounds
 
@@ -54,7 +65,13 @@ https://github.com/trebeljahr/quaternius-showcase, whose LICENSES.md lists each 
 The Kenney sounds were taken from the mirror https://github.com/ETdoFresh/kenney.nl.
 Kenney's own license files are kept in `assets/sounds/kenney_*_License.txt`.
 
-## Code-generated effects
+## Code-generated effects and detail
 
 The bullet holes, sparks, dust, blood and muzzle flash use no image files.
 They're built in Godot from gradients and simple meshes.
+
+These were made for this project, so no license applies:
+
+- `assets/textures/generated/`: the grime textures (cracks, oil, dirt stains, puddle mask), the tiling noise used to vary the walls and floor, and the chain-link pattern. `tools/gen_textures.gd` makes them from noise and random walks.
+- The pallets, electricity poles, wires, chain-link fences and grime quads in `level/generated/`. `tools/build_level.gd` builds them from boxes and cylinders.
+- The baked lighting (`main.lmbake`, `main.exr`), made with Godot's LightmapGI.

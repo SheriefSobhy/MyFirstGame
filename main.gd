@@ -26,8 +26,9 @@ var max_enemies := MAX_ENEMIES
 
 func _ready() -> void:
 	# Enemies walk around obstacles using the pre-baked navmesh in
-	# level_navmesh.res. If you change the level, select NavigationRegion3D
-	# in the editor and click "Bake NavigationMesh" to update it.
+	# level_navmesh.res, and static objects are lit by the baked lightmap
+	# (main.lmbake). If you change the level, run tools/rebake.bat to bake
+	# both again.
 
 	# Looping ambient wind.
 	wind.stream.loop = true
@@ -56,9 +57,11 @@ func _ready() -> void:
 
 # Cheaper rendering for phones: the 3D scene is drawn at a lower resolution
 # and scaled up (the HUD stays sharp), shadows are smaller and hard-edged,
-# glow is off, and the muzzle flash no longer lights up the scene.
+# glow is off, the skyline switches to simpler LODs sooner, and the muzzle
+# flash no longer lights up the scene.
 func _use_phone_settings() -> void:
 	get_viewport().scaling_3d_scale = PHONE_RENDER_SCALE
+	get_viewport().mesh_lod_threshold = 4.0
 	RenderingServer.directional_shadow_atlas_set_size(1024, true)
 	RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_HARD)
 	var sun: DirectionalLight3D = $Sun
