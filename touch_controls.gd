@@ -1,8 +1,8 @@
 extends Control
 ## On-screen touch controls, drawn with simple shapes (no images).
-##  - Anywhere outside the buttons: drag to look around.
-##  - Left half: a virtual joystick, only while the player's MOVEMENT_ENABLED is on
-##    (with walking switched off, the whole screen is for aiming).
+##  - Anywhere outside the buttons and the joystick: drag to look around.
+##  - Bottom-left: a fixed virtual joystick for walking (only while the player's
+##    MOVEMENT_ENABLED is on). Only touches that start on it move the player.
 ##  - Buttons: Shoot (hold for auto fire), Jump, Reload, Switch (next weapon)
 ##    and Aim (scope on/off; only shown for weapons with a scope).
 ## Each finger is tracked by its touch index, so you can move, look and
@@ -10,6 +10,8 @@ extends Control
 
 const JOY_RADIUS := 90.0            # how far the knob can move from the center
 const KNOB_RADIUS := 40.0
+const JOY_MARGIN := 170.0           # joystick centre, from the bottom-left corner
+const JOY_TOUCH_SCALE := 1.3        # touches this far out (x JOY_RADIUS) still grab the stick
 const LOOK_SENSITIVITY := 1.5       # multiplier on top of the player's mouse sensitivity
 const FONT_SIZE := 22
 const COLOR_FILL := Color(1, 1, 1, 0.15)
@@ -78,12 +80,15 @@ func _touch_down(index: int, pos: Vector2) -> void:
 		"aim":
 			player.toggle_aim()
 		_:
-			if _movement_enabled() and pos.x < size.x * 0.5:
-				if not _fingers.has("joy"):
-					# Start the joystick wherever the finger lands.
-					_fingers["joy"] = {"index": index, "pos": pos}
-					_joy_center = pos
-					_joy_knob = pos
+			# Only a touch that starts on the joystick moves; everywhere else
+			# (including the left half of the screen) is for aiming.
+			if _movement_enabled() and not _fingers.has("joy") \
+					and pos.distance_to(_joy_home()) <= JOY_RADIUS * JOY_TOUCH_SCALE:
+				_fingers["joy"] = {"index": index, "pos": pos}
+				_joy_center = _joy_home()
+				var offset := (pos - _joy_center).limit_length(JOY_RADIUS)
+				_joy_knob = _joy_center + offset
+				player.touch_move = offset / JOY_RADIUS
 			elif not _fingers.has("look"):
 				_fingers["look"] = {"index": index, "pos": pos}
 
@@ -142,6 +147,11 @@ func _role_for(index: int, pos: Vector2) -> Array:
 	return [nearest, false]
 
 
+## The joystick's fixed spot near the bottom-left corner.
+func _joy_home() -> Vector2:
+	return Vector2(JOY_MARGIN, size.y - JOY_MARGIN)
+
+
 func _movement_enabled() -> bool:
 	return player != null and player.MOVEMENT_ENABLED
 
@@ -169,7 +179,7 @@ func _draw() -> void:
 
 	# Joystick: drawn where the finger is, or faintly at a default spot.
 	if _movement_enabled():
-		var center := _joy_center if _fingers.has("joy") else Vector2(170, size.y - 170)
+		var center := _joy_home()
 		var knob := _joy_knob if _fingers.has("joy") else center
 		draw_circle(center, JOY_RADIUS, COLOR_FILL)
 		draw_arc(center, JOY_RADIUS, 0.0, TAU, 48, COLOR_LINE, 2.0)

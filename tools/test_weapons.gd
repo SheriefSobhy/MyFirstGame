@@ -57,6 +57,7 @@ func _run() -> void:
 	await _test_sniper()
 	await _test_switch_inputs()
 	await _test_ammo_box()
+	await _test_touch_layout()
 
 	print("\n%s: %d failure(s)" % ["OK" if failures == 0 else "FAILED", failures])
 	quit(1 if failures > 0 else 0)
@@ -296,6 +297,37 @@ func _test_ammo_box() -> void:
 		player.head.rotation.x = deg_to_rad(-25)
 		await seconds(0.3)
 		await _screenshot("rifle_pickup")
+
+
+func _test_touch_layout() -> void:
+	_put_player(Vector3(0, 0, 10))
+	var touch: Control = hud.touch_controls
+	touch.size = Vector2(1280, 720)
+	touch.visible = true
+	var joy: Vector2 = touch._joy_home()
+	# Left half, away from the joystick: aims, doesn't move.
+	var yaw: float = player.rotation.y
+	touch._touch_down(0, Vector2(300, 250))
+	touch._touch_drag(0, Vector2(360, 250))
+	check(touch._fingers.has("look") and not touch._fingers.has("joy"), "touch on the left half aims")
+	check(player.rotation.y != yaw and player.touch_move == Vector2.ZERO, "left-half drag turns the view without moving")
+	touch._touch_up(0, Vector2(360, 250))
+	# Joystick + aim + shoot at the same time (three fingers).
+	touch._touch_down(1, joy + Vector2(0, -60))
+	check(touch._fingers.has("joy") and player.touch_move.y < -0.5, "touch on the joystick moves forward")
+	touch._touch_down(2, Vector2(800, 200))
+	touch._touch_down(3, touch._button_center("shoot"))
+	yaw = player.rotation.y
+	touch._touch_drag(2, Vector2(850, 200))
+	check(touch._fingers.has("joy") and touch._fingers.has("look") and touch._fingers.has("shoot")
+			and player.touch_shoot and player.rotation.y != yaw and player.touch_move != Vector2.ZERO,
+			"move, aim and shoot at the same time")
+	touch._touch_up(3, touch._button_center("shoot"))
+	touch._touch_up(2, Vector2(850, 200))
+	touch._touch_up(1, joy + Vector2(0, -60))
+	check(touch._fingers.is_empty() and player.touch_move == Vector2.ZERO and not player.touch_shoot,
+			"releasing all fingers stops moving and shooting")
+	touch.visible = false
 
 
 # --- Helpers ----------------------------------------------------------------
