@@ -11,6 +11,9 @@ const WALK_SPEED := 5.0
 const RUN_SPEED := 8.5
 const JUMP_VELOCITY := 5.0
 const MOUSE_SENSITIVITY := 0.002  # radians per pixel of mouse movement
+## Walking is turned off for now: the player stands still and can only aim,
+## shoot, reload and jump. Set this back to true to bring WASD/joystick back.
+const MOVEMENT_ENABLED := false
 
 const MAX_HEALTH := 100
 const MAX_AMMO := 30
@@ -129,8 +132,10 @@ func _physics_process(delta: float) -> void:
 		velocity.y = JUMP_VELOCITY
 
 	# WASD (or the touch joystick) movement relative to where the player is facing.
-	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	input_dir = (input_dir + touch_move).limit_length(1.0)
+	var input_dir := Vector2.ZERO
+	if MOVEMENT_ENABLED:
+		input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+		input_dir = (input_dir + touch_move).limit_length(1.0)
 	var direction := (transform.basis * Vector3(input_dir.x, 0.0, input_dir.y)).normalized()
 	var speed := RUN_SPEED if Input.is_action_pressed("sprint") else WALK_SPEED
 	velocity.x = direction.x * speed

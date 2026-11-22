@@ -1,7 +1,8 @@
 extends Control
 ## On-screen touch controls, drawn with simple shapes (no images).
-##  - Left half: a virtual joystick that appears where you put your finger.
-##  - Right half: drag to look around.
+##  - Anywhere outside the buttons: drag to look around.
+##  - Left half: a virtual joystick, only while the player's MOVEMENT_ENABLED is on
+##    (walking is switched off for now, so the whole screen is for aiming).
 ##  - Buttons: Shoot (hold for auto fire), Jump, Reload.
 ## Each finger is tracked by its touch index, so you can move, look and
 ## shoot at the same time. Only shown on touch screen devices.
@@ -63,7 +64,7 @@ func _touch_down(index: int, pos: Vector2) -> void:
 		"reload":
 			player.start_reload()
 		_:
-			if pos.x < size.x * 0.5:
+			if _movement_enabled() and pos.x < size.x * 0.5:
 				if _joy_index == -1:
 					# Start the joystick wherever the finger lands.
 					_joy_index = index
@@ -95,6 +96,10 @@ func _touch_drag(index: int, pos: Vector2, relative: Vector2) -> void:
 		player.look(relative * LOOK_SENSITIVITY)
 
 
+func _movement_enabled() -> bool:
+	return player != null and player.MOVEMENT_ENABLED
+
+
 # Returns the name of the button under pos, or "" if none.
 func _button_at(pos: Vector2) -> String:
 	for button_name in BUTTONS:
@@ -111,11 +116,12 @@ func _draw() -> void:
 	var font := ThemeDB.fallback_font
 
 	# Joystick: drawn where the finger is, or faintly at a default spot.
-	var center := _joy_center if _joy_index != -1 else Vector2(170, size.y - 170)
-	var knob := _joy_knob if _joy_index != -1 else center
-	draw_circle(center, JOY_RADIUS, COLOR_FILL)
-	draw_arc(center, JOY_RADIUS, 0.0, TAU, 48, COLOR_LINE, 2.0)
-	draw_circle(knob, KNOB_RADIUS, COLOR_PRESSED)
+	if _movement_enabled():
+		var center := _joy_center if _joy_index != -1 else Vector2(170, size.y - 170)
+		var knob := _joy_knob if _joy_index != -1 else center
+		draw_circle(center, JOY_RADIUS, COLOR_FILL)
+		draw_arc(center, JOY_RADIUS, 0.0, TAU, 48, COLOR_LINE, 2.0)
+		draw_circle(knob, KNOB_RADIUS, COLOR_PRESSED)
 
 	# Buttons.
 	for button_name in BUTTONS:
