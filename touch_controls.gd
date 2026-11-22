@@ -32,6 +32,8 @@ const BUTTONS := {
 
 ## The player to control; assigned by main.gd.
 var player: Node
+## Controls (like the pause button) whose touches are left to the GUI.
+var blockers: Array[Control] = []
 
 ## A finger that jumps further than this (in pixels) between two events is
 ## treated as a different finger.
@@ -67,6 +69,9 @@ func _input(event: InputEvent) -> void:
 
 
 func _touch_down(index: int, pos: Vector2) -> void:
+	for blocker in blockers:
+		if blocker.is_visible_in_tree() and blocker.get_global_rect().has_point(pos):
+			return
 	match _button_at(pos):
 		"shoot":
 			_fingers["shoot"] = {"index": index, "pos": pos}
@@ -91,6 +96,16 @@ func _touch_down(index: int, pos: Vector2) -> void:
 				player.touch_move = offset / JOY_RADIUS
 			elif not _fingers.has("look"):
 				_fingers["look"] = {"index": index, "pos": pos}
+
+
+## Forgets every finger and lets go of the stick and trigger (used when
+## the game pauses, since finger lifts aren't seen while paused).
+func reset() -> void:
+	_fingers.clear()
+	if player != null:
+		player.touch_move = Vector2.ZERO
+		player.touch_shoot = false
+	queue_redraw()
 
 
 func _touch_up(index: int, pos: Vector2) -> void:

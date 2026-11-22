@@ -1,20 +1,46 @@
 extends Node3D
-## Main game scene: wires the player, enemies and HUD together,
-## keeps score, spawns enemies and handles Game Over / Restart.
+## Main game scene: wires the player, enemies and HUD together, runs the
+## waves, keeps score, applies the graphics settings and handles Game Over,
+## Retry and going back to the main menu.
+##
+## Waves: wave 1 has START_ENEMIES enemies and every wave adds
+## ENEMIES_PER_WAVE more, each a little faster. Enemies spawn one at a time,
+## with at most max_enemies in the yard at once. After a wave is cleared the
+## player gets a short break (and some health back) before the next one.
 
 const ENEMY_SCENE := preload("res://enemy.tscn")
+const MENU_SCENE := "res://ui/main_menu.tscn"
 const START_ENEMIES := 5
+const ENEMIES_PER_WAVE := 2      # extra enemies each wave
+const SPEED_PER_WAVE := 0.08     # +8% walking speed each wave...
+const MAX_SPEED_SCALE := 2.0     # ...up to twice the wave 1 speed
+const SPAWN_INTERVAL := 1.2      # seconds between spawns within a wave
+const BREAK_TIME := 6.0          # seconds between waves
+const WAVE_HEAL := 25            # health given back for clearing a wave
+const KILL_POINTS := 10
+const WAVE_POINTS := 50          # x the wave number, for clearing a wave
 const MAX_ENEMIES := 12      # cap so the arena (and phones) don't overflow
-const SPAWN_SPREAD := 1.0    # random offset around a spawn point
 const PHONE_MAX_ENEMIES := 8
-const PHONE_RENDER_SCALE := 0.6  # 3D resolution on phones (1.0 = full)
+const SPAWN_SPREAD := 1.0    # random offset around a spawn point
+const SAFE_SPAWN_DISTANCE := 10.0  # no spawning closer than this to the player
 const BULLET_HOLE_SCENE := preload("res://effects/bullet_hole.tscn")
 const SPARKS_SCENE := preload("res://effects/impact_sparks.tscn")
 const BLOOD_SCENE := preload("res://effects/blood_hit.tscn")
 const HIT_FLASH_MATERIAL := preload("res://effects/hit_flash_material.tres")
 
+enum Phase { FIGHT, BREAK, OVER }
+
 var score := 0
+var kills := 0
+var wave := 0
+var waves_survived := 0
+var phase := Phase.FIGHT
 var max_enemies := MAX_ENEMIES
+
+var _to_spawn := 0     # enemies of this wave not spawned yet
+var _alive := 0        # spawned and not dead yet
+var _break_left := 0.0
+var _break_shown := -1
 
 @onready var player: CharacterBody3D = $Player
 @onready var hud: CanvasLayer = $HUD
@@ -22,6 +48,8 @@ var max_enemies := MAX_ENEMIES
 @onready var spawn_points: Array[Node] = $SpawnPoints.get_children()
 @onready var spawn_timer: Timer = $SpawnTimer
 @onready var wind: AudioStreamPlayer = $Wind
+@onready var sun: DirectionalLight3D = $Sun
+@onready var environment: Environment = $WorldEnvironment.environment
 
 
 func _ready() -> void:
@@ -30,9 +58,10 @@ func _ready() -> void:
 	# (main.lmbake). If you change the level, run tools/rebake.bat to bake
 	# both again.
 
-	# Looping ambient wind.
+	# Looping ambient wind, and the gameplay music.
 	wind.stream.loop = true
 	wind.play()
+	Music.play_game()
 
 	# Player -> HUD
 	player.health_changed.connect(hud.set_health)
@@ -42,39 +71,146 @@ func _ready() -> void:
 	player.message.connect(hud.show_message)
 	player.died.connect(_on_player_died)
 	player.hit_taken.connect(hud.flash_damage)
-	hud.restart_requested.connect(_on_restart_requested)
+	hud.retry_requested.connect(_on_retry)
+	hud.main_menu_requested.connect(_on_main_menu)
 	hud.touch_controls.player = player
 	# The touch Aim button appears/disappears with the weapon.
 	player.weapon_changed.connect(func(_name: String) -> void: hud.touch_controls.queue_redraw())
 	player.scope_changed.connect(func(_on: bool) -> void: hud.touch_controls.queue_redraw())
-	spawn_timer.timeout.connect(spawn_enemy)
+	spawn_timer.wait_time = SPAWN_INTERVAL
+	spawn_timer.timeout.connect(_on_spawn_tick)
 
 	hud.set_health(player.health)
 	player.emit_status()
 	hud.set_score(score)
 
 	if DisplayServer.is_touchscreen_available():
-		_use_phone_settings()
+		max_enemies = PHONE_MAX_ENEMIES
+	_apply_quality()
+	Settings.changed.connect(_apply_quality)
 	_prewarm_effects()
 
-	for i in START_ENEMIES:
-		spawn_enemy()
+	start_wave(1)
 
 
-# Cheaper rendering for phones: the 3D scene is drawn at a lower resolution
-# and scaled up (the HUD stays sharp), shadows are smaller and hard-edged,
-# glow is off, the skyline switches to simpler LODs sooner, and the muzzle
-# flash no longer lights up the scene.
-func _use_phone_settings() -> void:
-	get_viewport().scaling_3d_scale = PHONE_RENDER_SCALE
-	get_viewport().mesh_lod_threshold = 4.0
-	RenderingServer.directional_shadow_atlas_set_size(1024, true)
-	RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_HARD)
-	var sun: DirectionalLight3D = $Sun
-	sun.directional_shadow_max_distance = 25.0
-	$WorldEnvironment.environment.glow_enabled = false
-	player.get_node("%FlashLight").visible = false
-	max_enemies = PHONE_MAX_ENEMIES
+func _process(delta: float) -> void:
+	if phase != Phase.BREAK:
+		return
+	_break_left -= delta
+	var seconds := ceili(_break_left)
+	if seconds != _break_shown:
+		_break_shown = seconds
+		hud.set_break(wave + 1, seconds)
+	if _break_left <= 0.0:
+		start_wave(wave + 1)
+
+
+static func enemies_in_wave(n: int) -> int:
+	return START_ENEMIES + ENEMIES_PER_WAVE * (n - 1)
+
+
+static func speed_in_wave(n: int) -> float:
+	return minf(1.0 + SPEED_PER_WAVE * (n - 1), MAX_SPEED_SCALE)
+
+
+func start_wave(n: int) -> void:
+	wave = n
+	phase = Phase.FIGHT
+	_to_spawn = enemies_in_wave(n)
+	hud.show_banner("Wave %d" % n, "%d enemies" % _to_spawn)
+	hud.set_wave(wave, _to_spawn + _alive)
+	spawn_timer.start()
+
+
+func _on_spawn_tick() -> void:
+	if _to_spawn <= 0:
+		spawn_timer.stop()
+		return
+	# Dead bodies count too until they sink away, which keeps phones smooth.
+	if enemies.get_child_count() >= max_enemies:
+		return
+	spawn_enemy()
+
+
+func spawn_enemy() -> void:
+	var enemy := ENEMY_SCENE.instantiate()
+	enemy.speed_scale = speed_in_wave(wave)
+	var point: Node3D = _pick_spawn_point()
+	var offset := Vector3(randf_range(-SPAWN_SPREAD, SPAWN_SPREAD), 0.0, randf_range(-SPAWN_SPREAD, SPAWN_SPREAD))
+	enemy.position = point.position + offset
+	enemy.died.connect(_on_enemy_died)
+	enemies.add_child(enemy)
+	_to_spawn -= 1
+	_alive += 1
+
+
+# A random spawn point that isn't right next to the player.
+func _pick_spawn_point() -> Node3D:
+	var far := spawn_points.filter(func(p: Node3D) -> bool:
+		return p.global_position.distance_to(player.global_position) > SAFE_SPAWN_DISTANCE)
+	return (far if not far.is_empty() else spawn_points).pick_random()
+
+
+func _on_enemy_died() -> void:
+	_alive -= 1
+	kills += 1
+	score += KILL_POINTS
+	hud.set_score(score)
+	if phase != Phase.FIGHT:
+		return
+	hud.set_wave(wave, _to_spawn + _alive)
+	if _to_spawn <= 0 and _alive <= 0:
+		_wave_cleared()
+
+
+func _wave_cleared() -> void:
+	waves_survived = wave
+	score += WAVE_POINTS * wave
+	hud.set_score(score)
+	player.heal(WAVE_HEAL)
+	hud.show_message("+%d health" % WAVE_HEAL)
+	phase = Phase.BREAK
+	_break_left = BREAK_TIME
+	_break_shown = -1
+	hud.show_banner("Wave %d cleared" % wave, "", BREAK_TIME - 0.6)
+
+
+# Graphics quality from the settings screen (Low / Medium / High): shadows,
+# fog, glow and the resolution the 3D scene is drawn at (it is scaled up to
+# the screen; the HUD always stays sharp). Medium matches the old phone setup.
+func _apply_quality() -> void:
+	var vp := get_viewport()
+	var flash_light: Light3D = player.get_node("%FlashLight")
+	match Settings.quality:
+		Settings.Quality.LOW:
+			vp.scaling_3d_scale = 0.5
+			vp.mesh_lod_threshold = 4.0
+			sun.shadow_enabled = false
+			environment.fog_enabled = false
+			environment.glow_enabled = false
+			flash_light.visible = false
+		Settings.Quality.MEDIUM:
+			vp.scaling_3d_scale = 0.6
+			vp.mesh_lod_threshold = 4.0
+			sun.shadow_enabled = true
+			sun.directional_shadow_max_distance = 25.0
+			RenderingServer.directional_shadow_atlas_set_size(1024, true)
+			RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_HARD)
+			environment.fog_enabled = true
+			environment.glow_enabled = false
+			flash_light.visible = false
+		_:
+			vp.scaling_3d_scale = 1.0
+			vp.mesh_lod_threshold = 1.0
+			sun.shadow_enabled = true
+			sun.directional_shadow_max_distance = 30.0
+			RenderingServer.directional_shadow_atlas_set_size(
+					ProjectSettings.get_setting("rendering/lights_and_shadows/directional_shadow/size"), true)
+			RenderingServer.directional_soft_shadow_filter_set_quality(
+					ProjectSettings.get_setting("rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality"))
+			environment.fog_enabled = true
+			environment.glow_enabled = true
+			flash_light.visible = true
 
 
 # The first time an effect is drawn, the browser has to compile its shaders,
@@ -116,29 +252,20 @@ func _prewarm_effects() -> void:
 		node.queue_free()
 
 
-func spawn_enemy() -> void:
-	if enemies.get_child_count() >= max_enemies:
-		return
-	var enemy := ENEMY_SCENE.instantiate()
-	var point: Node3D = spawn_points.pick_random()
-	var offset := Vector3(randf_range(-SPAWN_SPREAD, SPAWN_SPREAD), 0.0, randf_range(-SPAWN_SPREAD, SPAWN_SPREAD))
-	enemy.position = point.position + offset
-	enemy.died.connect(_on_enemy_died)
-	enemies.add_child(enemy)
-
-
-func _on_enemy_died() -> void:
-	score += 1
-	hud.set_score(score)
-
-
 func _on_player_died() -> void:
+	phase = Phase.OVER
 	spawn_timer.stop()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	hud.show_game_over(score)
-	get_tree().paused = true  # freezes everything except the HUD
+	var new_best: bool = Settings.submit_score(score, waves_survived)
+	hud.show_game_over(waves_survived, kills, score, Settings.best_score, new_best)
+	get_tree().paused = true  # freezes everything except the HUD and music
 
 
-func _on_restart_requested() -> void:
+func _on_retry() -> void:
 	get_tree().paused = false
 	get_tree().reload_current_scene()
+
+
+func _on_main_menu() -> void:
+	get_tree().paused = false
+	get_tree().change_scene_to_file(MENU_SCENE)

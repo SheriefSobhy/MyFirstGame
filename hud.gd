@@ -1,14 +1,21 @@
 extends CanvasLayer
-## On-screen HUD: health, score, weapon and ammo, FPS, crosshair, sniper
-## scope, pickup messages and the Game Over screen.
-## This layer keeps running while the game is paused so the Restart button works.
+## On-screen HUD: health, score, wave, weapon and ammo, FPS, crosshair, sniper
+## scope, pickup messages, the wave banner, the pause menu and the Game Over
+## screen. This layer keeps running while the game is paused so its menus work.
+##
+## Pausing: the II button (top right), Esc, or losing window focus. On a
+## computer, the browser giving up the mouse lock (it does that on Esc) also
+## pauses the game.
 
-signal restart_requested
+signal retry_requested
+signal main_menu_requested
 
 const MESSAGE_TIME := 1.5   # seconds a pickup message stays on screen
+const BANNER_TIME := 2.2    # seconds the "Wave X" banner stays up
 
 @onready var health_label: Label = $HealthLabel
 @onready var score_label: Label = $ScoreLabel
+@onready var wave_label: Label = $WaveLabel
 @onready var ammo_label: Label = $AmmoLabel
 @onready var weapon_label: Label = $WeaponLabel
 @onready var message_label: Label = $MessageLabel
@@ -17,27 +24,118 @@ const MESSAGE_TIME := 1.5   # seconds a pickup message stays on screen
 @onready var touch_controls: Control = $TouchControls
 @onready var damage_flash: ColorRect = $DamageFlash
 @onready var fps_label: Label = $FpsLabel
+@onready var wave_banner: Control = $WaveBanner
+@onready var banner_title: Label = $WaveBanner/Title
+@onready var banner_sub: Label = $WaveBanner/Sub
+@onready var pause_button: Button = $PauseButton
+@onready var pause_menu: Control = $PauseMenu
+@onready var resume_button: Button = %ResumeButton
+@onready var settings_menu: Control = %SettingsMenu
+@onready var game_over_panel: Control = $GameOverPanel
+@onready var waves_label: Label = %WavesLabel
+@onready var kills_label: Label = %KillsLabel
+@onready var final_score_label: Label = %FinalScoreLabel
+@onready var best_label: Label = %BestLabel
+@onready var retry_button: Button = %RetryButton
 
+var is_game_over := false
 var _last_health := -1
 var _flash_tween: Tween
 var _message_tween: Tween
+var _banner_tween: Tween
 var _fps_timer := 0.0
-@onready var game_over_panel: Control = $GameOverPanel
-@onready var final_score_label: Label = $GameOverPanel/Box/FinalScoreLabel
-@onready var restart_button: Button = $GameOverPanel/Box/RestartButton
+var _was_captured := false
 
 
 func _ready() -> void:
 	game_over_panel.visible = false
-	restart_button.pressed.connect(restart_requested.emit)
+	pause_menu.visible = false
+	settings_menu.visible = false
+	pause_button.pressed.connect(pause)
+	resume_button.pressed.connect(resume)
+	%SettingsButton.pressed.connect(_open_settings)
+	%MenuButton.pressed.connect(main_menu_requested.emit)
+	settings_menu.closed.connect(_on_settings_closed)
+	retry_button.pressed.connect(retry_requested.emit)
+	%OverMenuButton.pressed.connect(main_menu_requested.emit)
+	# Touches on the pause button shouldn't also turn the view.
+	touch_controls.blockers.append(pause_button)
 
 
-# Frames per second, refreshed twice a second so the number is readable.
 func _process(delta: float) -> void:
+	# Frames per second, refreshed twice a second so the number is readable.
 	_fps_timer -= delta
 	if _fps_timer <= 0.0:
 		_fps_timer = 0.5
 		fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
+
+	# The browser releases the mouse lock on Esc without always passing the
+	# key on, so treat losing the lock as a pause request.
+	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+	if _was_captured and not captured and not get_tree().paused:
+		pause()
+	_was_captured = captured
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if is_game_over or not event.is_action_pressed("release_mouse"):
+		return
+	if settings_menu.visible:
+		settings_menu.close()
+	elif get_tree().paused:
+		resume()
+	else:
+		pause()
+	get_viewport().set_input_as_handled()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and DisplayServer.get_name() != "headless":
+		pause()
+
+
+func pause() -> void:
+	if is_game_over or get_tree().paused:
+		return
+	get_tree().paused = true
+	touch_controls.reset()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_was_captured = false
+	pause_button.visible = false
+	pause_menu.visible = true
+	_focus(resume_button)
+
+
+func resume() -> void:
+	if is_game_over:
+		return
+	settings_menu.visible = false
+	pause_menu.visible = false
+	pause_button.visible = true
+	get_tree().paused = false
+	if not DisplayServer.is_touchscreen_available():
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func is_paused() -> bool:
+	return pause_menu.visible
+
+
+func _open_settings() -> void:
+	pause_menu.visible = false
+	settings_menu.open()
+
+
+func _on_settings_closed() -> void:
+	if get_tree().paused and not is_game_over:
+		pause_menu.visible = true
+		_focus(resume_button)
+
+
+# Keyboard focus for menus; skipped on phones, where the outline looks odd.
+func _focus(button: Button) -> void:
+	if not DisplayServer.is_touchscreen_available():
+		button.grab_focus()
 
 
 func set_health(value: int) -> void:
@@ -58,6 +156,31 @@ func flash_damage() -> void:
 
 func set_score(value: int) -> void:
 	score_label.text = "Score: %d" % value
+
+
+## Top-of-screen wave status, e.g. "Wave 3 · 7 left".
+func set_wave(wave: int, enemies_left: int) -> void:
+	wave_label.text = "Wave %d  ·  %d left" % [wave, enemies_left]
+
+
+## Countdown during the break between waves.
+func set_break(next_wave: int, seconds: int) -> void:
+	wave_label.text = "Wave %d in %d" % [next_wave, seconds]
+	banner_sub.text = "Next wave in %d" % seconds
+
+
+## Big text in the upper middle of the screen. hold = 0 keeps it up until
+## the next banner.
+func show_banner(title: String, sub: String, hold := BANNER_TIME) -> void:
+	banner_title.text = title
+	banner_sub.text = sub
+	if _banner_tween:
+		_banner_tween.kill()
+	_banner_tween = create_tween()
+	_banner_tween.tween_property(wave_banner, "modulate:a", 1.0, 0.25)
+	if hold > 0.0:
+		_banner_tween.tween_interval(hold)
+		_banner_tween.tween_property(wave_banner, "modulate:a", 0.0, 0.5)
 
 
 ## reserve = -1 means unlimited spare ammo.
@@ -91,10 +214,18 @@ func show_message(text: String) -> void:
 	_message_tween.tween_property(message_label, "modulate:a", 0.0, 0.4)
 
 
-func show_game_over(final_score: int) -> void:
+func show_game_over(waves: int, kills: int, score: int, best: int, new_best: bool) -> void:
+	is_game_over = true
 	crosshair.visible = false
 	scope_overlay.visible = false
 	touch_controls.visible = false
-	final_score_label.text = "Score: %d" % final_score
+	pause_button.visible = false
+	pause_menu.visible = false
+	settings_menu.visible = false
+	wave_banner.modulate.a = 0.0
+	waves_label.text = "Waves survived: %d" % waves
+	kills_label.text = "Kills: %d" % kills
+	final_score_label.text = "Score: %d" % score
+	best_label.text = "New best score!" if new_best else "Best: %d" % best
 	game_over_panel.visible = true
-	restart_button.grab_focus()
+	_focus(retry_button)

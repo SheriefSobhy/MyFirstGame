@@ -25,7 +25,7 @@ const MOUSE_SENSITIVITY := 0.002  # radians per pixel of mouse movement
 const MOVEMENT_ENABLED := true
 ## God mode for testing: enemy hits still shake the camera and flash the
 ## screen red, but health never goes down. Set to false for the real game.
-const GOD_MODE := true
+const GOD_MODE := false
 
 const MAX_HEALTH := 100
 const FLASH_TIME := 0.05    # how long the muzzle flash stays visible
@@ -232,8 +232,9 @@ func _physics_process(delta: float) -> void:
 
 ## Rotate the view by a mouse/finger movement in pixels.
 ## Turns the body left/right and tilts the head up/down. Slower while scoped.
+## Scaled by the look sensitivity from the settings screen.
 func look(relative: Vector2) -> void:
-	relative *= camera.fov / BASE_FOV
+	relative *= camera.fov / BASE_FOV * Settings.look_sensitivity
 	rotate_y(-relative.x * MOUSE_SENSITIVITY)
 	head.rotate_x(-relative.y * MOUSE_SENSITIVITY)
 	head.rotation.x = clampf(head.rotation.x, deg_to_rad(-89.0), deg_to_rad(89.0))
@@ -559,6 +560,14 @@ func take_damage(amount: int) -> void:
 		is_dead = true
 		_set_scoped(false)
 		died.emit()
+
+
+## Restores health (e.g. after clearing a wave), up to MAX_HEALTH.
+func heal(amount: int) -> void:
+	if is_dead:
+		return
+	health = mini(health + amount, MAX_HEALTH)
+	health_changed.emit(health)
 
 
 func _spawn_impact(point: Vector3, normal: Vector3, with_sparks: bool) -> void:

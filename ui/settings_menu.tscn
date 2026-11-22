@@ -1,0 +1,159 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/settings_menu.gd" id="1_settings"]
+[ext_resource type="Theme" path="res://ui/theme.tres" id="2_theme"]
+
+[node name="SettingsMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+script = ExtResource("1_settings")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.55)
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -380.0
+offset_top = -300.0
+offset_right = 380.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Box" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="Title" type="Label" parent="Panel/Box"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = "Settings"
+horizontal_alignment = 1
+
+[node name="Grid" type="GridContainer" parent="Panel/Box"]
+layout_mode = 2
+theme_override_constants/h_separation = 20
+theme_override_constants/v_separation = 22
+columns = 3
+
+[node name="MasterLabel" type="Label" parent="Panel/Box/Grid"]
+layout_mode = 2
+text = "Master Volume"
+
+[node name="MasterSlider" type="HSlider" parent="Panel/Box/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+step = 1.0
+
+[node name="MasterValue" type="Label" parent="Panel/Box/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "100%"
+horizontal_alignment = 2
+
+[node name="MusicLabel" type="Label" parent="Panel/Box/Grid"]
+layout_mode = 2
+text = "Music Volume"
+
+[node name="MusicSlider" type="HSlider" parent="Panel/Box/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+step = 1.0
+
+[node name="MusicValue" type="Label" parent="Panel/Box/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "60%"
+horizontal_alignment = 2
+
+[node name="SensitivityLabel" type="Label" parent="Panel/Box/Grid"]
+layout_mode = 2
+text = "Look Sensitivity"
+
+[node name="SensitivitySlider" type="HSlider" parent="Panel/Box/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+min_value = 0.2
+max_value = 3.0
+step = 0.05
+value = 1.0
+
+[node name="SensitivityValue" type="Label" parent="Panel/Box/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "1.00x"
+horizontal_alignment = 2
+
+[node name="QualityRow" type="HBoxContainer" parent="Panel/Box"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="QualityLabel" type="Label" parent="Panel/Box/QualityRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Graphics"
+
+[node name="Low" type="Button" parent="Panel/Box/QualityRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(130, 60)
+layout_mode = 2
+toggle_mode = true
+text = "Low"
+
+[node name="Medium" type="Button" parent="Panel/Box/QualityRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(130, 60)
+layout_mode = 2
+toggle_mode = true
+text = "Medium"
+
+[node name="High" type="Button" parent="Panel/Box/QualityRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(130, 60)
+layout_mode = 2
+toggle_mode = true
+text = "High"
+
+[node name="QualityHint" type="Label" parent="Panel/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.6)
+theme_override_font_sizes/font_size = 20
+text = "Shadows, fog and render resolution"
+horizontal_alignment = 1
+
+[node name="BackButton" type="Button" parent="Panel/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 64)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Back"

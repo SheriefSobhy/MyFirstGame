@@ -35,6 +35,8 @@ const HIT_SOUNDS := [
 	preload("res://assets/sounds/impactPunch_medium_002.ogg"),
 ]
 
+## Set by main.gd before spawning: later waves walk faster (1.0 = normal).
+var speed_scale := 1.0
 var hp := MAX_HP
 var state := State.CHASE
 var _state_time := 0.0
@@ -57,7 +59,7 @@ func _ready() -> void:
 	# The imported walk/idle animations don't loop by default.
 	anim.get_animation(ANIM_WALK).loop_mode = Animation.LOOP_LINEAR
 	anim.get_animation(ANIM_IDLE).loop_mode = Animation.LOOP_LINEAR
-	anim.play(ANIM_WALK, -1, WALK_ANIM_SPEED)
+	anim.play(ANIM_WALK, -1, WALK_ANIM_SPEED * speed_scale)
 	anim.seek(randf() * 1.0)  # so a group of enemies doesn't walk in sync
 	_growl_timer = randf_range(1.0, 6.0)
 
@@ -111,8 +113,8 @@ func _chase(delta: float) -> void:
 		to_target = _player.global_position - global_position
 		to_target.y = 0.0
 	var dir := to_target.normalized()
-	velocity.x = dir.x * WALK_SPEED
-	velocity.z = dir.z * WALK_SPEED
+	velocity.x = dir.x * WALK_SPEED * speed_scale
+	velocity.z = dir.z * WALK_SPEED * speed_scale
 	_turn_towards(dir, delta)
 
 	if _player_in_range(ATTACK_RANGE):
@@ -166,7 +168,7 @@ func _set_state(new_state: State) -> void:
 	_state_time = 0.0
 	match new_state:
 		State.CHASE:
-			anim.play(ANIM_WALK, 0.2, WALK_ANIM_SPEED)
+			anim.play(ANIM_WALK, 0.2, WALK_ANIM_SPEED * speed_scale)
 		State.ATTACK:
 			_attack_landed = false
 			_play_from_start(ANIM_ATTACK, 0.1)

@@ -3,6 +3,8 @@
 [ext_resource type="Script" path="res://hud.gd" id="1_hud"]
 [ext_resource type="PackedScene" path="res://touch_controls.tscn" id="2_touch"]
 [ext_resource type="Shader" path="res://effects/scope_overlay.gdshader" id="3_scope"]
+[ext_resource type="Theme" path="res://ui/theme.tres" id="4_theme"]
+[ext_resource type="PackedScene" path="res://ui/settings_menu.tscn" id="5_settings"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_scope"]
 shader = ExtResource("3_scope")
@@ -144,6 +146,130 @@ offset_right = 1.0
 offset_bottom = 10.0
 mouse_filter = 2
 
+
+[node name="WaveLabel" type="Label" parent="."]
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 58.0
+offset_right = 200.0
+offset_bottom = 90.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.5, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 22
+text = "Wave 1"
+horizontal_alignment = 1
+
+[node name="WaveBanner" type="VBoxContainer" parent="."]
+modulate = Color(1, 1, 1, 0)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -230.0
+offset_right = 400.0
+offset_bottom = -90.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+alignment = 1
+
+[node name="Title" type="Label" parent="WaveBanner"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.78, 0.45, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 10
+theme_override_font_sizes/font_size = 72
+text = "Wave 1"
+horizontal_alignment = 1
+
+[node name="Sub" type="Label" parent="WaveBanner"]
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 28
+horizontal_alignment = 1
+
+[node name="PauseButton" type="Button" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -96.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 96.0
+grow_horizontal = 0
+focus_mode = 0
+theme = ExtResource("4_theme")
+theme_override_font_sizes/font_size = 34
+text = "II"
+
+[node name="PauseMenu" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("4_theme")
+
+[node name="Dim" type="ColorRect" parent="PauseMenu"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.55)
+
+[node name="Box" type="VBoxContainer" parent="PauseMenu"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -190.0
+offset_right = 200.0
+offset_bottom = 190.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="Title" type="Label" parent="PauseMenu/Box"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 60
+text = "Paused"
+horizontal_alignment = 1
+
+[node name="ResumeButton" type="Button" parent="PauseMenu/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 68)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Resume"
+
+[node name="SettingsButton" type="Button" parent="PauseMenu/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 64)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Settings"
+
+[node name="MenuButton" type="Button" parent="PauseMenu/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 64)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Main Menu"
+
 [node name="GameOverPanel" type="Control" parent="."]
 visible = false
 layout_mode = 3
@@ -152,6 +278,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme = ExtResource("4_theme")
 
 [node name="Dim" type="ColorRect" parent="GameOverPanel"]
 layout_mode = 1
@@ -160,7 +287,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.6)
+color = Color(0.1, 0, 0, 0.65)
 
 [node name="Box" type="VBoxContainer" parent="GameOverPanel"]
 layout_mode = 1
@@ -169,31 +296,70 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -220.0
-offset_top = -130.0
-offset_right = 220.0
-offset_bottom = 130.0
+offset_left = -300.0
+offset_top = -260.0
+offset_right = 300.0
+offset_bottom = 260.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 20
+theme_override_constants/separation = 10
 alignment = 1
 
 [node name="GameOverLabel" type="Label" parent="GameOverPanel/Box"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 72
 text = "Game Over"
 horizontal_alignment = 1
 
-[node name="FinalScoreLabel" type="Label" parent="GameOverPanel/Box"]
+[node name="WavesLabel" type="Label" parent="GameOverPanel/Box"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+text = "Waves survived: 0"
+horizontal_alignment = 1
+
+[node name="KillsLabel" type="Label" parent="GameOverPanel/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Kills: 0"
+horizontal_alignment = 1
+
+[node name="FinalScoreLabel" type="Label" parent="GameOverPanel/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
 text = "Score: 0"
 horizontal_alignment = 1
 
-[node name="RestartButton" type="Button" parent="GameOverPanel/Box"]
-custom_minimum_size = Vector2(240, 64)
+[node name="BestLabel" type="Label" parent="GameOverPanel/Box"]
+unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 32
-text = "Restart"
+theme_override_colors/font_color = Color(1, 0.8, 0.45, 1)
+text = "Best: 0"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="GameOverPanel/Box"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+
+[node name="Buttons" type="HBoxContainer" parent="GameOverPanel/Box"]
+layout_mode = 2
+theme_override_constants/separation = 24
+alignment = 1
+
+[node name="RetryButton" type="Button" parent="GameOverPanel/Box/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(230, 68)
+layout_mode = 2
+text = "Retry"
+
+[node name="OverMenuButton" type="Button" parent="GameOverPanel/Box/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(230, 68)
+layout_mode = 2
+text = "Main Menu"
+
+[node name="SettingsMenu" parent="." instance=ExtResource("5_settings")]
+unique_name_in_owner = true
+visible = false

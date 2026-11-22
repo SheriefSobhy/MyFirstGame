@@ -82,9 +82,18 @@ Each file is a short cut of one track, converted to mono 16-bit 44.1 kHz and nor
 The Kenney sounds were taken from the mirror https://github.com/ETdoFresh/kenney.nl.
 Kenney's own license files are kept in `assets/sounds/kenney_*_License.txt`.
 
+## Music
+
+Both tracks are by yd on OpenGameArt, released as CC0. They're kept as uploaded (Ogg Vorbis, about 160 kbps) and loop in-game.
+
+| File | Used for | Track | Source |
+| --- | --- | --- | --- |
+| `assets/music/menu_menace.ogg` | Main menu | "Menace" by yd | https://opengameart.org/content/menace |
+| `assets/music/game_zombies_march.ogg` | Gameplay | "Zombies' March" by yd (`ZombiesAreComing.ogg`) | https://opengameart.org/content/zombies-march |
+
 ## Code-generated effects and detail
 
-The bullet holes, sparks, dust, blood, muzzle flash, sniper scope overlay, ammo boxes and pickup glow use no image files.
+The bullet holes, sparks, dust, blood, muzzle flash, sniper scope overlay, ammo boxes, pickup glow and the menu screens (theme and background gradient) use no image files.
 They're built in Godot from gradients and simple meshes.
 
 These were made for this project, so no license applies:
