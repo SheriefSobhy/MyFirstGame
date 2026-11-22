@@ -105,6 +105,7 @@ mesh = SubResource("CylinderMesh_sleeve")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.045, -0.135)
 
 [node name="MuzzleFlash" type="Node3D" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil/Muzzle"]
+unique_name_in_owner = true
 visible = false
 
 [node name="FlashMesh" type="MeshInstance3D" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil/Muzzle/MuzzleFlash"]
@@ -112,6 +113,7 @@ cast_shadow = 0
 mesh = SubResource("QuadMesh_flash")
 
 [node name="FlashLight" type="OmniLight3D" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil/Muzzle/MuzzleFlash"]
+unique_name_in_owner = true
 light_color = Color(1, 0.75, 0.4, 1)
 light_energy = 4.0
 omni_range = 6.0

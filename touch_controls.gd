@@ -28,10 +28,17 @@ const BUTTONS := {
 ## The player to control; assigned by main.gd.
 var player: Node
 
-# Which finger (touch index) is doing what; -1 = none.
-var _joy_index := -1
-var _look_index := -1
-var _shoot_index := -1
+## A finger that jumps further than this (in pixels) between two events is
+## treated as a different finger.
+const REMAP_DISTANCE := 250.0
+## Safety cap on how far a single drag event may turn the view (pixels).
+const MAX_LOOK_STEP := 120.0
+
+# Which finger is doing what: role ("joy", "look" or "shoot") -> {index, pos}.
+# Fingers are matched by position as well as by touch index, because web
+# browsers renumber the remaining touches when one finger lifts. Trusting the
+# index alone made the view jump (often up into the sky) when you let go of Shoot.
+var _fingers := {}
 var _joy_center := Vector2.ZERO
 var _joy_knob := Vector2.ZERO
 
@@ -48,16 +55,16 @@ func _input(event: InputEvent) -> void:
 		if event.pressed:
 			_touch_down(event.index, event.position)
 		else:
-			_touch_up(event.index)
+			_touch_up(event.index, event.position)
 		queue_redraw()
 	elif event is InputEventScreenDrag:
-		_touch_drag(event.index, event.position, event.relative)
+		_touch_drag(event.index, event.position)
 
 
 func _touch_down(index: int, pos: Vector2) -> void:
 	match _button_at(pos):
 		"shoot":
-			_shoot_index = index
+			_fingers["shoot"] = {"index": index, "pos": pos}
 			player.touch_shoot = true
 		"jump":
 			player.request_jump()
@@ -65,35 +72,67 @@ func _touch_down(index: int, pos: Vector2) -> void:
 			player.start_reload()
 		_:
 			if _movement_enabled() and pos.x < size.x * 0.5:
-				if _joy_index == -1:
+				if not _fingers.has("joy"):
 					# Start the joystick wherever the finger lands.
-					_joy_index = index
+					_fingers["joy"] = {"index": index, "pos": pos}
 					_joy_center = pos
 					_joy_knob = pos
-			elif _look_index == -1:
-				_look_index = index
+			elif not _fingers.has("look"):
+				_fingers["look"] = {"index": index, "pos": pos}
 
 
-func _touch_up(index: int) -> void:
-	if index == _joy_index:
-		_joy_index = -1
-		player.touch_move = Vector2.ZERO
-	elif index == _look_index:
-		_look_index = -1
-	elif index == _shoot_index:
-		_shoot_index = -1
-		player.touch_shoot = false
+func _touch_up(index: int, pos: Vector2) -> void:
+	var role := _role_for(index, pos)[0] as String
+	_fingers.erase(role)
+	match role:
+		"joy":
+			player.touch_move = Vector2.ZERO
+		"shoot":
+			player.touch_shoot = false
 
 
-func _touch_drag(index: int, pos: Vector2, relative: Vector2) -> void:
-	if index == _joy_index:
-		var offset := (pos - _joy_center).limit_length(JOY_RADIUS)
-		_joy_knob = _joy_center + offset
-		# x = strafe, y = forward/back (up on screen = forward), like WASD.
-		player.touch_move = offset / JOY_RADIUS
-		queue_redraw()
-	elif index == _look_index:
-		player.look(relative * LOOK_SENSITIVITY)
+func _touch_drag(index: int, pos: Vector2) -> void:
+	var match_info := _role_for(index, pos)
+	var role: String = match_info[0]
+	if role == "":
+		return
+	var trusted: bool = match_info[1]
+	var last_pos: Vector2 = _fingers[role].pos
+	_fingers[role] = {"index": index, "pos": pos}
+	match role:
+		"joy":
+			var offset := (pos - _joy_center).limit_length(JOY_RADIUS)
+			_joy_knob = _joy_center + offset
+			# x = strafe, y = forward/back (up on screen = forward), like WASD.
+			player.touch_move = offset / JOY_RADIUS
+			queue_redraw()
+		"look":
+			# Measure the movement ourselves instead of using event.relative,
+			# and skip the event where a finger was re-identified.
+			if trusted:
+				var delta := (pos - last_pos).limit_length(MAX_LOOK_STEP)
+				player.look(delta * LOOK_SENSITIVITY)
+
+
+# Works out which tracked finger an event belongs to.
+# Returns [role, trusted]: role is "" if no finger is tracked, and trusted is
+# false when the finger was matched by position because its index changed.
+func _role_for(index: int, pos: Vector2) -> Array:
+	var by_index := ""
+	var nearest := ""
+	var nearest_dist := INF
+	for role: String in _fingers:
+		var finger: Dictionary = _fingers[role]
+		if finger.index == index:
+			by_index = role
+		var dist := pos.distance_to(finger.pos)
+		if dist < nearest_dist:
+			nearest_dist = dist
+			nearest = role
+	if by_index != "" and (by_index == nearest
+			or pos.distance_to(_fingers[by_index].pos) < REMAP_DISTANCE):
+		return [by_index, true]
+	return [nearest, false]
 
 
 func _movement_enabled() -> bool:
@@ -117,8 +156,8 @@ func _draw() -> void:
 
 	# Joystick: drawn where the finger is, or faintly at a default spot.
 	if _movement_enabled():
-		var center := _joy_center if _joy_index != -1 else Vector2(170, size.y - 170)
-		var knob := _joy_knob if _joy_index != -1 else center
+		var center := _joy_center if _fingers.has("joy") else Vector2(170, size.y - 170)
+		var knob := _joy_knob if _fingers.has("joy") else center
 		draw_circle(center, JOY_RADIUS, COLOR_FILL)
 		draw_arc(center, JOY_RADIUS, 0.0, TAU, 48, COLOR_LINE, 2.0)
 		draw_circle(knob, KNOB_RADIUS, COLOR_PRESSED)
@@ -127,7 +166,7 @@ func _draw() -> void:
 	for button_name in BUTTONS:
 		var b: Dictionary = BUTTONS[button_name]
 		var c := _button_center(button_name)
-		var held: bool = button_name == "shoot" and _shoot_index != -1
+		var held: bool = button_name == "shoot" and _fingers.has("shoot")
 		draw_circle(c, b.radius, COLOR_PRESSED if held else COLOR_FILL)
 		draw_arc(c, b.radius, 0.0, TAU, 48, COLOR_LINE, 2.0)
 		draw_string(font, Vector2(c.x - b.radius, c.y + FONT_SIZE * 0.35), b.label,

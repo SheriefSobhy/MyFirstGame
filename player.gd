@@ -6,6 +6,7 @@ extends CharacterBody3D
 signal health_changed(health: int)
 signal ammo_changed(ammo: int, max_ammo: int, reloading: bool)
 signal died
+signal hit_taken  # god mode: hit without losing health
 
 const WALK_SPEED := 5.0
 const RUN_SPEED := 8.5
@@ -14,6 +15,9 @@ const MOUSE_SENSITIVITY := 0.002  # radians per pixel of mouse movement
 ## Walking is turned off for now: the player stands still and can only aim,
 ## shoot, reload and jump. Set this back to true to bring WASD/joystick back.
 const MOVEMENT_ENABLED := false
+## God mode for testing: enemy hits still shake the camera and flash the
+## screen red, but health never goes down. Set to false for the real game.
+const GOD_MODE := true
 
 const MAX_HEALTH := 100
 const MAX_AMMO := 30
@@ -224,8 +228,11 @@ func start_reload() -> void:
 func take_damage(amount: int) -> void:
 	if is_dead:
 		return
-	health = maxi(health - amount, 0)
 	_shake = maxf(_shake, SHAKE_ON_HIT)
+	if GOD_MODE:
+		hit_taken.emit()  # red flash only
+		return
+	health = maxi(health - amount, 0)
 	health_changed.emit(health)
 	if health == 0:
 		is_dead = true
