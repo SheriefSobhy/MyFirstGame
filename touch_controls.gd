@@ -4,7 +4,7 @@ extends Control
 ##  - Bottom-left: a fixed virtual joystick for walking (only while the player's
 ##    MOVEMENT_ENABLED is on). Only touches that start on it move the player.
 ##  - Buttons: Shoot (hold for auto fire), Jump, Reload, Switch (next weapon)
-##    and Aim (scope on/off; only shown for weapons with a scope).
+##    and Aim (aim down the sights / sniper scope, on/off).
 ## Each finger is tracked by its touch index, so you can move, look and
 ## shoot at the same time. Only shown on touch screen devices.
 
@@ -180,7 +180,7 @@ func _button_at(pos: Vector2) -> String:
 	return ""
 
 
-# The Aim button only exists for weapons with a scope (the sniper).
+# The Aim button shows for every weapon that can aim (all of them).
 func _button_shown(button_name: String) -> bool:
 	return button_name != "aim" or (player != null and player.can_aim())
 
@@ -207,7 +207,7 @@ func _draw() -> void:
 		var b: Dictionary = BUTTONS[button_name]
 		var c := _button_center(button_name)
 		var held: bool = (button_name == "shoot" and _fingers.has("shoot")) \
-				or (button_name == "aim" and player.is_scoped())
+				or (button_name == "aim" and player.is_aiming())
 		draw_circle(c, b.radius, COLOR_PRESSED if held else COLOR_FILL)
 		draw_arc(c, b.radius, 0.0, TAU, 48, COLOR_LINE, 2.0)
 		draw_string(font, Vector2(c.x - b.radius, c.y + FONT_SIZE * 0.35), b.label,

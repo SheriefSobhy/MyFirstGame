@@ -54,6 +54,7 @@ func _run() -> void:
 	await _test_weapon_pickups()
 	await _test_rifle()
 	await _test_shotgun()
+	await _test_aim_down_sights()
 	await _test_sniper()
 	await _test_switch_inputs()
 	await _test_ammo_box()
@@ -218,7 +219,54 @@ func _test_sniper() -> void:
 	player.switch_to(0)
 	await seconds(0.5)
 	check(not player.is_scoped() and absf(player.camera.fov - 75.0) < 0.5, "switching weapons leaves the scope")
-	check(touch._button_at(aim_pos) == "", "touch AIM button hidden for other weapons")
+	check(touch._button_at(aim_pos) == "aim", "touch AIM button also shown for the pistol")
+
+
+# Pistol, rifle and shotgun aim down their sights: the gun moves to the
+# centre, the view zooms a little, the crosshair goes and the spread tightens.
+func _test_aim_down_sights() -> void:
+	var touch: Control = hud.touch_controls
+	for slot in 3:
+		player.switch_to(slot)
+		await seconds(0.5)
+		var w: Dictionary = Weapons.LIST[slot]
+		check(player.can_aim() and touch._button_at(touch._button_center("aim")) == "aim",
+				"%s can aim (touch AIM button shown)" % w.name)
+		var hip_x: float = player.weapon_sway.position.x
+		player.toggle_aim()
+		await seconds(0.35)
+		check(player.is_aiming() and not player.is_scoped() and not hud.scope_overlay.visible,
+				"%s aims down the sights (no scope overlay)" % w.name)
+		check(absf(player.camera.fov - w.ads_fov) < 0.5, "%s zooms to fov %.0f (got %.1f)" % [w.name, w.ads_fov, player.camera.fov])
+		check(not hud.crosshair.visible and player.weapon_sway.visible, "%s: sights replace the crosshair, gun stays visible" % w.name)
+		check(hud.aim_dot.visible == (w.sight == "iron"), "%s: small aim dot only with iron sights" % w.name)
+		check(hip_x > 0.1 and absf(player.weapon_sway.position.x) < 0.02,
+				"%s moves to the centre of the screen (x %.3f -> %.3f)" % [w.name, hip_x, player.weapon_sway.position.x])
+		await _screenshot("ads_%d_%s" % [slot, w.name.to_lower().replace(" ", "_")])
+		player.toggle_aim()
+		await seconds(0.35)
+		check(not player.is_aiming() and absf(player.camera.fov - 75.0) < 0.5 and hud.crosshair.visible,
+				"%s: AIM again goes back to the hip" % w.name)
+	var rifle: Node = player._views[1]
+	check(rifle.get_node_or_null("RedDotSight") != null, "assault rifle has a red dot sight")
+
+	# Aiming slows walking.
+	player.switch_to(1)
+	await seconds(0.5)
+	player.toggle_aim()
+	await seconds(0.3)
+	player.touch_move = Vector2(0, -1)
+	await frames(5)
+	var ads_speed := Vector2(player.velocity.x, player.velocity.z).length()
+	player.touch_move = Vector2.ZERO
+	check(absf(ads_speed - player.WALK_SPEED * player.ADS_MOVE_SCALE) < 0.3, "aiming slows walking (%.1f m/s)" % ads_speed)
+	# Reloading lowers the sights.
+	player.start_reload()
+	await frames(3)
+	check(not player.is_aiming(), "reloading stops aiming")
+	await seconds(2.3)
+	player.switch_to(0)
+	await seconds(0.5)
 
 
 func _test_switch_inputs() -> void:

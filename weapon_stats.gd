@@ -36,6 +36,13 @@ extends RefCounted
 ##  flash_size      muzzle flash scale
 ##  zoom_fov        scope field of view while aiming (0 = no scope)
 ##  scoped_spread   spread while scoped (replaces `spread`)
+##  sight           what aiming looks through: "iron" (the top of the gun),
+##                  "red_dot" (a reflex sight added on top) or "scope" (the
+##                  sniper: full-screen scope overlay, uses zoom_fov)
+##  ads_fov         field of view while aiming down the sights (not "scope")
+##  ads_spread      spread multiplier while aiming down the sights (0.5 = half)
+##  sight_at        where along the gun the sight sits, 0 = back .. 1 = muzzle
+##  ads_offset      extra nudge (m) for the gun while aiming, if a hand is in the way
 
 const LIST := [
 	{
@@ -76,6 +83,11 @@ const LIST := [
 		"flash_size": 1.0,
 		"zoom_fov": 0.0,
 		"scoped_spread": 0.0,
+		"sight": "iron",
+		"ads_fov": 60.0,
+		"ads_spread": 0.5,
+		"sight_at": 0.2,
+		"ads_offset": Vector3.ZERO,
 	},
 	{
 		"name": "Assault Rifle",
@@ -115,6 +127,11 @@ const LIST := [
 		"flash_size": 1.3,
 		"zoom_fov": 0.0,
 		"scoped_spread": 0.0,
+		"sight": "red_dot",
+		"ads_fov": 50.0,
+		"ads_spread": 0.35,
+		"sight_at": 0.3,
+		"ads_offset": Vector3.ZERO,
 	},
 	{
 		"name": "Shotgun",
@@ -156,6 +173,11 @@ const LIST := [
 		"flash_size": 1.9,
 		"zoom_fov": 0.0,
 		"scoped_spread": 0.0,
+		"sight": "iron",
+		"ads_fov": 62.0,
+		"ads_spread": 0.7,
+		"sight_at": 0.9,
+		"ads_offset": Vector3(0.0, -0.035, 0.0),
 	},
 	{
 		"name": "Sniper",
@@ -196,5 +218,10 @@ const LIST := [
 		"flash_size": 1.7,
 		"zoom_fov": 18.0,
 		"scoped_spread": 0.0,
+		"sight": "scope",
+		"ads_fov": 0.0,
+		"ads_spread": 1.0,
+		"sight_at": 0.0,
+		"ads_offset": Vector3.ZERO,
 	},
 ]

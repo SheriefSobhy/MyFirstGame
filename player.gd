@@ -1,14 +1,17 @@
 extends CharacterBody3D
 ## First-person player: movement, mouse/touch look, weapons and health.
 ## The weapons' stats live in weapon_stats.gd. This script handles shooting,
-## reloading, switching, the sniper scope and pickups, plus the "feel"
-## effects: head bob, weapon sway, recoil, camera shake and footsteps.
+## reloading, switching, aiming (down the sights, or the sniper scope) and
+## pickups, plus the "feel" effects: head bob, weapon sway, recoil, camera
+## shake and footsteps.
 
 signal health_changed(health: int)
 ## reserve is -1 when the weapon has unlimited spare ammo.
 signal ammo_changed(ammo: int, reserve: int, reloading: bool)
 signal weapon_changed(weapon_name: String)
-signal scope_changed(scoped: bool)
+signal scope_changed(scoped: bool)   # sniper scope overlay on/off
+## Any aiming: sights or scope. sight is the weapon's "iron", "red_dot" or "scope".
+signal aim_changed(aiming: bool, sight: String)
 signal message(text: String)  # short HUD notice, e.g. "Picked up Shotgun"
 signal died
 signal hit_taken  # god mode: hit without losing health
@@ -43,6 +46,13 @@ const BOB_SIDE := 0.035
 const SWAY_AMOUNT := 0.0012     # weapon lag per pixel of look movement
 const SHAKE_ON_HIT := 0.8
 
+# Aiming down the sights.
+const ADS_TIME := 0.15          # seconds to raise the sights / lower them again
+const ADS_MOVE_SCALE := 0.6     # walking speed while aiming
+const ADS_SWAY := 0.3           # sway and bob left while aiming (1 = all)
+const ADS_SIGHT_DROP := 0.004   # iron sights sit this far (m) below the screen centre
+const ADS_FORWARD := 0.05       # the gun moves this far (m) away from the eye when aiming
+
 const BULLET_HOLE_SCENE := preload("res://effects/bullet_hole.tscn")
 const IMPACT_SCENE := preload("res://effects/impact_sparks.tscn")
 const FOOTSTEP_SOUNDS := [
@@ -68,6 +78,7 @@ var _mag: Array[int] = []        # rounds in the magazine
 var _reserve: Array[int] = []    # spare rounds (-1 = unlimited)
 var _views: Array[Node3D] = []   # first-person models (only the current one is shown)
 var _muzzles: Array[Vector3] = []
+var _ads_positions: Array[Vector3] = []  # WeaponSway position that centres the sights
 
 # Countdown timers (in seconds), ticked down every frame.
 var _fire_cooldown := 0.0
@@ -78,7 +89,10 @@ var _trigger_ready := true   # semi-auto: the trigger was released since the las
 var _reload_queued := false  # reload pressed while pumping / cycling the bolt
 var _switching := false
 var _aim_wanted := false     # right mouse held, or the touch AIM button toggled on
-var _scoped := false
+var _aiming := false         # aiming with any weapon (sights or scope)
+var _scoped := false         # aiming with the sniper scope (overlay shown)
+var _ads := 0.0              # 0 = gun at the hip, 1 = sights centred
+var _ads_tween: Tween
 var _spread := 0.0           # extra spread from sustained fire (degrees)
 var _weapon_tween: Tween     # reload / switch / pump animation
 var _sound_tween: Tween      # reload sounds
@@ -125,7 +139,9 @@ func _ready() -> void:
 
 
 # Builds the first-person model for one weapon: scaled to view_length, barrel
-# pointing forward (-Z), and remembers where its muzzle is.
+# pointing forward (-Z), and remembers where its muzzle is. Also adds the
+# red dot sight if the weapon has one, and works out where the gun must move
+# so its sights line up with the centre of the screen.
 func _add_view_model(w: Dictionary) -> void:
 	var model: Node3D = w.model.instantiate()
 	var info := WeaponModel.measure(model)
@@ -136,6 +152,17 @@ func _add_view_model(w: Dictionary) -> void:
 	gun_holder.add_child(model)
 	_views.append(model)
 	_muzzles.append(model.transform * info.tip)
+
+	var sight_x: float = aabb.position.x + aabb.size.x * w.sight_at
+	var sight := WeaponModel.top_at(model, aabb, sight_x)
+	var drop := ADS_SIGHT_DROP
+	if w.sight == "red_dot":
+		sight = WeaponModel.add_red_dot(model, sight, s)
+		drop = 0.0  # look straight through the window
+	# The Gun node sits at WeaponSway's origin, so this is the sight in
+	# WeaponSway space; move WeaponSway so it ends up on the camera's axis.
+	var p := model.transform * sight
+	_ads_positions.append(Vector3(-p.x, -p.y - drop, _weapon_base_position.z - ADS_FORWARD) + w.ads_offset)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -179,10 +206,10 @@ func _process(delta: float) -> void:
 		_flash_timer -= delta
 		if _flash_timer <= 0.0:
 			muzzle_flash.visible = false
-	var want_scope := _aim_wanted and can_aim() and not is_dead \
+	var want_aim := _aim_wanted and can_aim() and not is_dead \
 			and not _switching and _reload_timer <= 0.0
-	if want_scope != _scoped:
-		_set_scoped(want_scope)
+	if want_aim != _aiming:
+		_set_aiming(want_aim)
 	_update_feel(delta)
 
 
@@ -205,6 +232,8 @@ func _physics_process(delta: float) -> void:
 		input_dir = (input_dir + touch_move).limit_length(1.0)
 	var direction := (transform.basis * Vector3(input_dir.x, 0.0, input_dir.y)).normalized()
 	var speed := RUN_SPEED if Input.is_action_pressed("sprint") else WALK_SPEED
+	if _aiming:
+		speed = WALK_SPEED * ADS_MOVE_SCALE
 	velocity.x = direction.x * speed
 	velocity.z = direction.z * speed
 	move_and_slide()
@@ -266,18 +295,25 @@ func is_reloading() -> bool:
 	return _reload_timer > 0.0
 
 
+## True while looking through the sniper scope (black overlay shown).
 func is_scoped() -> bool:
 	return _scoped
 
 
-## True for weapons with a scope (the sniper).
+## True while aiming with any weapon (down the sights or through the scope).
+func is_aiming() -> bool:
+	return _aiming
+
+
+## Every weapon can aim: sights for most, the scope for the sniper.
 func can_aim() -> bool:
-	return current_weapon().zoom_fov > 0.0
+	var w := current_weapon()
+	return w.zoom_fov > 0.0 if w.sight == "scope" else w.ads_fov > 0.0
 
 
-## Touch AIM button: scope in / out.
+## Touch AIM button: aim in / out.
 func toggle_aim() -> void:
-	_aim_wanted = not _scoped
+	_aim_wanted = not _aiming
 
 
 # --- Shooting ---------------------------------------------------------------
@@ -316,7 +352,11 @@ func shoot() -> void:
 	# Bullets go out of the camera, i.e. through the crosshair, with some
 	# random spread. Pellets that hit the same enemy are added together so it
 	# takes one hit (one blood splash, one stagger) per shot.
-	var spread: float = (w.scoped_spread if _scoped else w.spread) + _spread
+	var spread: float = w.spread + _spread
+	if _scoped:
+		spread = w.scoped_spread + _spread
+	elif _aiming:
+		spread *= w.ads_spread
 	_spread = minf(_spread + w.spread_per_shot, w.max_spread)
 	var enemy_hits := {}
 	var sparks := 0
@@ -427,7 +467,7 @@ func switch_to(index: int) -> void:
 		return
 	_cancel_reload()
 	_aim_wanted = false
-	_set_scoped(false)
+	_set_aiming(false)
 	_switching = true
 	_emit_ammo()
 	# Lower the current gun, swap models, raise the new one.
@@ -473,19 +513,34 @@ func _kill_weapon_tween() -> void:
 	weapon_reload.rotation = Vector3.ZERO
 
 
-# --- Scope ------------------------------------------------------------------
+# --- Aiming -----------------------------------------------------------------
 
-func _set_scoped(on: bool) -> void:
-	if on == _scoped:
+## Aim in or out. The sniper looks through its scope (black overlay, gun
+## hidden, big zoom); the other guns move to the centre of the screen so you
+## look along their sights, with a smaller zoom and tighter spread.
+func _set_aiming(on: bool) -> void:
+	if on == _aiming:
 		return
-	_scoped = on
-	var fov: float = current_weapon().zoom_fov if on else BASE_FOV
+	_aiming = on
+	var w := current_weapon()
+	var scope: bool = w.sight == "scope"
+	var fov := BASE_FOV
+	if on:
+		fov = w.zoom_fov if scope else w.ads_fov
 	if _fov_tween:
 		_fov_tween.kill()
 	_fov_tween = create_tween()
-	_fov_tween.tween_property(camera, "fov", fov, 0.12)
-	weapon_sway.visible = not on  # the gun would block the scope view
-	scope_changed.emit(on)
+	_fov_tween.tween_property(camera, "fov", fov, 0.12 if scope else ADS_TIME)
+	if _ads_tween:
+		_ads_tween.kill()
+	_ads_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_ads_tween.tween_property(self, "_ads", 1.0 if on and not scope else 0.0, ADS_TIME)
+	var scoped := on and scope
+	if scoped != _scoped:
+		_scoped = scoped
+		weapon_sway.visible = not scoped  # the gun would block the scope view
+		scope_changed.emit(scoped)
+	aim_changed.emit(on, w.sight)
 
 
 # --- Pickups ----------------------------------------------------------------
@@ -558,7 +613,7 @@ func take_damage(amount: int) -> void:
 	health_changed.emit(health)
 	if health == 0:
 		is_dead = true
-		_set_scoped(false)
+		_set_aiming(false)
 		died.emit()
 
 
@@ -603,14 +658,16 @@ func _update_feel(delta: float) -> void:
 
 	# Head bob: the camera dips twice per cycle and sways side to side once.
 	var bob := Vector3(cos(_bob_time) * BOB_SIDE, -absf(sin(_bob_time)) * BOB_HEIGHT, 0.0) * _bob_blend
-	camera.position = bob
+	camera.position = bob * lerpf(1.0, 0.4, _ads)
 
 	# Weapon sway: lags behind look movement and bobs a little while walking.
+	# Aiming down the sights moves the gun to the centre and steadies it.
 	_sway = _sway.lerp(Vector2.ZERO, clampf(delta * 10.0, 0.0, 1.0))
-	weapon_sway.position = _weapon_base_position \
-			+ Vector3(-_sway.x * SWAY_AMOUNT, _sway.y * SWAY_AMOUNT, 0.0) \
-			+ Vector3(cos(_bob_time) * 0.012, -absf(sin(_bob_time)) * 0.015, 0.0) * _bob_blend
-	weapon_sway.rotation = Vector3(_sway.y * 0.002, _sway.x * 0.002, -_sway.x * 0.001)
+	var steady := lerpf(1.0, ADS_SWAY, _ads)
+	weapon_sway.position = _weapon_base_position.lerp(_ads_positions[weapon_index], _ads) \
+			+ Vector3(-_sway.x * SWAY_AMOUNT, _sway.y * SWAY_AMOUNT, 0.0) * steady \
+			+ Vector3(cos(_bob_time) * 0.012, -absf(sin(_bob_time)) * 0.015, 0.0) * _bob_blend * steady
+	weapon_sway.rotation = Vector3(_sway.y * 0.002, _sway.x * 0.002, -_sway.x * 0.001) * steady
 
 	# Recoil: the gun kicks back and up, then settles.
 	_recoil = lerpf(_recoil, 0.0, clampf(delta * 12.0, 0.0, 1.0))

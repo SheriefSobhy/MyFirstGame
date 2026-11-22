@@ -20,6 +20,7 @@ const BANNER_TIME := 2.2    # seconds the "Wave X" banner stays up
 @onready var weapon_label: Label = $WeaponLabel
 @onready var message_label: Label = $MessageLabel
 @onready var crosshair: Control = $Crosshair
+@onready var aim_dot: Control = $AimDot
 @onready var scope_overlay: ColorRect = $ScopeOverlay
 @onready var touch_controls: Control = $TouchControls
 @onready var damage_flash: ColorRect = $DamageFlash
@@ -45,6 +46,8 @@ var _message_tween: Tween
 var _banner_tween: Tween
 var _fps_timer := 0.0
 var _was_captured := false
+var _aiming := false
+var _sight := "iron"
 
 
 func _ready() -> void:
@@ -200,7 +203,20 @@ func set_scoped(scoped: bool) -> void:
 	var size := scope_overlay.get_viewport_rect().size
 	scope_overlay.material.set_shader_parameter("aspect", size.x / maxf(size.y, 1.0))
 	scope_overlay.visible = scoped
-	crosshair.visible = not scoped
+	_update_crosshair()
+
+
+## Aiming with any weapon: the sights (or the scope) replace the crosshair.
+## Iron sights also get a small dot, so the exact aim point stays clear.
+func set_aiming(aiming: bool, sight := "iron") -> void:
+	_aiming = aiming
+	_sight = sight
+	_update_crosshair()
+
+
+func _update_crosshair() -> void:
+	crosshair.visible = not _aiming and not scope_overlay.visible and not is_game_over
+	aim_dot.visible = _aiming and _sight == "iron" and not is_game_over
 
 
 ## A short notice in the middle of the screen, e.g. "Picked up Shotgun".
@@ -219,6 +235,7 @@ func show_game_over(waves: int, kills: int, score: int, best: int, new_best: boo
 	crosshair.visible = false
 	scope_overlay.visible = false
 	touch_controls.visible = false
+	aim_dot.visible = false
 	pause_button.visible = false
 	pause_menu.visible = false
 	settings_menu.visible = false

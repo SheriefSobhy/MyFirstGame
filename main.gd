@@ -68,15 +68,17 @@ func _ready() -> void:
 	player.ammo_changed.connect(hud.set_ammo)
 	player.weapon_changed.connect(hud.set_weapon)
 	player.scope_changed.connect(hud.set_scoped)
+	player.aim_changed.connect(hud.set_aiming)
 	player.message.connect(hud.show_message)
 	player.died.connect(_on_player_died)
 	player.hit_taken.connect(hud.flash_damage)
 	hud.retry_requested.connect(_on_retry)
 	hud.main_menu_requested.connect(_on_main_menu)
 	hud.touch_controls.player = player
-	# The touch Aim button appears/disappears with the weapon.
+	# The touch Aim button lights up while aiming.
 	player.weapon_changed.connect(func(_name: String) -> void: hud.touch_controls.queue_redraw())
 	player.scope_changed.connect(func(_on: bool) -> void: hud.touch_controls.queue_redraw())
+	player.aim_changed.connect(func(_on: bool, _sight: String) -> void: hud.touch_controls.queue_redraw())
 	spawn_timer.wait_time = SPAWN_INTERVAL
 	spawn_timer.timeout.connect(_on_spawn_tick)
 
