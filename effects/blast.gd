@@ -5,6 +5,7 @@ extends RefCounted
 ## explosion visuals and sound (explosion.gd).
 
 const Explosion := preload("res://effects/explosion.gd")
+const Haptics := preload("res://effects/haptics.gd")
 const LOS_MASK := 3              # walls and props that block the blast
 const SHAKE_RANGE := 25.0        # camera shake fades out at this distance
 const MAX_SHAKE := 1.2
@@ -46,6 +47,7 @@ static func detonate(source: Node3D, pos: Vector3, radius: float, max_damage: in
 			player.take_damage(dmg)
 		if player.has_method("add_shake"):
 			player.add_shake(MAX_SHAKE * clampf(1.0 - d / SHAKE_RANGE, 0.0, 1.0))
+		Haptics.explosion(clampf(1.0 - d / SHAKE_RANGE, 0.0, 1.0))
 
 
 ## Damage with linear falloff: `max_damage` at the centre, 0 at `radius`.

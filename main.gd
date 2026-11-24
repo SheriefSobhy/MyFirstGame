@@ -99,6 +99,9 @@ func _ready() -> void:
 	player.message.connect(hud.show_message)
 	player.died.connect(_on_player_died)
 	player.hit_taken.connect(hud.flash_damage)
+	player.enemy_hit.connect(hud.feedback.on_enemy_hit)
+	# Aim assist only helps the touch controls.
+	player.touch_active = hud.touch_controls.visible
 	hud.retry_requested.connect(_on_retry)
 	hud.main_menu_requested.connect(_on_main_menu)
 	hud.touch_controls.player = player
@@ -336,6 +339,7 @@ func _on_enemy_died(enemy: Node) -> void:
 	# Exploders that blow themselves up give no points.
 	if enemy.killed_by_player:
 		score += enemy.stats.points
+		hud.feedback.on_kill()  # kill sound, streak popup, vibration
 	hud.set_score(score)
 	if enemy == _boss:
 		_boss = null
@@ -449,6 +453,7 @@ func _prewarm_effects() -> void:
 	player.show_all_view_models(true)
 	hud.scope_overlay.self_modulate.a = 0.02
 	hud.scope_overlay.visible = true
+	hud.feedback.prewarm(true)  # low-health vignette shader
 	# Keep them for a few frames so they are really drawn, then remove them.
 	for i in 3:
 		await get_tree().process_frame
@@ -456,6 +461,7 @@ func _prewarm_effects() -> void:
 	player.show_all_view_models(false)
 	hud.scope_overlay.visible = false
 	hud.scope_overlay.self_modulate.a = 1.0
+	hud.feedback.prewarm(false)
 	for node in warm:
 		node.queue_free()
 

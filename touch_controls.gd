@@ -186,7 +186,7 @@ func _touch_drag(index: int, pos: Vector2) -> void:
 			# and skip the event where a finger was re-identified.
 			if trusted:
 				var delta := (pos - last_pos).limit_length(MAX_LOOK_STEP)
-				player.look(delta * LOOK_SENSITIVITY)
+				player.look(delta * LOOK_SENSITIVITY, true)
 
 
 # Works out which tracked finger an event belongs to.

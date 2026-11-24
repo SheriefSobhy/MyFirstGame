@@ -11,6 +11,7 @@ extends CanvasLayer
 signal retry_requested
 signal main_menu_requested
 
+const CombatFeedback := preload("res://combat_feedback.gd")
 const MESSAGE_TIME := 1.5   # seconds a pickup message stays on screen
 const BANNER_TIME := 2.2    # seconds the "Wave X" banner stays up
 
@@ -44,6 +45,10 @@ const BANNER_TIME := 2.2    # seconds the "Wave X" banner stays up
 @onready var retry_button: Button = %RetryButton
 
 var is_game_over := false
+## Hit markers, headshot / kill streak popups, damage numbers and the
+## low-health effects (combat_feedback.gd). Drawn over the 3D view, under
+## the touch controls and the rest of the HUD.
+var feedback: CombatFeedback
 var _last_health := -1
 var _flash_tween: Tween
 var _message_tween: Tween
@@ -55,6 +60,10 @@ var _sight := "iron"
 
 
 func _ready() -> void:
+	feedback = CombatFeedback.new()
+	feedback.name = "CombatFeedback"
+	add_child(feedback)
+	move_child(feedback, scope_overlay.get_index() + 1)
 	game_over_panel.visible = false
 	pause_menu.visible = false
 	settings_menu.visible = false
@@ -147,6 +156,7 @@ func _focus(button: Button) -> void:
 
 func set_health(value: int) -> void:
 	health_label.text = "Health: %d" % value
+	feedback.set_health(value)
 	# Losing health flashes the screen red.
 	if _last_health != -1 and value < _last_health:
 		flash_damage()
@@ -257,6 +267,7 @@ func show_message(text: String) -> void:
 
 func show_game_over(waves: int, kills: int, score: int, best: int, new_best: bool) -> void:
 	is_game_over = true
+	feedback.clear()
 	crosshair.visible = false
 	scope_overlay.visible = false
 	touch_controls.visible = false

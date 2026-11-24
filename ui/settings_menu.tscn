@@ -30,9 +30,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -380.0
-offset_top = -300.0
+offset_top = -320.0
 offset_right = 380.0
-offset_bottom = 300.0
+offset_bottom = 320.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -150,6 +150,32 @@ theme_override_colors/font_color = Color(1, 1, 1, 0.6)
 theme_override_font_sizes/font_size = 20
 text = "Shadows, fog and render resolution"
 horizontal_alignment = 1
+
+[node name="ToggleRow" type="HBoxContainer" parent="Panel/Box"]
+layout_mode = 2
+theme_override_constants/separation = 24
+alignment = 1
+
+[node name="DamageNumbers" type="CheckButton" parent="Panel/Box/ToggleRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Damage Numbers"
+
+[node name="Vibration" type="CheckButton" parent="Panel/Box/ToggleRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Vibration"
+
+[node name="AimAssist" type="CheckButton" parent="Panel/Box/ToggleRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Aim Assist"
 
 [node name="BackButton" type="Button" parent="Panel/Box"]
 unique_name_in_owner = true

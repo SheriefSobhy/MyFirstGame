@@ -1,9 +1,10 @@
 extends CharacterBody3D
 ## First-person player: movement, mouse/touch look, weapons and health.
-## The weapons' stats live in weapon_stats.gd. This script handles shooting,
-## reloading, switching, aiming (down the sights, or the sniper scope),
-## throwing grenades and pickups, plus the "feel" effects: head bob, weapon
-## sway, recoil, camera shake and footsteps.
+## The weapons' stats live in weapon_stats.gd. This script handles shooting
+## (with headshots), reloading, switching, aiming (down the sights, or the
+## sniper scope), throwing grenades and pickups, plus the "feel" effects:
+## head bob, weapon sway, recoil, camera shake, footsteps, phone vibration
+## (effects/haptics.gd) and the touch-only aim assist.
 
 signal health_changed(health: int)
 ## reserve is -1 when the weapon has unlimited spare ammo.
@@ -16,8 +17,12 @@ signal grenades_changed(count: int)
 signal message(text: String)  # short HUD notice, e.g. "Picked up Shotgun"
 signal died
 signal hit_taken  # god mode: hit without losing health
+## A shot hit an enemy (all pellets on it added up). For the hit marker and
+## damage numbers. killed = this shot killed it.
+signal enemy_hit(enemy: Node3D, damage: int, point: Vector3, headshot: bool, killed: bool)
 
 const Weapons := preload("res://weapon_stats.gd")
+const Haptics := preload("res://effects/haptics.gd")
 const WeaponModel := preload("res://weapon_model.gd")
 const Grenade := preload("res://effects/grenade.gd")
 
@@ -58,6 +63,17 @@ const BOB_HEIGHT := 0.05
 const BOB_SIDE := 0.035
 const SWAY_AMOUNT := 0.0012     # weapon lag per pixel of look movement
 const SHAKE_ON_HIT := 0.8
+const HEADSHOT_MULTIPLIER := 2
+
+# Aim assist (touch controls only, Settings.aim_assist).
+const ASSIST_SLOW := 0.5         # look speed while the crosshair is on an enemy
+const ASSIST_CONE := 12.0        # degrees: aiming in pulls towards enemies this close to the crosshair
+const ASSIST_RANGE := 45.0       # m
+const ASSIST_SNAP_TIME := 0.25   # s after aiming in with the stronger pull...
+const ASSIST_SNAP_RATE := 5.0    # ...which closes this share (1/s, exponential) of the gap
+const ASSIST_TRACK_RATE := 1.2   # then a gentle pull that follows a moving target
+const ASSIST_OVER_MARGIN := 1.3  # x the enemy's radius counts as "on" it
+const ASSIST_MASK := 3           # walls and props hide enemies from the assist
 
 # Aiming down the sights.
 const ADS_TIME := 0.15          # seconds to raise the sights / lower them again
@@ -84,7 +100,14 @@ var grenades := START_GRENADES
 # Set by the on-screen touch controls (see touch_controls.gd).
 var touch_move := Vector2.ZERO   # joystick direction, length 0..1
 var touch_shoot := false         # true while the Shoot button is held
+## true while the touch controls are in use (set by main.gd): aim assist only works then.
+var touch_active := false
 var _jump_requested := false
+
+# Aim assist state, updated every physics frame.
+var _assist_over: Node3D = null    # enemy under the crosshair
+var _assist_target: Node3D = null  # enemy aiming in pulls towards
+var _aim_time := 0.0               # seconds since aiming in
 
 # Per-weapon state, indexed like Weapons.LIST.
 var _owned: Array[bool] = []
@@ -286,13 +309,17 @@ func _physics_process(delta: float) -> void:
 		shoot()
 	else:
 		_trigger_ready = true
+	_update_aim_assist(delta)
 
 
 ## Rotate the view by a mouse/finger movement in pixels.
 ## Turns the body left/right and tilts the head up/down. Slower while scoped.
-## Scaled by the look sensitivity from the settings screen.
-func look(relative: Vector2) -> void:
+## Scaled by the look sensitivity from the settings screen. With aim assist
+## on, finger looking slows down while the crosshair is on an enemy.
+func look(relative: Vector2, from_touch := false) -> void:
 	relative *= camera.fov / BASE_FOV * Settings.look_sensitivity
+	if from_touch and _assist_over != null and aim_assist_active():
+		relative *= ASSIST_SLOW
 	rotate_y(-relative.x * MOUSE_SENSITIVITY)
 	head.rotate_x(-relative.y * MOUSE_SENSITIVITY)
 	head.rotation.x = clampf(head.rotation.x, deg_to_rad(-89.0), deg_to_rad(89.0))
@@ -387,24 +414,32 @@ func shoot() -> void:
 	elif _aiming:
 		spread *= w.ads_spread
 	_spread = minf(_spread + w.spread_per_shot, w.max_spread)
+	Haptics.shot()
+	# Pellets through the head hitbox do double damage.
 	var enemy_hits := {}
 	var sparks := 0
 	for i in w.pellets:
-		var hit := _fire_ray(_spread_direction(spread), w.range)
+		var dir := _spread_direction(spread)
+		var hit := _fire_ray(dir, w.range)
 		if hit.is_empty():
 			continue
 		var target: Object = hit.collider
 		if target.has_method("take_damage"):
+			var head: bool = target.has_method("is_head_hit") and target.is_head_hit(camera.global_position, dir)
+			var dmg: int = w.damage * (HEADSHOT_MULTIPLIER if head else 1)
 			if enemy_hits.has(target):
-				enemy_hits[target].damage += w.damage
+				enemy_hits[target].damage += dmg
+				enemy_hits[target].headshot = enemy_hits[target].headshot or head
 			else:
-				enemy_hits[target] = {"damage": w.damage, "point": hit.position, "normal": hit.normal}
+				enemy_hits[target] = {"damage": dmg, "point": hit.position, "normal": hit.normal, "headshot": head}
 		else:
 			_spawn_impact(hit.position, hit.normal, sparks < MAX_SPARKS_PER_SHOT)
 			sparks += 1
 	for target: Object in enemy_hits:
 		var h: Dictionary = enemy_hits[target]
-		target.take_damage(h.damage, h.point, h.normal)  # enemy: blood + hit reaction
+		target.take_damage(h.damage, h.point, h.normal, h.headshot)  # enemy: blood + hit reaction
+		var killed: bool = "hp" in target and target.hp <= 0
+		enemy_hit.emit(target, h.damage, h.point, h.headshot, killed)
 
 	# The view climbs a little (after the bullets left, so they go where you aimed).
 	head.rotation.x = minf(head.rotation.x + deg_to_rad(w.view_kick), deg_to_rad(89.0))
@@ -551,6 +586,7 @@ func _set_aiming(on: bool) -> void:
 	if on == _aiming:
 		return
 	_aiming = on
+	_aim_time = 0.0
 	var w := current_weapon()
 	var scope: bool = w.sight == "scope"
 	var fov := BASE_FOV
@@ -570,6 +606,102 @@ func _set_aiming(on: bool) -> void:
 		weapon_sway.visible = not scoped  # the gun would block the scope view
 		scope_changed.emit(scoped)
 	aim_changed.emit(on, w.sight)
+
+
+# --- Aim assist (touch only) ------------------------------------------------
+
+## On with the touch controls only: not with a captured mouse (e.g. a
+## touchscreen laptop played with the mouse).
+func aim_assist_active() -> bool:
+	return touch_active and Settings.aim_assist and not is_dead \
+			and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED
+
+
+## The enemy under the crosshair (aim assist), or null.
+func assist_enemy_under_crosshair() -> Node3D:
+	return _assist_over
+
+
+## The enemy aiming in is pulling towards (aim assist), or null.
+func assist_target() -> Node3D:
+	return _assist_target
+
+
+# Finds the enemy under the crosshair (look speed slows down on it) and,
+# while aiming, the visible enemy closest to the crosshair within ASSIST_CONE,
+# and turns the view a little towards its chest: more just after aiming in,
+# then gently. At most two rays a frame (visibility of those two enemies).
+func _update_aim_assist(delta: float) -> void:
+	_aim_time += delta
+	_assist_over = null
+	_assist_target = null
+	if not aim_assist_active():
+		return
+	var from := camera.global_position
+	var forward := -head.global_basis.z
+	var over: Node3D = null
+	var over_dist := INF
+	var best: Node3D = null
+	var best_angle := deg_to_rad(ASSIST_CONE)
+	for e: Node in get_tree().get_nodes_in_group("enemies"):
+		if not e is CharacterBody3D or not "stats" in e:
+			continue
+		var enemy := e as Node3D
+		var to := _assist_point(enemy) - from
+		var dist := to.length()
+		if dist > ASSIST_RANGE or dist < 0.3:
+			continue
+		if dist < over_dist and _crosshair_on(from, forward, enemy):
+			over = enemy
+			over_dist = dist
+		if _aiming:
+			var angle := forward.angle_to(to / dist)
+			if angle < best_angle:
+				best_angle = angle
+				best = enemy
+	if over != null and _can_see(from, _assist_point(over)):
+		_assist_over = over
+	if best != null and _can_see(from, _assist_point(best)):
+		_assist_target = best
+		var rate := ASSIST_SNAP_RATE if _aim_time < ASSIST_SNAP_TIME else ASSIST_TRACK_RATE
+		_turn_towards(_assist_point(best), 1.0 - exp(-rate * delta))
+
+
+func _assist_point(enemy: Node3D) -> Vector3:
+	return enemy.global_position + Vector3.UP * enemy.stats.height * 0.6
+
+
+# True if the line of sight passes through the enemy's body (its upright
+# capsule, a little wider).
+func _crosshair_on(from: Vector3, forward: Vector3, enemy: Node3D) -> bool:
+	var flat := Vector2(forward.x, forward.z)
+	if flat.length_squared() < 1e-4:
+		return false  # looking straight up or down
+	var base := enemy.global_position
+	var t := Vector2(base.x - from.x, base.z - from.z).dot(flat) / flat.length_squared()
+	if t <= 0.0:
+		return false
+	var p := from + forward * t
+	var miss := Vector2(p.x - base.x, p.z - base.z).length()
+	var y := p.y - base.y
+	return miss < enemy.stats.radius * ASSIST_OVER_MARGIN and y > -0.1 and y < enemy.stats.height + 0.15
+
+
+# Nothing but enemies (that one, or another in front of it) between `from` and `to`.
+func _can_see(from: Vector3, to: Vector3) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(from, to, ASSIST_MASK, [get_rid()])
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	return hit.is_empty() or hit.collider is CharacterBody3D
+
+
+# Turns the body (yaw) and head (pitch) a share `amount` (0..1) of the way
+# to look at `target`.
+func _turn_towards(target: Vector3, amount: float) -> void:
+	var local := head.global_basis.inverse() * (target - camera.global_position)
+	var yaw := atan2(local.x, -local.z)
+	var pitch := atan2(local.y, Vector2(local.x, local.z).length())
+	rotate_y(-yaw * amount)
+	head.rotation.x = clampf(head.rotation.x + pitch * amount, deg_to_rad(-89.0), deg_to_rad(89.0))
 
 
 # --- Pickups ----------------------------------------------------------------
@@ -640,6 +772,7 @@ func take_damage(amount: int) -> void:
 	if is_dead:
 		return
 	_shake = maxf(_shake, SHAKE_ON_HIT)
+	Haptics.damage()
 	if GOD_MODE:
 		hit_taken.emit()  # red flash only
 		return

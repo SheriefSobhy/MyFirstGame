@@ -23,6 +23,9 @@ var master_volume := 1.0     # 0..1
 var music_volume := 0.6      # 0..1
 var look_sensitivity := 1.0  # multiplier on mouse and touch look speed
 var quality: int = Quality.HIGH
+var damage_numbers := true   # floating damage numbers on hits
+var haptics := true          # phone vibration on shots, kills, explosions and damage
+var aim_assist := true       # touch only: slower look over enemies, pull when aiming
 
 ## Best score and wave per map id (see maps.gd): {id: {"score": int, "wave": int}}.
 var bests := {}
@@ -60,6 +63,9 @@ func save_settings() -> void:
 	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("controls", "look_sensitivity", look_sensitivity)
 	cfg.set_value("graphics", "quality", quality)
+	cfg.set_value("gameplay", "damage_numbers", damage_numbers)
+	cfg.set_value("gameplay", "haptics", haptics)
+	cfg.set_value("gameplay", "aim_assist", aim_assist)
 	cfg.save(SETTINGS_PATH)
 
 
@@ -109,6 +115,9 @@ func _load() -> void:
 		look_sensitivity = clampf(cfg.get_value("controls", "look_sensitivity", look_sensitivity),
 				MIN_SENSITIVITY, MAX_SENSITIVITY)
 		quality = clampi(cfg.get_value("graphics", "quality", quality), Quality.LOW, Quality.HIGH)
+		damage_numbers = bool(cfg.get_value("gameplay", "damage_numbers", damage_numbers))
+		haptics = bool(cfg.get_value("gameplay", "haptics", haptics))
+		aim_assist = bool(cfg.get_value("gameplay", "aim_assist", aim_assist))
 	var save := ConfigFile.new()
 	if save.load(SAVE_PATH) == OK:
 		for section in save.get_sections():

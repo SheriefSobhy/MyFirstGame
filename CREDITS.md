@@ -185,3 +185,4 @@ These were made for this project, so no license applies:
 - The pallets, electricity poles, wires, chain-link fences and grime quads in `level/generated/`. `tools/build_level.gd` builds them from boxes and cylinders.
 - The baked lighting (`main.lmbake`, `main.exr`), made with Godot's LightmapGI.
 - The map pictures on the map selection screen (`ui/thumbnails/`), rendered from the game by `tools/make_thumbnails.gd`.
+- The hit marker tick, headshot ring, kill sound and heartbeat are synthesized in code by `effects/synth_sounds.gd` (no audio files).

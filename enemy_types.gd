@@ -22,6 +22,8 @@ extends RefCounted
 ##  growls          voice clips (null = slices of the shared moan recording)
 ##  growl_pitch     random pitch range for the voice
 ##  steps           footstep sounds (heavy types), played on each step
+##  blood           colour of the hit spray; null = metal sparks instead (exploder vest)
+##  head_size       head hitbox radius as a share of the head bone length (see enemy.gd)
 
 const ZOMBIE_MOANS := preload("res://assets/sounds/zombie_moans.ogg")
 
@@ -79,6 +81,8 @@ const TYPES := {
 		"growls": null,
 		"growl_pitch": Vector2(0.85, 1.1),
 		"steps": [],
+		"blood": Color(0.45, 0.06, 0.03),
+		"head_size": 0.6,
 	},
 	# Small, fast and fragile: sprints at the player, hits lightly but often.
 	"runner": {
@@ -112,6 +116,8 @@ const TYPES := {
 		],
 		"growl_pitch": Vector2(1.15, 1.35),
 		"steps": [],
+		"blood": Color(0.5, 0.07, 0.03),
+		"head_size": 0.6,
 	},
 	# Huge, slow and very tough. Doesn't flinch, and each punch hurts a lot.
 	"brute": {
@@ -148,6 +154,8 @@ const TYPES := {
 			preload("res://assets/sounds/enemies/brute_step_2.ogg"),
 			preload("res://assets/sounds/enemies/brute_step_3.ogg"),
 		],
+		"blood": Color(0.3, 0.03, 0.02),
+		"head_size": 0.6,
 	},
 	# Every 5th wave: an even bigger brute with glowing eyes and a health bar.
 	"boss": {
@@ -184,6 +192,8 @@ const TYPES := {
 			preload("res://assets/sounds/enemies/brute_step_2.ogg"),
 			preload("res://assets/sounds/enemies/brute_step_3.ogg"),
 		],
+		"blood": Color(0.28, 0.02, 0.04),
+		"head_size": 0.6,
 	},
 	# Keeps its distance and shoots: a red laser and a warning tone first,
 	# then a shot with a visible tracer. Punches if you get too close.
@@ -219,6 +229,8 @@ const TYPES := {
 		],
 		"growl_pitch": Vector2(1.2, 1.4),
 		"steps": [],
+		"blood": Color(0.75, 0.02, 0.02),
+		"head_size": 0.6,
 	},
 	# Glowing, beeping walking bomb: blows up next to the player, or when killed.
 	"exploder": {
@@ -251,5 +263,7 @@ const TYPES := {
 		],
 		"growl_pitch": Vector2(0.9, 1.1),
 		"steps": [],
+		"blood": null,
+		"head_size": 0.6,
 	},
 }

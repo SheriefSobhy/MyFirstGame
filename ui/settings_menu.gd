@@ -19,6 +19,12 @@ const QUALITY_HINTS := [
 @onready var quality_hint: Label = %QualityHint
 @onready var back_button: Button = %BackButton
 @onready var quality_buttons: Array[Button] = [%Low, %Medium, %High]
+## On/off settings: the button and the Settings variable it switches.
+@onready var toggles := {
+	"damage_numbers": %DamageNumbers as CheckButton,
+	"haptics": %Vibration as CheckButton,
+	"aim_assist": %AimAssist as CheckButton,
+}
 
 
 func _ready() -> void:
@@ -37,6 +43,10 @@ func _ready() -> void:
 	sensitivity_slider.value_changed.connect(func(v: float) -> void:
 		Settings.set_value("look_sensitivity", v)
 		_refresh_labels())
+	for key: String in toggles:
+		var button: CheckButton = toggles[key]
+		button.toggled.connect(func(on: bool) -> void: Settings.set_value(key, on))
+	%AimAssist.tooltip_text = "Touch controls only: slower turning over enemies, and a gentle pull towards them when you aim"
 	back_button.pressed.connect(close)
 	visibility_changed.connect(func() -> void:
 		if visible:
@@ -70,6 +80,8 @@ func _refresh() -> void:
 	sensitivity_slider.set_value_no_signal(Settings.look_sensitivity)
 	for i in quality_buttons.size():
 		quality_buttons[i].set_pressed_no_signal(i == Settings.quality)
+	for key: String in toggles:
+		(toggles[key] as CheckButton).set_pressed_no_signal(Settings.get(key))
 	_refresh_labels()
 
 

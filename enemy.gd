@@ -2,13 +2,18 @@ extends CharacterBody3D
 ## An animated enemy. Its `kind` picks the stats, model, colours and sounds
 ## from enemy_types.gd (set it before adding the enemy to the scene):
 ##  - normal, runner, brute, boss: walk to the player around obstacles
-##    (navmesh), punch when close, stagger when shot (brutes don't), and play
-##    a death animation.
+##    (navmesh), punch when close, stagger when shot (brutes don't, but they
+##    still flinch), and play a death animation.
 ##  - soldier: walks to a firing spot 7-15 m from the player (a reachable
 ##    point on the navmesh with a clear view), then aims (red laser +
 ##    warning tone) and fires a shot with a visible tracer.
 ##  - exploder: runs at the player, beeps faster when close and blows up,
 ##    or blows up when killed. Its blast hurts other enemies too.
+##
+## Every type has a head hitbox (head_sphere / is_head_hit; the gun doubles
+## the damage), is knocked back and flinches when hit, sprays blood in its
+## colour (sparks for the exploder) and on death is thrown back and falls
+## away from the shot.
 ##
 ## Navigation: Brutes and the Boss walk on the large navmesh (layer 2), the
 ## rest on the small one (enemy_types.gd nav_layer). Avoidance keeps them from
@@ -73,7 +78,18 @@ const BLAST_ENEMY_DAMAGE := 10
 const BLAST_PLAYER_DAMAGE := 45
 const DEATH_BLAST_DELAY := 0.2    # killed exploders go off a moment later
 
+# Hit reactions.
+const KNOCK_PER_DAMAGE := 1.0     # m/s of knockback per point of damage...
+const KNOCK_MAX := 4.0            # ...up to this (before the size factor)
+const KNOCK_MIN := 1.3            # m/s for the weakest hit (about 10 cm)
+const KNOCK_DECAY := 8.0          # m/s² the knockback slows down by
+const FLINCH_DEG := 9.0           # lean back on a hit (degrees, more for big hits)
+const HEADSHOT_FLINCH_DEG := 22.0
+const DEATH_SLIDE_PER_FORCE := 0.3  # m the body is thrown back per m/s of knockback
+const DEATH_SLIDE_MAX := 1.6
+
 const BLOOD_SCENE := preload("res://effects/blood_hit.tscn")
+const SPARKS_SCENE := preload("res://effects/impact_sparks.tscn")
 const FLASH_MATERIAL := preload("res://effects/hit_flash_material.tres")  # white overlay for hits
 const HIT_SOUNDS := [
 	preload("res://assets/sounds/impactPunch_medium_000.ogg"),
@@ -139,6 +155,17 @@ var _laser: MeshInstance3D
 var _glint: MeshInstance3D
 var _tracer: MeshInstance3D
 var _sfx: AudioStreamPlayer3D
+var _push := Vector3.ZERO         # knockback velocity, fades out
+var _last_hit_dir := Vector3.ZERO # direction the last hit pushed it (flat)
+var _last_hit_force := 0.0
+var _last_headshot := false
+var _flinch_tween: Tween
+var _head_bone := -1
+var _head_end_bone := -1          # tip of the head, if the rig has one
+var _head_length := 0.3           # m, head bone to the top of the head (without a tip bone)
+
+## Blood spray colours, one gradient per colour (shared by every enemy).
+static var _blood_ramps := {}
 
 @onready var anim: AnimationPlayer = $Model/AnimationPlayer
 @onready var agent: NavigationAgent3D = $NavigationAgent3D
@@ -189,6 +216,7 @@ func _ready() -> void:
 	_sfx.max_distance = 50.0
 	_sfx.position.y = stats.height * 0.7
 	add_child(_sfx)
+	_setup_head()
 	_setup_agent()
 	if kind == "soldier":
 		_add_gun()
@@ -228,8 +256,7 @@ func _physics_process(delta: float) -> void:
 		State.ATTACK:
 			_attack(delta)
 		State.HIT:
-			velocity.x = move_toward(velocity.x, 0.0, 20.0 * delta)
-			velocity.z = move_toward(velocity.z, 0.0, 20.0 * delta)
+			_stop()  # only the knockback moves it
 			if _state_time > stats.hit_stun:
 				_set_state(State.CHASE)
 		State.AIM:
@@ -247,6 +274,11 @@ func _physics_process(delta: float) -> void:
 		_orient_gun()
 	if not _wants_move and agent.avoidance_enabled:
 		agent.velocity = Vector3.ZERO  # standing: others still walk around it
+	if _push != Vector3.ZERO:
+		# Knocked back by a hit (on top of walking; walls still stop it).
+		velocity.x += _push.x
+		velocity.z += _push.z
+		_push = _push.move_toward(Vector3.ZERO, KNOCK_DECAY * delta)
 	move_and_slide()
 	_update_stuck(delta)
 	if _ghost_time > 0.0:
@@ -506,27 +538,118 @@ func _attack(delta: float) -> void:
 		_set_state(State.CHASE)
 
 
-## Called by the player's gun and by explosions.
-func take_damage(amount: int, hit_position := Vector3.ZERO, hit_normal := Vector3.UP) -> void:
+## Called by the player's gun and by explosions. The gun works out headshots
+## (is_head_hit) and has already doubled the damage for them.
+## Gun hits pass the surface normal (pointing back at the shooter);
+## explosions pass the direction the blast pushes.
+func take_damage(amount: int, hit_position := Vector3.ZERO, hit_normal := Vector3.UP, headshot := false) -> void:
 	if state == State.DEAD:
 		return
 	hp -= amount
 	health_changed.emit(maxi(hp, 0), max_hp)
-	_spawn_blood(hit_position, hit_normal)
+	_spawn_hit_effect(hit_position, hit_normal, headshot)
 	_flash()
 	hit_player.stream = HIT_SOUNDS.pick_random()
 	hit_player.pitch_scale = randf_range(0.9, 1.1)
 	hit_player.play()
+	_knock_back(amount, hit_position, hit_normal, headshot)
 
 	if hp <= 0:
 		_die()
-	elif stats.hit_stun > 0.0 and state != State.ARMED:
-		_set_state(State.HIT)
+	else:
+		_flinch(amount, headshot)
+		if stats.hit_stun > 0.0 and state != State.ARMED:
+			_set_state(State.HIT)
+
+
+# Pushed away from the hit; small enemies fly further than big ones.
+func _knock_back(amount: int, hit_position: Vector3, hit_normal: Vector3, headshot: bool) -> void:
+	var dir := global_position - hit_position
+	dir.y = 0.0
+	if dir.length_squared() < 0.0025:
+		dir = Vector3(hit_normal.x, 0.0, hit_normal.z)  # explosions hit the middle
+	if dir.length_squared() < 0.0025:
+		return
+	dir = dir.normalized()
+	var mass := clampf(pow(0.35 / stats.radius, 2.0), 0.15, 1.2)
+	var force := clampf(KNOCK_PER_DAMAGE * amount, KNOCK_MIN, KNOCK_MAX) * mass * (1.3 if headshot else 1.0)
+	_push = dir * force
+	_last_hit_dir = dir
+	_last_hit_force = force
+	_last_headshot = headshot
+
+
+# A quick lean back of the model (the whole model, so it also shows on the
+# Brutes and the Boss, which don't stagger). Headshots snap it further.
+func _flinch(amount: int, headshot: bool) -> void:
+	var model: Node3D = $Model
+	var angle := HEADSHOT_FLINCH_DEG if headshot else minf(FLINCH_DEG * (0.6 + amount * 0.2), FLINCH_DEG * 2.0)
+	if stats.radius > 0.5:
+		angle *= 0.5  # heavy ones barely rock
+	if _flinch_tween:
+		_flinch_tween.kill()
+	_flinch_tween = create_tween().set_trans(Tween.TRANS_QUAD)
+	# The model looks along its +Z: a negative X rotation leans it back.
+	_flinch_tween.tween_property(model, "rotation:x", -deg_to_rad(angle), 0.06).set_ease(Tween.EASE_OUT)
+	_flinch_tween.tween_property(model, "rotation:x", 0.0, 0.22).set_ease(Tween.EASE_IN_OUT)
+
+
+# --- Head hitbox ----------------------------------------------------------------
+
+# The head is a sphere from the "Head" bone to the top of the head ("Head_end",
+# or the top of the collision capsule for rigs without it). It follows the
+# animation; it is only worked out when a bullet hits, so it costs nothing
+# per frame.
+func _setup_head() -> void:
+	if _skel == null:
+		var found := $Model.find_children("*", "Skeleton3D", true, false)
+		if found.is_empty():
+			return
+		_skel = found[0]
+	_head_bone = _skel.find_bone("Head")
+	_head_end_bone = _skel.find_bone("Head_end")
+	if _head_bone >= 0 and _head_end_bone < 0:
+		var head_y := (_skel.global_transform * _skel.get_bone_global_pose(_head_bone).origin).y - global_position.y
+		_head_length = maxf(stats.height - head_y, 0.15)
+
+
+## The head hitbox right now: {"center": Vector3, "radius": float}, or empty
+## if the rig has no head bone.
+func head_sphere() -> Dictionary:
+	if _skel == null or _head_bone < 0:
+		return {}
+	var head := _skel.global_transform * _skel.get_bone_global_pose(_head_bone)
+	var top: Vector3
+	if _head_end_bone >= 0:
+		top = _skel.global_transform * _skel.get_bone_global_pose(_head_end_bone).origin
+	else:
+		top = head.origin + head.basis.y.normalized() * _head_length
+	var length := head.origin.distance_to(top)
+	return {"center": (head.origin + top) * 0.5, "radius": length * stats.head_size}
+
+
+## True if a bullet from `from` along `dir` (normalized) goes through the head.
+func is_head_hit(from: Vector3, dir: Vector3) -> bool:
+	if state == State.DEAD:
+		return false
+	var head := head_sphere()
+	if head.is_empty():
+		return false
+	var to_center: Vector3 = head.center - from
+	var along := to_center.dot(dir)
+	if along < 0.0:
+		return false
+	return (to_center - dir * along).length() <= head.radius
 
 
 func _die() -> void:
 	_set_state(State.DEAD)
 	velocity = Vector3.ZERO
+	_push = Vector3.ZERO
+	if _flinch_tween:
+		_flinch_tween.kill()
+		($Model as Node3D).rotation.x = 0.0
+	_throw_body()
 	collision.set_deferred("disabled", true)  # bullets and the player pass through the body
 	agent.avoidance_enabled = false           # the others walk through the body too
 	remove_from_group("enemies")
@@ -553,12 +676,20 @@ func _set_state(new_state: State) -> void:
 		State.DEAD:
 			_play_from_start(stats.anims.death, 0.1)
 			if stats.fall_over:
-				# Tip over backwards onto the ground (pivots on the feet).
+				# Tip over onto the ground (pivots on the feet): backwards,
+				# or forwards when the shot came from behind. Faster after a
+				# headshot or a big hit, with a small bounce.
+				var forward := -global_basis.z
+				forward.y = 0.0
+				var fall := 88.0
+				if _last_hit_dir.dot(forward.normalized()) > 0.3:
+					fall = -88.0
+				var quick := 0.7 if _last_headshot or _last_hit_force > 2.5 else 1.0
 				var tween := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-				tween.tween_interval(0.15)
-				tween.tween_property(self, "rotation:x", deg_to_rad(88.0), 0.45)
-				tween.tween_property(self, "rotation:x", deg_to_rad(80.0), 0.1).set_ease(Tween.EASE_OUT)
-				tween.tween_property(self, "rotation:x", deg_to_rad(88.0), 0.1)
+				tween.tween_interval(0.1 * quick)
+				tween.tween_property(self, "rotation:x", deg_to_rad(fall), 0.42 * quick)
+				tween.tween_property(self, "rotation:x", deg_to_rad(fall * 0.88), 0.1).set_ease(Tween.EASE_OUT)
+				tween.tween_property(self, "rotation:x", deg_to_rad(fall), 0.1)
 		State.AIM:
 			# Raise the gun and hold it there while the laser shows.
 			_play_from_start(stats.anims.shoot, 0.0)
@@ -978,10 +1109,53 @@ func _update_steps(delta: float) -> void:
 			_player.add_shake(0.25)
 
 
-func _spawn_blood(pos: Vector3, normal: Vector3) -> void:
-	var blood := BLOOD_SCENE.instantiate()
-	get_tree().current_scene.add_child(blood)
-	blood.setup(pos, normal)
+# Blood in the type's colour, or metal sparks for the Exploder's bomb vest.
+# Headshots get a second, upward burst.
+func _spawn_hit_effect(pos: Vector3, normal: Vector3, headshot: bool) -> void:
+	_spawn_spray(pos, normal)
+	if headshot:
+		_spawn_spray(pos, (normal + Vector3.UP).normalized())
+
+
+func _spawn_spray(pos: Vector3, normal: Vector3) -> void:
+	var color: Variant = stats.blood
+	var fx: Node3D = (SPARKS_SCENE if color == null else BLOOD_SCENE).instantiate()
+	get_tree().current_scene.add_child(fx)
+	if color != null:
+		var drops := fx.get_node_or_null("Drops") as CPUParticles3D
+		if drops:
+			drops.color_ramp = _blood_ramp(color)
+	fx.setup(pos, normal)
+
+
+static func _blood_ramp(c: Color) -> Gradient:
+	if not _blood_ramps.has(c):
+		var g := Gradient.new()
+		g.offsets = PackedFloat32Array([0.0, 0.7, 1.0])
+		g.colors = PackedColorArray([c, c.darkened(0.35), Color(c.darkened(0.6), 0.0)])
+		_blood_ramps[c] = g
+	return _blood_ramps[c]
+
+
+# Death: the body is thrown back along the last hit (not through walls).
+func _throw_body() -> void:
+	if _last_hit_force <= 0.0 or _last_hit_dir == Vector3.ZERO or not is_inside_tree():
+		return
+	var dist := minf(_last_hit_force * DEATH_SLIDE_PER_FORCE * (1.4 if _last_headshot else 1.0), DEATH_SLIDE_MAX)
+	var from: Vector3 = global_position + Vector3.UP * stats.height * 0.5
+	var q := PhysicsRayQueryParameters3D.create(from, from + _last_hit_dir * (dist + stats.radius), SIGHT_MASK, _sight_exclusions())
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	if not hit.is_empty():
+		dist = maxf(from.distance_to(hit.position) - stats.radius, 0.0)
+	if dist < 0.05:
+		return
+	var target := global_position + _last_hit_dir * dist
+	var parent := get_parent() as Node3D
+	if parent:
+		target = parent.to_local(target)
+	var tween := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "position:x", target.x, 0.4)
+	tween.parallel().tween_property(self, "position:z", target.z, 0.4)
 
 
 # Brief white overlay on every mesh of the model.
