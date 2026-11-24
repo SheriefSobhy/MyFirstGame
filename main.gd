@@ -62,6 +62,9 @@ var _boss: Node = null
 var _alive := 0        # spawned and not dead yet
 var _break_left := 0.0
 var _break_shown := -1
+var _nav_regions := {}       # navigation layer -> its NavigationRegion3D
+var _player_start := Vector3.ZERO
+var _spawns_by_layer := {}   # navigation layer -> spawn points usable on it
 
 @onready var player: CharacterBody3D = $Player
 @onready var hud: CanvasLayer = $HUD
@@ -74,10 +77,12 @@ var _break_shown := -1
 
 
 func _ready() -> void:
-	# Enemies walk around obstacles using the pre-baked navmesh in
-	# level_navmesh.res, and static objects are lit by the baked lightmap
-	# (main.lmbake). If you change the level, run tools/rebake.bat to bake
-	# both again.
+	# Enemies walk around obstacles using the pre-baked navmeshes (made by
+	# tools/bake_navmesh.gd), and the yard's static objects are lit by the
+	# baked lightmap (main.lmbake). If you change the level, run
+	# tools/rebake.bat to bake both again.
+	_add_navmeshes()
+	_player_start = player.global_position
 
 	# Looping ambient wind, and the gameplay music.
 	wind.stream.loop = true
@@ -207,10 +212,12 @@ func spawn_enemy() -> void:
 		enemy.hp_override = boss_hp(wave)
 		enemy.health_changed.connect(hud.set_boss_health)
 		_boss = enemy
-	var point: Node3D = _pick_spawn_point()
+	var layer := EnemyTypes.nav_layer(enemy.kind)
+	var point: Node3D = _pick_spawn_point(layer)
 	var offset := Vector3(randf_range(-SPAWN_SPREAD, SPAWN_SPREAD), 0.0, randf_range(-SPAWN_SPREAD, SPAWN_SPREAD))
-	enemy.position = point.position + offset
+	enemy.position = _on_navmesh(point.global_position + offset, layer)
 	enemy.died.connect(_on_enemy_died.bind(enemy))
+	enemy.stuck.connect(_on_enemy_stuck.bind(enemy))
 	enemies.add_child(enemy)
 	_to_spawn -= 1
 	_alive += 1
@@ -219,11 +226,108 @@ func spawn_enemy() -> void:
 		hud.show_message("The Brute Boss is here!")
 
 
-# A random spawn point that isn't right next to the player.
-func _pick_spawn_point() -> Node3D:
-	var far := spawn_points.filter(func(p: Node3D) -> bool:
+# A random spawn point that isn't right next to the player, and that enemies
+# on navigation `layer` can walk out of.
+func _pick_spawn_point(layer := EnemyTypes.NAV_SMALL) -> Node3D:
+	var usable := _spawn_points_for(layer)
+	var far := usable.filter(func(p: Node3D) -> bool:
 		return p.global_position.distance_to(player.global_position) > SAFE_SPAWN_DISTANCE)
-	return (far if not far.is_empty() else spawn_points).pick_random()
+	return (far if not far.is_empty() else usable).pick_random()
+
+
+# Spawn points connected to the player's start on that layer's navmesh (some
+# are in corners too tight for the Brute). Worked out once the map is ready.
+func _spawn_points_for(layer: int) -> Array[Node]:
+	if _spawns_by_layer.has(layer):
+		return _spawns_by_layer[layer]
+	var map := get_world_3d().navigation_map
+	if NavigationServer3D.map_get_iteration_id(map) == 0:
+		return spawn_points  # navmesh not ready yet
+	var ok: Array[Node] = []
+	for p: Node3D in spawn_points:
+		# The path must start at the spawn point (it isn't in a pocket cut out of
+		# this layer's navmesh) and end at the player start.
+		var path := NavigationServer3D.map_get_path(map, p.global_position, _player_start, true, layer)
+		if not path.is_empty() and path[path.size() - 1].distance_to(_player_start) < 1.5 \
+				and Vector2(path[0].x - p.global_position.x, path[0].z - p.global_position.z).length() < SPAWN_SPREAD + 0.5:
+			ok.append(p)
+	if ok.is_empty():
+		ok = spawn_points
+	_spawns_by_layer[layer] = ok
+	return ok
+
+
+# The closest point to `pos` on that layer's navmesh (if there is one near).
+func _on_navmesh(pos: Vector3, layer: int) -> Vector3:
+	var region: NavigationRegion3D = _nav_regions.get(layer, $NavigationRegion3D)
+	var map := get_world_3d().navigation_map
+	if NavigationServer3D.map_get_iteration_id(map) == 0:
+		return pos
+	var p := NavigationServer3D.region_get_closest_point(region.get_rid(), pos)
+	if Vector2(p.x - pos.x, p.z - pos.z).length() > 2.0:
+		return pos
+	return Vector3(p.x, pos.y, p.z)
+
+
+# The scene's NavigationRegion3D holds the small enemies' navmesh (layer 1).
+# The Brute's and the Boss's (<navmesh>_brute.res, _boss.res, see
+# enemy_types.gd NAV_MESHES) each go in a region of their own.
+func _add_navmeshes() -> void:
+	var small: NavigationRegion3D = $NavigationRegion3D
+	var base := small.navigation_mesh.resource_path.get_basename()
+	for m: Dictionary in EnemyTypes.NAV_MESHES:
+		if m.suffix == "":
+			small.navigation_layers = m.layer
+			_nav_regions[m.layer] = small
+			continue
+		var path: String = base + m.suffix + ".res"
+		if not ResourceLoader.exists(path):
+			push_warning("No navmesh at %s: run tools/bake_navmesh.gd" % path)
+			continue
+		var region := NavigationRegion3D.new()
+		region.name = "NavigationRegion" + m.suffix.capitalize().replace(" ", "")
+		region.navigation_layers = m.layer
+		region.navigation_mesh = load(path)
+		add_child(region)
+		_nav_regions[m.layer] = region
+
+
+## The navigation region of a layer (for tests).
+func nav_region(layer: int) -> NavigationRegion3D:
+	return _nav_regions.get(layer)
+
+
+# An enemy that couldn't get unstuck: move it to a spawn point the player
+# can't see (behind them or behind a wall), the furthest one if none is hidden.
+func _on_enemy_stuck(enemy: Node3D) -> void:
+	if not is_instance_valid(enemy) or enemy.state == enemy.State.DEAD:
+		return
+	var camera := get_viewport().get_camera_3d()
+	var layer := EnemyTypes.nav_layer(enemy.kind)
+	var hidden: Array[Node3D] = []
+	var furthest: Node3D = null
+	for p: Node3D in _spawn_points_for(layer):
+		var d := p.global_position.distance_to(player.global_position)
+		if d < SAFE_SPAWN_DISTANCE:
+			continue
+		if furthest == null or d > furthest.global_position.distance_to(player.global_position):
+			furthest = p
+		if not _player_can_see(camera, p.global_position + Vector3.UP * 1.2):
+			hidden.append(p)
+	var point: Node3D = hidden.pick_random() if not hidden.is_empty() else furthest
+	if point == null:
+		point = _pick_spawn_point(layer)
+	enemy.relocate(_on_navmesh(point.global_position, layer))
+
+
+func _player_can_see(camera: Camera3D, pos: Vector3) -> bool:
+	if camera == null:
+		return true
+	var to := pos - camera.global_position
+	if to.normalized().dot(-camera.global_basis.z) < 0.3:
+		return false  # outside (roughly) the field of view
+	var q := PhysicsRayQueryParameters3D.create(camera.global_position, pos, 3, [player.get_rid()])
+	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 
 func _on_enemy_died(enemy: Node) -> void:

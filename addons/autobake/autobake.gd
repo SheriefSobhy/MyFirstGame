@@ -1,10 +1,10 @@
 @tool
 extends EditorPlugin
-## Bakes the navmesh and the lightmap for main.tscn without clicking anything.
+## Bakes the lightmap for main.tscn without clicking anything.
 ## It does NOTHING unless the editor is started with the --autobake user arg:
 ##   Godot_v4.7.2-stable_win64_console.exe --editor --path . -- --autobake
-## (tools/rebake.bat runs exactly that.) It opens main.tscn, bakes the
-## NavigationRegion3D into level_navmesh.res, presses the editor's own
+## (tools/rebake.bat runs exactly that, then bakes the navmeshes with
+## tools/bake_navmesh.gd.) It opens main.tscn, presses the editor's own
 ## "Bake Lightmaps" button (LightmapGI can't be baked from script in 4.7),
 ## answers the save dialog with res://main.lmbake, saves the scene and quits.
 
@@ -27,10 +27,8 @@ func _run() -> void:
 	await _frames(30)
 	var scene := EditorInterface.get_edited_scene_root()
 
-	var nav: NavigationRegion3D = scene.get_node("NavigationRegion3D")
-	nav.bake_navigation_mesh(false)
-	var err := ResourceSaver.save(nav.navigation_mesh, "res://level_navmesh.res")
-	print("AUTOBAKE: navmesh polygons ", nav.navigation_mesh.get_polygon_count(), " save ", error_string(err))
+	# The navmeshes are baked by tools/bake_navmesh.gd (rebake.bat runs it
+	# after this), which also removes unreachable islands.
 
 	var lm: LightmapGI = scene.get_node("LightmapGI")
 	EditorInterface.get_selection().clear()

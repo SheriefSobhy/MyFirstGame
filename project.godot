@@ -118,6 +118,11 @@ weapon_prev={
 "events": [Object(InputEventMouseButton,"button_index":4)]
 }
 
+[navigation]
+
+3d/default_cell_size=0.125
+3d/default_cell_height=0.1
+
 [physics]
 
 3d/physics_engine="Jolt Physics"

@@ -1,6 +1,7 @@
 extends SceneTree
 ## Builds the two extra maps, maps/town.tscn and maps/warehouse.tscn, from
-## code, and bakes their navmeshes (maps/<id>_navmesh.res).
+## code, and does a first bake of their navmeshes (maps/<id>_navmesh.res);
+## run tools/bake_navmesh.gd afterwards for the final ones.
 ## Each map is a full game scene running main.gd, with the same nodes as
 ## main.tscn (Player, HUD, Enemies, SpawnPoints, SpawnTimer, Pickups, Sun...).
 ## Run: godot --headless --path . --script res://tools/build_maps.gd
@@ -34,7 +35,8 @@ func _process(_delta: float) -> bool:
 	_make_shared_materials()
 	_save_map(_build_town(), "town")
 	_save_map(_build_warehouse(), "warehouse")
-	print("BUILD_MAPS: done")
+	print("BUILD_MAPS: done. Now run tools/bake_navmesh.gd for the final navmeshes")
+	print("  (Brute/Boss navmeshes, unreachable islands removed).")
 	quit()
 	return true
 
@@ -755,7 +757,8 @@ func _save_map(map_root: Node3D, id: String) -> void:
 	var yard: NavigationMesh = load("res://level_navmesh.res")
 	var nm := NavigationMesh.new()
 	for p in ["cell_size", "cell_height", "agent_radius", "agent_height", "agent_max_climb", "agent_max_slope",
-			"geometry_parsed_geometry_type", "geometry_collision_mask", "region_min_size", "edge_max_error"]:
+			"geometry_parsed_geometry_type", "geometry_collision_mask", "region_min_size", "edge_max_error",
+			"filter_walkable_low_height_spans", "filter_ledge_spans", "filter_low_hanging_obstacles"]:
 		nm.set(p, yard.get(p))
 	region.navigation_mesh = nm
 	region.bake_navigation_mesh(false)

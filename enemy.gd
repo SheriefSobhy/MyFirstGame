@@ -4,13 +4,22 @@ extends CharacterBody3D
 ##  - normal, runner, brute, boss: walk to the player around obstacles
 ##    (navmesh), punch when close, stagger when shot (brutes don't), and play
 ##    a death animation.
-##  - soldier: keeps 7-15 m away with a clear view of the player, then aims
-##    (red laser + warning tone) and fires a shot with a visible tracer.
+##  - soldier: walks to a firing spot 7-15 m from the player (a reachable
+##    point on the navmesh with a clear view), then aims (red laser +
+##    warning tone) and fires a shot with a visible tracer.
 ##  - exploder: runs at the player, beeps faster when close and blows up,
 ##    or blows up when killed. Its blast hurts other enemies too.
+##
+## Navigation: Brutes and the Boss walk on the large navmesh (layer 2), the
+## rest on the small one (enemy_types.gd nav_layer). Avoidance keeps them from
+## pushing each other into walls. An enemy that stops making progress first
+## recalculates its path (STUCK_REPATH), then sidesteps (STUCK_SLIDE), and
+## finally asks main.gd to move it to a hidden spawn point (STUCK_RESPAWN).
 
 signal died
 signal health_changed(hp: int, max_hp: int)
+## Still stuck after STUCK_RESPAWN seconds: main.gd calls relocate().
+signal stuck
 
 enum State { CHASE, ATTACK, HIT, DEAD, AIM, SHOOT, ARMED }
 
@@ -21,6 +30,20 @@ const WeaponModel := preload("res://weapon_model.gd")
 const TURN_SPEED := 8.0           # how fast the enemy turns to face its direction
 const CORPSE_TIME := 4.0          # seconds the body stays before sinking away
 const FLASH_TIME := 0.08
+
+# Navigation.
+const REPATH_MOVE := 0.75         # new path as soon as the target moved this far...
+const REPATH_TIME := 1.5          # ...and at least this often (not every frame: with two
+                                  # equally long ways round an obstacle it kept flipping)
+const AVOID_MARGIN := 0.15        # extra avoidance radius around the body
+const PROGRESS_CHECK := 0.5       # seconds between "is it getting anywhere?" checks
+const PROGRESS_MIN := 0.3         # m/s: slower than this (or half its speed) = barely moving
+const STUCK_REPATH := 2.0         # seconds without progress before recalculating the path
+const STUCK_SLIDE := 5.0          # ... before sidestepping
+const STUCK_RESPAWN := 10.0       # ... before moving to a hidden spawn point
+const SLIDE_TIME := 0.8           # length of a sidestep
+const NEAR_PLAYER := 1.5          # within attack range + this, crowding isn't "stuck"
+const GHOST_TIME := 1.5           # seconds it walks through other enemies to break a jam
 
 # Soldier.
 const SOLDIER_MIN_RANGE := 7.0    # backs away if the player is closer
@@ -37,6 +60,11 @@ const GUN_SCALE := 0.045          # pistol in the hand (the rig's bones are 100x
 const SIGHT_MASK := 3             # walls and props block the soldier's view and shots
 const AIM_POSE_TIME := 0.05       # frame of the shoot animation held while aiming
 const GLINT_SIZE := 0.5           # the blinking red warning light at the muzzle (m)
+const SPOT_RANGES := [11.0, 8.5, 13.5]  # distances tried for a firing spot
+const SPOT_ANGLES := 10           # directions tried around the player
+const SPOT_TIME := Vector2(1.5, 3.0)    # seconds before moving to the next spot
+const SPOT_PLAYER_MOVE := 3.0     # re-pick when the player moved this far
+const SPOT_REACHED := 0.6
 
 # Exploder.
 const ARM_TIME := 0.7             # seconds of fast beeping before it blows up
@@ -72,6 +100,10 @@ var state := State.CHASE
 var silent := false
 ## false when an exploder blew itself up (no points for the player).
 var killed_by_player := true
+## How stuck it is now (0 fine, 1 re-pathed, 2 sidestepped, 3 relocated), and
+## how many times each happened (for tests).
+var stuck_level := 0
+var stuck_counts := [0, 0, 0, 0]
 
 var _state_time := 0.0
 var _attack_landed := false
@@ -80,10 +112,23 @@ var _growl_timer := 0.0
 var _flash_timer := 0.0
 var _step_timer := 0.0
 var _shot_cooldown := 0.0
-var _strafe_dir := 1.0
-var _strafe_timer := 0.0
+var _strafe_dir := 1.0            # soldier: which side its next firing spot is on
 var _beep_timer := 0.0
 var _exploded := false
+var _wants_move := false          # set each frame by _walk_to when it is trying to walk
+var _speed_mult := 1.0
+var _safe_velocity := Vector3.ZERO
+var _safe_frame := -100           # physics frame of the last avoidance result
+var _progress_from := Vector3.ZERO
+var _progress_timer := 0.0
+var _stuck_time := 0.0
+var _slide_dir := Vector3.ZERO
+var _slide_time := 0.0
+var _ghost_time := 0.0
+var _ghosted: Array[Node] = []    # enemies it is passing through right now
+var _spot := Vector3.INF          # soldier's firing spot
+var _spot_timer := 0.0
+var _spot_player_pos := Vector3.ZERO
 var _player: Node3D
 var _setup_done := false
 var _glow_materials: Array[StandardMaterial3D] = []
@@ -144,6 +189,7 @@ func _ready() -> void:
 	_sfx.max_distance = 50.0
 	_sfx.position.y = stats.height * 0.7
 	add_child(_sfx)
+	_setup_agent()
 	if kind == "soldier":
 		_add_gun()
 		_shot_cooldown = randf_range(0.8, 1.6)
@@ -172,6 +218,7 @@ func _physics_process(delta: float) -> void:
 		velocity += get_gravity() * delta
 	_update_growl(delta)
 
+	_wants_move = false
 	match state:
 		State.CHASE:
 			if kind == "soldier":
@@ -198,7 +245,14 @@ func _physics_process(delta: float) -> void:
 	_update_steps(delta)
 	if _gun:
 		_orient_gun()
+	if not _wants_move and agent.avoidance_enabled:
+		agent.velocity = Vector3.ZERO  # standing: others still walk around it
 	move_and_slide()
+	_update_stuck(delta)
+	if _ghost_time > 0.0:
+		_ghost_time -= delta
+		if _ghost_time <= 0.0:
+			_end_ghost()
 
 
 func _walk_anim_speed() -> float:
@@ -209,27 +263,223 @@ func _player_alive() -> bool:
 	return _player != null and not _player.is_dead
 
 
+# Its navmesh (by size), and avoidance so enemies make room for each other
+# instead of shoving each other into walls. Bigger enemies have the right of way.
+func _setup_agent() -> void:
+	agent.navigation_layers = Types.nav_layer(kind)
+	agent.radius = stats.radius + AVOID_MARGIN
+	agent.height = stats.height
+	agent.path_desired_distance = 0.4  # reach each corner before turning (big ones cut them)
+	agent.max_speed = stats.speed * speed_scale * 1.2
+	agent.neighbor_distance = 5.0
+	agent.max_neighbors = 8
+	agent.time_horizon_agents = 1.0
+	agent.avoidance_priority = clampf(stats.radius, 0.3, 1.0)  # Boss > Brute > the rest
+	agent.avoidance_enabled = not silent
+	agent.velocity_computed.connect(_on_velocity_computed)
+	_progress_from = global_position
+
+
+func _on_velocity_computed(safe: Vector3) -> void:
+	_safe_velocity = safe
+	_safe_frame = Engine.get_physics_frames()
+
+
 # Walk along the navmesh towards `target` at the type's speed.
 func _walk_to(target: Vector3, delta: float, speed_mult := 1.0) -> void:
-	_repath_timer -= delta
-	if _repath_timer <= 0.0:
-		agent.target_position = target
-		_repath_timer = 0.25
-	var to_target := agent.get_next_path_position() - global_position
-	to_target.y = 0.0
-	if to_target.length() < 0.05:
-		# No path (e.g. navmesh not ready yet): walk straight at the target.
-		to_target = target - global_position
-		to_target.y = 0.0
-	var dir := to_target.normalized()
-	velocity.x = dir.x * stats.speed * speed_scale * speed_mult
-	velocity.z = dir.z * stats.speed * speed_scale * speed_mult
+	_wants_move = true
+	_speed_mult = speed_mult
+	var dir: Vector3
+	var use_avoidance := _slide_time <= 0.0 and _ghost_time <= 0.0
+	if _slide_time > 0.0:
+		# Sidestepping out of a stuck spot.
+		_slide_time -= delta
+		dir = _slide_dir
+		if _slide_time <= 0.0:
+			_repath_timer = 0.0
+	else:
+		_repath_timer -= delta
+		if _repath_timer <= 0.0 or target.distance_to(agent.target_position) > REPATH_MOVE:
+			agent.target_position = target
+			_repath_timer = REPATH_TIME
+		var to_next := agent.get_next_path_position() - global_position
+		to_next.y = 0.0
+		if agent.is_navigation_finished() or to_next.length() < 0.05:
+			# End of the path (or no navmesh yet): the last bit straight at the
+			# target, if nothing is in the way. If the path stops short (the
+			# target is somewhere too tight for this enemy), wait there for it
+			# to come out instead of squeezing in.
+			var to_target := target - global_position
+			to_target.y = 0.0
+			var step := to_target.normalized() * 0.3
+			var path_end := agent.get_final_position()
+			var short := not agent.get_current_navigation_path().is_empty() \
+					and _flat_distance(path_end, target) > maxf(stats.attack_range, 1.0)
+			if short or to_target.length() < 0.2 or test_move(global_transform.translated(Vector3.UP * 0.05), step):
+				_wants_move = false
+				_stop()
+				return
+			to_next = to_target
+			use_avoidance = false  # the agent's avoidance stops once its path is done
+		dir = to_next.normalized()
+	var desired: Vector3 = dir * stats.speed * speed_scale * speed_mult
+	var v := desired
+	if agent.avoidance_enabled:
+		agent.velocity = desired
+	if agent.avoidance_enabled and use_avoidance:
+		# Avoidance only knows about the other enemies: never let it steer
+		# this one into a wall or a crate (the path itself is clear of them),
+		# and don't let a crowd freeze everyone in place (RVO can return ~0
+		# for all of them in a narrow spot): then just push on.
+		var fresh := Engine.get_physics_frames() - _safe_frame <= 2
+		if fresh and _safe_velocity.length() >= desired.length() * 0.2 \
+				and _static_normal(_safe_velocity * 0.15) == Vector3.ZERO:
+			v = _safe_velocity
+	# Walking straight into an obstacle (e.g. shoved off its path next to a
+	# crate): go along it instead, on the side of the next waypoint.
+	if v.length_squared() > 0.01:
+		var n := _static_normal(v.normalized() * 0.2)
+		if n != Vector3.ZERO and v.normalized().dot(-n) > 0.7:
+			var along := n.cross(Vector3.UP)
+			along.y = 0.0
+			var side := along.dot(dir)
+			if absf(side) < 0.05:
+				side = _strafe_dir
+			v = along.normalized() * signf(side) * v.length()
+	velocity.x = v.x
+	velocity.z = v.z
 	_turn_towards(dir, delta)
+
+
+# The normal of the wall/prop it would hit moving by `motion` (zero if none;
+# other enemies and the player don't count).
+func _static_normal(motion: Vector3) -> Vector3:
+	var hit := KinematicCollision3D.new()
+	if test_move(global_transform.translated(Vector3.UP * 0.05), motion, hit) and hit.get_collider() is StaticBody3D:
+		var n := hit.get_normal()
+		n.y = 0.0
+		return n.normalized() if n.length_squared() > 0.01 else Vector3.ZERO
+	return Vector3.ZERO
 
 
 func _stop() -> void:
 	velocity.x = 0.0
 	velocity.z = 0.0
+
+
+# Every PROGRESS_CHECK seconds while walking: did it cover at least
+# PROGRESS_MIN of the distance it should have? If not, the stuck time adds
+# up: at STUCK_REPATH it recalculates its path, at STUCK_SLIDE it sidesteps,
+# at STUCK_RESPAWN main.gd moves it to a spawn point out of the player's view.
+func _update_stuck(delta: float) -> void:
+	var walking := _wants_move and (state == State.CHASE or state == State.ARMED)
+	if not walking or (_player_alive() and _player_in_range(stats.attack_range + NEAR_PLAYER)):
+		# Standing on purpose, or crowding round the player: not stuck.
+		_reset_progress()
+		return
+	_progress_timer += delta
+	if _progress_timer < PROGRESS_CHECK:
+		return
+	var moved := Vector2(global_position.x - _progress_from.x, global_position.z - _progress_from.z).length()
+	var speed: float = stats.speed * speed_scale * _speed_mult
+	if moved >= minf(PROGRESS_MIN, speed * 0.5) * _progress_timer:
+		_stuck_time = 0.0
+		stuck_level = 0
+	else:
+		_stuck_time += _progress_timer
+		if _ghost_time <= 0.0 and _pressed_against_enemy():
+			_start_ghost()
+	_progress_timer = 0.0
+	_progress_from = global_position
+	if _stuck_time >= STUCK_RESPAWN and stuck_level < 3:
+		_set_stuck_level(3)
+		stuck.emit()
+	elif _stuck_time >= STUCK_SLIDE and stuck_level < 2:
+		_set_stuck_level(2)
+		_start_slide()
+	elif _stuck_time >= STUCK_REPATH and stuck_level < 1:
+		_set_stuck_level(1)
+		_repath_timer = 0.0  # a new path query on the next step
+		_spot = Vector3.INF  # soldiers also pick a new firing spot
+
+
+# Jammed in with other enemies (e.g. two Brutes meeting in a gap only one of
+# them fits through): neither gives way, so this one walks through the others
+# for a moment. Walls and the player still stop it.
+func _pressed_against_enemy() -> bool:
+	for e: Node3D in get_tree().get_nodes_in_group("enemies"):
+		if e != self and e is CharacterBody3D:
+			var reach: float = stats.radius + e.stats.radius + 0.3
+			if Vector2(e.global_position.x - global_position.x, e.global_position.z - global_position.z).length() < reach:
+				return true
+	return false
+
+
+func _start_ghost() -> void:
+	_ghost_time = GHOST_TIME
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if e != self and e is PhysicsBody3D:
+			add_collision_exception_with(e)
+			_ghosted.append(e)
+
+
+func _end_ghost() -> void:
+	_ghost_time = 0.0
+	for e in _ghosted:
+		if is_instance_valid(e):
+			remove_collision_exception_with(e)
+	_ghosted.clear()
+
+
+func _set_stuck_level(level: int) -> void:
+	stuck_level = level
+	stuck_counts[level] += 1
+
+
+func _reset_progress() -> void:
+	_progress_timer = 0.0
+	_progress_from = global_position
+	_stuck_time = 0.0
+	stuck_level = 0
+
+
+# Sidestep: left or right of where it was trying to go, whichever is free
+# (backwards if both are blocked).
+func _start_slide() -> void:
+	var forward := agent.get_next_path_position() - global_position
+	forward.y = 0.0
+	if forward.length_squared() < 0.01:
+		forward = -global_basis.z
+	forward = forward.normalized()
+	var side := forward.cross(Vector3.UP)
+	if randf() < 0.5:
+		side = -side
+	var from := global_transform.translated(Vector3.UP * 0.05)
+	var options := [side, -side, (side - forward).normalized(), (-side - forward).normalized(), -forward]
+	_slide_dir = -forward
+	for o: Vector3 in options:
+		if not test_move(from, o * 0.8):
+			_slide_dir = o
+			break
+	_slide_time = SLIDE_TIME
+
+
+## Called by main.gd when it was stuck for too long: start again from `pos`.
+func relocate(pos: Vector3) -> void:
+	global_position = pos
+	velocity = Vector3.ZERO
+	_slide_time = 0.0
+	_spot = Vector3.INF
+	_repath_timer = 0.0
+	_safe_frame = -100
+	_reset_progress()
+	if state != State.DEAD:
+		_set_state(State.CHASE)
+
+
+## True while it is walking somewhere (not standing to shoot, waiting or attacking).
+func is_trying_to_move() -> bool:
+	return _wants_move
 
 
 func _chase(delta: float) -> void:
@@ -278,6 +528,7 @@ func _die() -> void:
 	_set_state(State.DEAD)
 	velocity = Vector3.ZERO
 	collision.set_deferred("disabled", true)  # bullets and the player pass through the body
+	agent.avoidance_enabled = false           # the others walk through the body too
 	remove_from_group("enemies")
 	_hide_laser()
 	_growl(0.7)  # a groan
@@ -355,45 +606,102 @@ func _face_player(delta: float) -> void:
 
 # --- Soldier ------------------------------------------------------------------
 
-# Keeps a good shooting distance: closer if too far or the view is blocked,
-# backs off if the player is too close, otherwise sidesteps until it can fire.
+# Walks (along the navmesh) to a firing spot SOLDIER_MIN_RANGE..MAX_RANGE from
+# the player with a clear view, and fires from there. Every few seconds it
+# moves on to a spot a little to the side, so it doesn't stand still.
 func _soldier_move(delta: float) -> void:
 	if not _player_alive():
 		_stop()
 		return
 	_shot_cooldown -= delta
-	var dist := _flat_distance_to_player()
 	if _player_in_range(stats.attack_range):
 		_set_state(State.ATTACK)
 		return
-	var sees := can_see_player()
-	if dist > SOLDIER_MAX_RANGE or not sees:
-		_walk_to(_player.global_position, delta)
+	_spot_timer -= delta
+	if _spot == Vector3.INF or _spot_timer <= 0.0 or not _spot_still_good():
+		_pick_spot()
+	var dist := _flat_distance_to_player()
+	var in_band := dist >= SOLDIER_MIN_RANGE and dist <= SOLDIER_MAX_RANGE
+	if in_band and can_see_player():
+		# Good place to shoot from: drift on to the spot, facing the player.
+		if _spot != Vector3.INF and _flat_distance(global_position, _spot) > SPOT_REACHED:
+			_walk_to(_spot, delta, 0.5)
+		else:
+			_stop()
+		_face_player(delta)
+		if _shot_cooldown <= 0.0:
+			_set_state(State.AIM)
 		return
-	var away := global_position - _player.global_position
-	away.y = 0.0
-	away = away.normalized()
-	if dist < SOLDIER_MIN_RANGE:
-		velocity.x = away.x * stats.speed * speed_scale
-		velocity.z = away.z * stats.speed * speed_scale
-	else:
-		_strafe_timer -= delta
-		if _strafe_timer <= 0.0:
-			_strafe_timer = randf_range(1.5, 3.0)
-			_strafe_dir = -_strafe_dir
-		var side := away.cross(Vector3.UP) * _strafe_dir
-		velocity.x = side.x * stats.speed * 0.5
-		velocity.z = side.z * stats.speed * 0.5
-	_face_player(delta)
-	if _shot_cooldown <= 0.0:
-		_set_state(State.AIM)
+	if _spot != Vector3.INF and _flat_distance(global_position, _spot) <= SPOT_REACHED:
+		_spot_timer = minf(_spot_timer, 0.3)  # here, but the view is gone: find another soon
+	_walk_to(_spot if _spot != Vector3.INF else _player.global_position, delta)
+
+
+func _flat_distance(a: Vector3, b: Vector3) -> float:
+	return Vector2(a.x - b.x, a.z - b.z).length()
+
+
+func _spot_still_good() -> bool:
+	if _player.global_position.distance_to(_spot_player_pos) > SPOT_PLAYER_MOVE:
+		return false
+	var d := _flat_distance(_spot, _player.global_position)
+	return d >= SOLDIER_MIN_RANGE and d <= SOLDIER_MAX_RANGE
+
+
+## Picks the firing spot: points around the player, snapped onto this
+## soldier's navmesh by asking for a path there (so it is reachable), kept
+## only if they are in range and have a clear view of the player. The one
+## with the shortest walk wins; the next spot is a little to the side.
+func _pick_spot() -> void:
+	_spot_timer = randf_range(SPOT_TIME.x, SPOT_TIME.y)
+	_spot_player_pos = _player.global_position
+	_strafe_dir = -_strafe_dir
+	var map := get_world_3d().navigation_map
+	if NavigationServer3D.map_get_iteration_id(map) == 0:
+		_spot = Vector3.INF  # navmesh not ready yet
+		return
+	var from_player := global_position - _player.global_position
+	from_player.y = 0.0
+	var base := atan2(from_player.x, from_player.z) + _strafe_dir * 0.35
+	var best := Vector3.INF
+	var best_cost := INF
+	for r: float in SPOT_RANGES:
+		for i in SPOT_ANGLES:
+			# Directions alternate either side of `base`, nearest first.
+			var step := ceili(i / 2.0) * (1 if i % 2 == 0 else -1)
+			var a := base + step * TAU / SPOT_ANGLES
+			var wanted := _player.global_position + Vector3(sin(a), 0.0, cos(a)) * r
+			var path := NavigationServer3D.map_get_path(map, global_position, wanted, true, agent.navigation_layers)
+			if path.is_empty():
+				continue
+			var p: Vector3 = path[path.size() - 1]
+			var d := _flat_distance(p, _player.global_position)
+			if _flat_distance(p, wanted) > 1.5 or d < SOLDIER_MIN_RANGE + 0.5 or d > SOLDIER_MAX_RANGE - 0.5:
+				continue
+			if not _clear_view_from(p):
+				continue
+			var length := 0.0
+			for k in range(1, path.size()):
+				length += path[k - 1].distance_to(path[k])
+			var cost := length + absf(step) * 0.5
+			if cost < best_cost:
+				best_cost = cost
+				best = p
+		if best != Vector3.INF:
+			break  # the preferred distance found one
+	_spot = best
 
 
 ## True if nothing solid is between the soldier's eyes and the player's chest.
 func can_see_player() -> bool:
+	return _clear_view_from(global_position)
+
+
+# The same check as if the soldier stood at `pos`.
+func _clear_view_from(pos: Vector3) -> bool:
 	if _player == null:
 		return false
-	var from: Vector3 = global_position + Vector3.UP * stats.height * 0.85
+	var from: Vector3 = pos + Vector3.UP * stats.height * 0.85
 	var to := _player.global_position + Vector3.UP * 1.2
 	var q := PhysicsRayQueryParameters3D.create(from, to, SIGHT_MASK, _sight_exclusions())
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)

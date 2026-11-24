@@ -25,6 +25,32 @@ extends RefCounted
 
 const ZOMBIE_MOANS := preload("res://assets/sounds/zombie_moans.ogg")
 
+## Navigation: every map has one navmesh per entry, baked by
+## tools/bake_navmesh.gd into <map navmesh><suffix>.res, each kept `radius`
+## away from walls and props with `height` of headroom. Each enemy type walks
+## on the first one it fits (nav_mesh_for), on that entry's navigation layer.
+## The first is the map scene's own NavigationRegion3D; main.gd adds the others.
+## radius/height are whole numbers of cells (0.125 m / 0.1 m).
+const NAV_MESHES := [
+	{"layer": 1, "suffix": "", "radius": 0.5, "height": 1.8},          # zombie, runner, soldier, exploder
+	{"layer": 2, "suffix": "_brute", "radius": 0.625, "height": 2.7},  # Brute (0.6 m, 2.6 m)
+	{"layer": 4, "suffix": "_boss", "radius": 0.875, "height": 3.5},   # Brute Boss (0.8 m, 3.3 m)
+]
+const NAV_SMALL := 1
+
+
+## The navmesh entry an enemy type walks on: the smallest it fits.
+static func nav_mesh_for(kind: String) -> Dictionary:
+	for m: Dictionary in NAV_MESHES:
+		if m.radius >= TYPES[kind].radius and m.height >= TYPES[kind].height:
+			return m
+	return NAV_MESHES[NAV_MESHES.size() - 1]
+
+
+## The navigation layer an enemy type walks on.
+static func nav_layer(kind: String) -> int:
+	return nav_mesh_for(kind).layer
+
 const TYPES := {
 	"normal": {
 		"name": "Zombie",
