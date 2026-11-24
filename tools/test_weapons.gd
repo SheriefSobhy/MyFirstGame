@@ -56,7 +56,9 @@ func _run() -> void:
 	await _test_shotgun()
 	await _test_aim_down_sights()
 	await _test_sniper()
+	await _test_new_weapons()
 	await _test_switch_inputs()
+	await _test_grenades()
 	await _test_ammo_box()
 	await _test_touch_layout()
 
@@ -67,7 +69,12 @@ func _run() -> void:
 func _test_start_state() -> void:
 	check(player.weapon_index == 0, "starts with the pistol")
 	check(player.has_weapon(0) and not player.has_weapon(1) and not player.has_weapon(2) \
-			and not player.has_weapon(3), "only the pistol is owned at start")
+			and not player.has_weapon(3), "rifle, shotgun and sniper still need their pickups")
+	for idx in [4, 5, 6, 7]:
+		check(player.has_weapon(idx), "%s is available from the start" % Weapons.LIST[idx].name)
+	check(Weapons.LIST.size() == 8, "8 weapons in total")
+	check(player.grenades == 3, "starts with 3 grenades")
+	check(hud.grenade_label.text == "Grenades: 3", "HUD shows grenade count (got '%s')" % hud.grenade_label.text)
 	check(hud.weapon_label.text == "Pistol", "HUD shows weapon name (got '%s')" % hud.weapon_label.text)
 	check(hud.ammo_label.text == "12 / ∞", "HUD shows pistol ammo 12 / ∞ (got '%s')" % hud.ammo_label.text)
 	player.switch_to(2)
@@ -222,11 +229,11 @@ func _test_sniper() -> void:
 	check(touch._button_at(aim_pos) == "aim", "touch AIM button also shown for the pistol")
 
 
-# Pistol, rifle and shotgun aim down their sights: the gun moves to the
+# Every gun but the sniper aims down its sights: the gun moves to the
 # centre, the view zooms a little, the crosshair goes and the spread tightens.
 func _test_aim_down_sights() -> void:
 	var touch: Control = hud.touch_controls
-	for slot in 3:
+	for slot in [0, 1, 2, 4, 5, 6, 7]:
 		player.switch_to(slot)
 		await seconds(0.5)
 		var w: Dictionary = Weapons.LIST[slot]
@@ -289,7 +296,22 @@ func _test_switch_inputs() -> void:
 	touch._touch_down(0, touch._button_center("switch"))
 	touch._touch_up(0, touch._button_center("switch"))
 	await seconds(0.5)
+	check(player.weapon_index == 4, "touch SWITCH goes on to the SMG")
+	for i in 3:
+		touch._touch_down(0, touch._button_center("switch"))
+		touch._touch_up(0, touch._button_center("switch"))
+		await seconds(0.5)
+	touch._touch_down(0, touch._button_center("switch"))
+	touch._touch_up(0, touch._button_center("switch"))
+	await seconds(0.5)
 	check(player.weapon_index == 0, "touch SWITCH wraps around to the pistol")
+	check(not touch.is_wheel_open(), "a quick SWITCH tap doesn't open the weapon wheel")
+	# Keys 5-8 pick the new guns.
+	for k in 4:
+		_press_key(KEY_5 + k)
+		await seconds(0.5)
+		check(player.weapon_index == 4 + k, "key %d selects the %s" % [5 + k, Weapons.LIST[4 + k].name])
+	await _test_weapon_wheel()
 	# Switch animation blocks firing while the gun is lowered.
 	player.switch_to(1)
 	await frames(3)
@@ -301,19 +323,338 @@ func _test_switch_inputs() -> void:
 	check(player._mag[1] == before, "can't fire while switching")
 	await seconds(0.5)
 	check(not player._switching and player.weapon_reload.position.is_zero_approx(), "gun is raised again")
-	for idx in [1, 2, 3]:
+	for idx in Weapons.LIST.size():
 		player.switch_to(idx)
 		await seconds(0.6)
-		await _screenshot(Weapons.LIST[idx].name.to_lower().replace(" ", "_"))
+		await _screenshot("hip_%d_%s" % [idx, Weapons.LIST[idx].name.to_lower().replace(" ", "_")])
+
+
+# SMG, AK, LMG and Revolver: fire rate, damage, magazine, reload and feel.
+func _test_new_weapons() -> void:
+	_put_player(Vector3(0, 0, 10))
+	# SMG: very fast, low damage, 35 rounds.
+	player.switch_to(4)
+	await seconds(0.5)
+	check(hud.weapon_label.text == "SMG" and hud.ammo_label.text == "35 / 140",
+			"HUD shows SMG 35 / 140 (got '%s' '%s')" % [hud.weapon_label.text, hud.ammo_label.text])
+	player.touch_shoot = true
+	await seconds(0.55)
+	player.touch_shoot = false
+	var smg_fired: int = 35 - player.ammo()
+	check(smg_fired >= 9 and smg_fired <= 12, "SMG fires very fast, ~18 shots/s (fired %d in 0.55 s)" % smg_fired)
+	await seconds(1.0)
+	var e := _enemy_in_front(6.0)
+	await frames(2)
+	await _tap_trigger()
+	check(e.hp == 2, "SMG does 1 damage per bullet (enemy hp %d)" % e.hp)
+	_clear_enemies()
+	player.start_reload()
+	await seconds(1.9)
+	check(player.ammo() == 35, "SMG reloads to 35")
+
+	# AK: full auto, 2 damage, strong recoil, 30 rounds.
+	player.switch_to(5)
+	await seconds(0.5)
+	check(hud.weapon_label.text == "AK Rifle" and hud.ammo_label.text == "30 / 90",
+			"HUD shows AK Rifle 30 / 90 (got '%s' '%s')" % [hud.weapon_label.text, hud.ammo_label.text])
+	var pitch_before: float = player.head.rotation.x
+	player.touch_shoot = true
+	await seconds(0.55)
+	player.touch_shoot = false
+	var ak_fired: int = 30 - player.ammo()
+	var ak_climb: float = rad_to_deg(player.head.rotation.x - pitch_before)
+	check(ak_fired >= 5 and ak_fired <= 6, "AK is full auto, ~9 shots/s (fired %d)" % ak_fired)
+	check(ak_climb > ak_fired * 0.4, "AK has strong recoil: view climbs %.1f deg" % ak_climb)
+	check(Weapons.LIST[5].view_kick > Weapons.LIST[1].view_kick * 3.0
+			and Weapons.LIST[5].recoil > Weapons.LIST[1].recoil, "AK kicks harder than the assault rifle")
+	await seconds(1.0)
+	_put_player(Vector3(0, 0, 10))
+	e = _enemy_in_front(6.0)
+	await frames(2)
+	await _tap_trigger()
+	check(e.hp == 1, "AK does 2 damage per bullet (enemy hp %d)" % e.hp)
+	_clear_enemies()
+
+	# LMG: 100 rounds, slow reload, slower walking.
+	player.switch_to(6)
+	await seconds(0.5)
+	check(hud.weapon_label.text == "LMG" and hud.ammo_label.text == "100 / 200",
+			"HUD shows LMG 100 / 200 (got '%s' '%s')" % [hud.weapon_label.text, hud.ammo_label.text])
+	player.touch_shoot = true
+	await seconds(1.0)
+	player.touch_shoot = false
+	var lmg_fired: int = 100 - player.ammo()
+	check(lmg_fired >= 10 and lmg_fired <= 12, "LMG is full auto (fired %d in 1 s)" % lmg_fired)
+	_put_player(Vector3(0, 0, 10))
+	player.touch_move = Vector2(0, -1)
+	await frames(5)
+	var lmg_speed := Vector2(player.velocity.x, player.velocity.z).length()
+	player.touch_move = Vector2.ZERO
+	await frames(2)
+	check(lmg_speed < player.WALK_SPEED * 0.8 and lmg_speed > player.WALK_SPEED * 0.6,
+			"walking is slower with the LMG (%.1f m/s vs %.1f)" % [lmg_speed, player.WALK_SPEED])
+	player.start_reload()
+	await seconds(3.0)
+	check(player.is_reloading(), "LMG reload is slow (still reloading after 3 s)")
+	await seconds(1.7)
+	check(not player.is_reloading() and player.ammo() == 100, "LMG reload done after 4.5 s (ammo %d)" % player.ammo())
+	player.switch_to(5)
+	await seconds(0.5)
+	_put_player(Vector3(0, 0, 10))
+	player.touch_move = Vector2(0, -1)
+	await frames(5)
+	var ak_speed := Vector2(player.velocity.x, player.velocity.z).length()
+	player.touch_move = Vector2.ZERO
+	check(ak_speed > lmg_speed + 0.8, "the AK walks faster than the LMG (%.1f vs %.1f m/s)" % [ak_speed, lmg_speed])
+
+	# Revolver: 6 rounds, one-shot kill, slow semi-auto fire.
+	player.switch_to(7)
+	await seconds(0.5)
+	check(hud.weapon_label.text == "Revolver" and hud.ammo_label.text == "6 / 24",
+			"HUD shows Revolver 6 / 24 (got '%s' '%s')" % [hud.weapon_label.text, hud.ammo_label.text])
+	player.touch_shoot = true
+	await seconds(0.8)
+	player.touch_shoot = false
+	await frames(2)
+	check(player.ammo() == 5, "revolver is semi-auto: holding fires once (ammo %d)" % player.ammo())
+	await seconds(0.3)
+	_put_player(Vector3(0, 0, 10))
+	e = _enemy_in_front(6.0)
+	await frames(2)
+	await _tap_trigger()
+	check(e.hp <= 0, "revolver kills in one shot")
+	_clear_enemies()
+	await seconds(0.2)
+	await _tap_trigger(false)
+	check(player.ammo() == 4, "revolver: slow fire blocks a quick second shot (ammo %d)" % player.ammo())
+	player.start_reload()
+	await seconds(3.2)
+	check(player.ammo() == 6 and player.reserve() == 22, "revolver reloads to 6 (%d / %d)" % [player.ammo(), player.reserve()])
+	player.switch_to(0)
+	await seconds(0.5)
+
+
+# Touch SWITCH held: the weapon wheel opens; dragging picks a slot.
+func _test_weapon_wheel() -> void:
+	var touch: Control = hud.touch_controls
+	touch.size = Vector2(1280, 720)
+	touch.visible = true
+	player.switch_to(0)
+	await seconds(0.5)
+	var start: Vector2 = touch._button_center("switch")
+	touch._touch_down(0, start)
+	await seconds(0.35)
+	check(touch.is_wheel_open(), "holding SWITCH opens the weapon wheel")
+	await _screenshot("weapon_wheel")
+	# Slot 6 (LMG) sits at -90 + 6 * 45 = 180 degrees: straight left.
+	touch._touch_drag(0, start + Vector2(-90, 0))
+	check(touch._wheel_pick == 6, "dragging left highlights the LMG (slot %d)" % touch._wheel_pick)
+	touch._touch_up(0, start + Vector2(-90, 0))
+	await seconds(0.5)
+	check(player.weapon_index == 6 and not touch.is_wheel_open(), "letting go picks the LMG and closes the wheel")
+	# A drag opens it at once; letting go near the start picks nothing.
+	touch._touch_down(0, start)
+	touch._touch_drag(0, start + Vector2(0, -30))
+	check(touch.is_wheel_open(), "dragging from SWITCH opens the wheel right away")
+	touch._touch_drag(0, start + Vector2(0, -100))
+	check(touch._wheel_pick == 0, "dragging up highlights the pistol")
+	touch._touch_drag(0, start + Vector2(5, -5))
+	touch._touch_up(0, start + Vector2(5, -5))
+	await seconds(0.5)
+	check(player.weapon_index == 6, "letting go back at the button cancels")
+	# Slots not owned yet (picked up later) can't be chosen.
+	player._owned[3] = false
+	touch._touch_down(0, start)
+	touch._touch_drag(0, start + Vector2(80, 80))  # 135 degrees: slot 3, the sniper
+	check(touch._wheel_pick == -1, "a weapon you don't have can't be picked on the wheel")
+	touch._touch_up(0, start + Vector2(80, 80))
+	player._owned[3] = true
+	touch.visible = false
+	player.switch_to(0)
+	await seconds(0.5)
+
+
+# Frag grenades: arc preview, throw, bounce, 3 s fuse, falloff damage, effects.
+func _test_grenades() -> void:
+	const Grenade := preload("res://effects/grenade.gd")
+	_clear_enemies()
+	_put_player(Vector3(0, 0, 10))
+	player.switch_to(0)
+	await seconds(0.5)
+	player.grenades = 3
+	player.emit_status()
+	check(Grenade.damage_at(0.0, 7.0, 10) == 10 and Grenade.damage_at(3.5, 7.0, 10) == 5
+			and Grenade.damage_at(7.0, 7.0, 10) == 0, "grenade damage falls off with distance")
+
+	# Looking ahead: the arc curves from the hand out to the landing ring.
+	if shots_dir != "":
+		player.head.rotation.x = deg_to_rad(-4)
+		player.start_grenade()
+		await seconds(0.2)
+		await _screenshot("grenade_preview_level")
+		player.cancel_grenade()
+		await seconds(0.9)
+	# Holding G shows the arc; a slight downward look lands it a few metres away.
+	player.head.rotation.x = deg_to_rad(-20)
+	await frames(2)
+	_press_action("grenade", true)
+	await frames(3)
+	check(player.is_holding_grenade() and player._preview.visible, "holding G shows the throw preview")
+	check(player._preview_marker.visible, "the preview marks where the grenade lands")
+	var landing: Vector3 = player._preview_marker.global_position
+	var arc: Array = player.throw_arc().points
+	check(arc.size() > 5 and arc[arc.size() / 2].y > landing.y + 0.3, "the preview is an arc (%d points)" % arc.size())
+	await _screenshot("grenade_preview")
+	_press_action("grenade", false)
+	await frames(2)
+	var g: RigidBody3D = _find_grenade()
+	check(g != null, "releasing G throws a grenade")
+	check(not player._preview.visible, "the preview hides after the throw")
+	check(player.grenades == 2 and hud.grenade_label.text == "Grenades: 2", "grenade count goes down (HUD '%s')" % hud.grenade_label.text)
+	# Watch it fly: it should bounce (vertical speed flips up) and rest near the preview.
+	var bounced := false
+	var last_vy := 0.0
+	var t0 := Time.get_ticks_msec()
+	while is_instance_valid(g) and g.fuse > 0.3:
+		if last_vy < -1.0 and g.linear_velocity.y > 0.3:
+			bounced = true
+		last_vy = g.linear_velocity.y
+		await physics_frame
+	check(bounced, "the grenade bounces")
+	if is_instance_valid(g):
+		var first_hit := Vector2(landing.x, landing.z)
+		check(Vector2(g.global_position.x, g.global_position.z).distance_to(first_hit) < 4.0,
+				"it lands near the previewed spot (%.1f m off)" % Vector2(g.global_position.x, g.global_position.z).distance_to(first_hit))
+	while is_instance_valid(g):
+		await physics_frame
+	var fuse_time := (Time.get_ticks_msec() - t0) / 1000.0
+	check(absf(fuse_time - 3.0) < 0.2, "explodes 3 s after the throw (%.2f s)" % fuse_time)
+	var fx := _find_explosion()
+	check(fx != null, "an explosion effect is spawned")
+	if fx:
+		var light: OmniLight3D = fx.find_children("*", "OmniLight3D", false, false)[0]
+		check(light.visible and light.light_energy > 1.0, "the explosion flashes a light")
+		check(fx.find_children("*", "CPUParticles3D", false, false).size() == 3, "fireball, smoke and spark particles")
+		check(fx.find_children("*", "AudioStreamPlayer3D", false, false).size() == 1, "explosion sound plays")
+		check(player._shake > 0.3, "the camera shakes (%.2f)" % player._shake)
+	await _screenshot("grenade_explosion")
+	await seconds(0.5)
+	check(fx == null or not is_instance_valid(fx) or not fx._light.visible, "the light flash fades out")
+
+	# Area damage with falloff: a grenade at rest in the open, enemies around it.
+	await seconds(1.0)
+	# An open patch of the yard (x 1..11, z -2..2); the player well away at x -6.
+	_put_player(Vector3(-6, 0, -1))
+	var center := Vector3(5, 0.1, 0)
+	var near := _enemy_at(center + Vector3(1.0, 0, 0))     # 10*(1-1.3/7) ~ 8: dies
+	var mid := _enemy_at(center + Vector3(-5.4, 0, 0))     # ~2 damage: survives on 1 HP
+	var far := _enemy_at(center + Vector3(6.0, 0, 5.6))    # 8.2 m: out of range
+	await frames(2)
+	var health_before: int = player.health
+	var g2: RigidBody3D = Grenade.new()
+	g2.thrower = player
+	g2.fuse = 0.2
+	main.add_child(g2)
+	g2.global_position = center
+	await seconds(0.5)
+	check(near.hp <= 0, "enemy 1.4 m away is killed")
+	check(mid.hp > 0 and mid.hp < 3, "enemy ~5.5 m away is only hurt (hp %d)" % mid.hp)
+	check(far.hp == 3, "enemy 8.2 m away is untouched")
+	check(player.health == health_before, "the player 11 m away isn't hurt")
+	_clear_enemies()
+	# Cover works: an enemy behind the metal crate (x -3..0, z 1..3) is safe.
+	await seconds(1.0)
+	var hidden := _enemy_at(Vector3(-1.5, 0, -0.5))
+	var exposed := _enemy_at(Vector3(-4.0, 0, 6.0))
+	await frames(2)
+	var g4: RigidBody3D = Grenade.new()
+	g4.thrower = player
+	g4.fuse = 0.2
+	main.add_child(g4)
+	g4.global_position = Vector3(-1.5, 0.1, 4.5)
+	await seconds(0.5)
+	check(hidden.hp == 3, "the blast doesn't go through the crate (hp %d)" % hidden.hp)
+	check(exposed.hp < 3, "an enemy in the open at the same range is hit (hp %d)" % exposed.hp)
+	_clear_enemies()
+	# Too close: the thrower gets hurt.
+	await seconds(1.0)
+	var g3: RigidBody3D = Grenade.new()
+	g3.thrower = player
+	g3.fuse = 0.2
+	main.add_child(g3)
+	g3.global_position = player.global_position + Vector3(1.5, 0.1, 0)
+	await seconds(0.5)
+	check(player.health < health_before and player.health > 0, "standing next to it hurts the player (%d)" % player.health)
+	player.heal(100)
+
+	# Touch GRENADE button: hold for the preview, let go to throw.
+	var touch: Control = hud.touch_controls
+	touch.size = Vector2(1280, 720)
+	touch.visible = true
+	var gpos: Vector2 = touch._button_center("grenade")
+	check(touch._button_at(gpos) == "grenade", "touch GRENADE button exists")
+	var count: int = player.grenades
+	touch._touch_down(0, gpos)
+	await frames(2)
+	check(player.is_holding_grenade() and player._preview.visible, "holding GRENADE shows the preview")
+	touch._touch_up(0, gpos)
+	await frames(2)
+	check(player.grenades == count - 1 and _find_grenade() != null, "letting go of GRENADE throws")
+	await seconds(3.5)
+	# None left: nothing happens.
+	player.grenades = 0
+	player.emit_status()
+	await seconds(1.0)
+	touch._touch_down(0, gpos)
+	await frames(2)
+	check(not player.is_holding_grenade(), "no grenades left: GRENADE does nothing")
+	touch._touch_up(0, gpos)
+	touch.visible = false
+	player.grenades = 3
+	player.emit_status()
+	await seconds(1.0)
+
+
+func _find_grenade() -> RigidBody3D:
+	for n in main.get_children():
+		if n is RigidBody3D and n.has_method("explode"):
+			return n
+	return null
+
+
+func _find_explosion() -> Node3D:
+	for n in main.get_children():
+		if n.get_script() == preload("res://effects/explosion.gd") and n.with_sound:
+			return n
+	return null
+
+
+func _enemy_at(pos: Vector3) -> Node:
+	var e: Node3D = main.ENEMY_SCENE.instantiate()
+	e.position = Vector3(pos.x, 0.0, pos.z)
+	main.get_node("Enemies").add_child(e)
+	e.set_physics_process(false)
+	return e
+
+
+func _press_action(action: String, pressed: bool) -> void:
+	var ev := InputEventAction.new()
+	ev.action = action
+	ev.pressed = pressed
+	Input.parse_input_event(ev)
 
 
 func _test_ammo_box() -> void:
 	player._reserve[1] = 10
 	player._reserve[3] = 25  # sniper already full
+	player._reserve[6] = 100
+	player.grenades = 2
 	var box: Node3D = main.get_node("Pickups/AmmoBox1")
 	_put_player(box.global_position)
 	await frames(5)
 	check(player._reserve[1] == 40, "ammo box adds 30 rifle rounds (%d)" % player._reserve[1])
+	check(player._reserve[6] == 150, "ammo box adds 50 LMG rounds (%d)" % player._reserve[6])
+	check(player.grenades == 3 and hud.grenade_label.text == "Grenades: 3", "ammo box gives +1 grenade (%d)" % player.grenades)
 	check(player._reserve[3] == 25, "full weapons stay at their max")
 	check(player._reserve[0] == -1, "pistol stays unlimited")
 	check(not box._active, "ammo box disappears when taken")
@@ -325,12 +666,18 @@ func _test_ammo_box() -> void:
 	Engine.time_scale = 1.0
 	check(box._active, "ammo box respawns after 30 s")
 	# A full box isn't wasted.
-	for i in 4:
+	for i in Weapons.LIST.size():
 		if player.has_weapon(i) and Weapons.LIST[i].max_reserve > 0:
 			player._reserve[i] = Weapons.LIST[i].max_reserve
+	player.grenades = player.MAX_GRENADES
 	_put_player(box.global_position)
 	await frames(5)
-	check(box._active, "ammo box stays when all ammo is full")
+	check(box._active, "ammo box stays when all ammo and grenades are full")
+	check(player.grenades == player.MAX_GRENADES, "grenades stop at %d" % player.MAX_GRENADES)
+	# One more grenade short: the box is used again, but only up to the max.
+	player.grenades = player.MAX_GRENADES - 1
+	await frames(5)
+	check(not box._active and player.grenades == player.MAX_GRENADES, "a box tops grenades up to the max of 5")
 	if shots_dir != "":
 		_put_player(box.global_position + Vector3(0, 0, 2.5))
 		player.rotation.y = 0.0
@@ -353,6 +700,15 @@ func _test_touch_layout() -> void:
 	touch.size = Vector2(1280, 720)
 	touch.visible = true
 	var joy: Vector2 = touch._joy_home()
+	# No two buttons overlap (the GRENADE button is new).
+	var names: Array = touch.BUTTONS.keys()
+	var overlap := false
+	for i in names.size():
+		for j in range(i + 1, names.size()):
+			var d: float = touch._button_center(names[i]).distance_to(touch._button_center(names[j]))
+			if d < touch.BUTTONS[names[i]].radius + touch.BUTTONS[names[j]].radius + 4.0:
+				overlap = true
+	check(not overlap, "touch buttons don't overlap")
 	# Left half, away from the joystick: aims, doesn't move.
 	var yaw: float = player.rotation.y
 	touch._touch_down(0, Vector2(300, 250))

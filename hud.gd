@@ -1,7 +1,8 @@
 extends CanvasLayer
-## On-screen HUD: health, score, wave, weapon and ammo, FPS, crosshair, sniper
-## scope, pickup messages, the wave banner, the pause menu and the Game Over
-## screen. This layer keeps running while the game is paused so its menus work.
+## On-screen HUD: health, score, wave (and the boss health bar), weapon,
+## ammo and grenades, FPS, crosshair, sniper scope, pickup messages, the
+## wave banner, the pause menu and the Game Over screen. This layer keeps
+## running while the game is paused so its menus work.
 ##
 ## Pausing: the II button (top right), Esc, or losing window focus. On a
 ## computer, the browser giving up the mouse lock (it does that on Esc) also
@@ -18,6 +19,9 @@ const BANNER_TIME := 2.2    # seconds the "Wave X" banner stays up
 @onready var wave_label: Label = $WaveLabel
 @onready var ammo_label: Label = $AmmoLabel
 @onready var weapon_label: Label = $WeaponLabel
+@onready var grenade_label: Label = $GrenadeLabel
+@onready var boss_bar: ProgressBar = $BossBar
+@onready var boss_name: Label = $BossBar/BossName
 @onready var message_label: Label = $MessageLabel
 @onready var crosshair: Control = $Crosshair
 @onready var aim_dot: Control = $AimDot
@@ -198,6 +202,27 @@ func set_weapon(weapon_name: String) -> void:
 	weapon_label.text = weapon_name
 
 
+func set_grenades(count: int) -> void:
+	grenade_label.text = "Grenades: %d" % count
+
+
+## Boss health bar under the wave counter (shown on boss waves).
+func show_boss(title: String, hp: int, max_hp: int) -> void:
+	boss_name.text = title.to_upper()
+	boss_bar.max_value = max_hp
+	boss_bar.value = hp
+	boss_bar.visible = true
+
+
+func set_boss_health(hp: int, max_hp: int) -> void:
+	boss_bar.max_value = max_hp
+	boss_bar.value = hp
+
+
+func hide_boss() -> void:
+	boss_bar.visible = false
+
+
 ## Sniper scope on/off: black lens overlay instead of the normal crosshair.
 func set_scoped(scoped: bool) -> void:
 	var size := scope_overlay.get_viewport_rect().size
@@ -240,6 +265,7 @@ func show_game_over(waves: int, kills: int, score: int, best: int, new_best: boo
 	pause_menu.visible = false
 	settings_menu.visible = false
 	wave_banner.modulate.a = 0.0
+	boss_bar.visible = false
 	waves_label.text = "Waves survived: %d" % waves
 	kills_label.text = "Kills: %d" % kills
 	final_score_label.text = "Score: %d" % score

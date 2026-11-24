@@ -30,8 +30,7 @@ func _run() -> void:
 	_backup_saves()
 	var settings: Node = root.get_node("Settings")
 	var music: Node = root.get_node("Music")
-	settings.best_score = 0
-	settings.best_wave = 0
+	settings.clear_bests()
 
 	await _test_settings(settings)
 
@@ -49,9 +48,14 @@ func _run() -> void:
 	check(not menu.settings_menu.visible, "settings Back closes it")
 
 	menu.play_button.pressed.emit()
+	await frames(5)
+	var select := current_scene
+	check(select.name == "MapSelect", "Play opens the map selection screen")
+	check(select.play_buttons.size() == 3, "three maps to choose from")
+	select.play_buttons["yard"].pressed.emit()
 	await frames(15)
 	var main := current_scene
-	check(main.name == "Main", "Play loads the game")
+	check(main.name == "Main" and main.map_id == "yard", "picking Industrial Yard loads the yard")
 	await create_timer(1.6).timeout  # let the music fade over
 	check(music.current_track() == music.GAME_TRACK, "gameplay music plays")
 
@@ -194,8 +198,8 @@ func _test_game_over(main: Node, settings: Node) -> void:
 	check(hud.best_label.text == "New best score!", "first run is a new best")
 	check(not hud.pause_button.visible, "no pause button on Game Over")
 	var save := ConfigFile.new()
-	check(save.load(settings.SAVE_PATH) == OK and save.get_value("best", "score") == score,
-			"best score saved to user://")
+	check(save.load(settings.SAVE_PATH) == OK and save.get_value("best_yard", "score") == score,
+			"best score saved to user:// for the yard")
 
 	# Retry: a fresh run that ends with a lower score.
 	hud.retry_button.pressed.emit()

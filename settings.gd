@@ -1,7 +1,7 @@
 extends Node
-## Player settings and the best score, autoloaded as "Settings".
-## Settings are saved to user://settings.cfg and the best score to
-## user://save.cfg (on the web build these live in the browser's storage).
+## Player settings and the best scores, autoloaded as "Settings".
+## Settings are saved to user://settings.cfg and the best score of each map
+## to user://save.cfg (on the web build these live in the browser's storage).
 ##
 ## To change a setting: Settings.set_value("music_volume", 0.5), then
 ## Settings.save_settings() once the player is done (the settings screen does
@@ -24,6 +24,9 @@ var music_volume := 0.6      # 0..1
 var look_sensitivity := 1.0  # multiplier on mouse and touch look speed
 var quality: int = Quality.HIGH
 
+## Best score and wave per map id (see maps.gd): {id: {"score": int, "wave": int}}.
+var bests := {}
+## The best score over all maps (shown on the main menu).
 var best_score := 0
 var best_wave := 0
 
@@ -36,8 +39,10 @@ func _ready() -> void:
 		AudioServer.set_bus_name(bus, MUSIC_BUS)
 		AudioServer.set_bus_send(bus, &"Master")
 	# The Android app and phones start on Medium (the old phone settings),
-	# computers on High.
-	var phone := OS.has_feature("android") or DisplayServer.is_touchscreen_available()
+	# computers on High. Desktop builds ("pc") always count as computers, even
+	# on touchscreen laptops.
+	var phone := not OS.has_feature("pc") and (OS.has_feature("android")
+			or DisplayServer.is_touchscreen_available())
 	quality = Quality.MEDIUM if phone else Quality.HIGH
 	_load()
 	_apply_audio()
@@ -58,17 +63,42 @@ func save_settings() -> void:
 	cfg.save(SETTINGS_PATH)
 
 
-## Records a finished run. Returns true if it is a new best score.
-func submit_score(score: int, waves: int) -> bool:
-	best_wave = maxi(best_wave, waves)
-	var new_best := score > best_score
-	if new_best:
-		best_score = score
+## Records a finished run on a map. Returns true if it is a new best score
+## for that map.
+func submit_score(score: int, waves: int, map_id := "yard") -> bool:
+	var b: Dictionary = bests.get(map_id, {"score": 0, "wave": 0})
+	var new_best: bool = score > b.score
+	b = {"score": maxi(b.score, score), "wave": maxi(b.wave, waves)}
+	bests[map_id] = b
+	_update_overall()
 	var cfg := ConfigFile.new()
-	cfg.set_value("best", "score", best_score)
-	cfg.set_value("best", "wave", best_wave)
+	for id: String in bests:
+		cfg.set_value("best_" + id, "score", bests[id].score)
+		cfg.set_value("best_" + id, "wave", bests[id].wave)
 	cfg.save(SAVE_PATH)
 	return new_best
+
+
+func best_score_for(map_id: String) -> int:
+	return bests.get(map_id, {"score": 0}).score
+
+
+func best_wave_for(map_id: String) -> int:
+	return bests.get(map_id, {"wave": 0}).wave
+
+
+## Forgets every best score (tests use this; nothing is saved until the next run).
+func clear_bests() -> void:
+	bests.clear()
+	_update_overall()
+
+
+func _update_overall() -> void:
+	best_score = 0
+	best_wave = 0
+	for id: String in bests:
+		best_score = maxi(best_score, bests[id].score)
+		best_wave = maxi(best_wave, bests[id].wave)
 
 
 func _load() -> void:
@@ -81,8 +111,16 @@ func _load() -> void:
 		quality = clampi(cfg.get_value("graphics", "quality", quality), Quality.LOW, Quality.HIGH)
 	var save := ConfigFile.new()
 	if save.load(SAVE_PATH) == OK:
-		best_score = save.get_value("best", "score", 0)
-		best_wave = save.get_value("best", "wave", 0)
+		for section in save.get_sections():
+			if section.begins_with("best_"):
+				bests[section.trim_prefix("best_")] = {
+					"score": int(save.get_value(section, "score", 0)),
+					"wave": int(save.get_value(section, "wave", 0)),
+				}
+		# Saves from before there were several maps: that score was the yard's.
+		if save.has_section("best") and not bests.has("yard"):
+			bests["yard"] = {"score": int(save.get_value("best", "score", 0)), "wave": int(save.get_value("best", "wave", 0))}
+	_update_overall()
 
 
 func _apply_audio() -> void:

@@ -3,8 +3,10 @@ extends Control
 ##  - Anywhere outside the buttons and the joystick: drag to look around.
 ##  - Bottom-left: a fixed virtual joystick for walking (only while the player's
 ##    MOVEMENT_ENABLED is on). Only touches that start on it move the player.
-##  - Buttons: Shoot (hold for auto fire), Jump, Reload, Switch (next weapon)
-##    and Aim (aim down the sights / sniper scope, on/off).
+##  - Buttons: Shoot (hold for auto fire), Jump, Reload, Aim (aim down the
+##    sights / sniper scope, on/off), Grenade (hold to see the throw arc,
+##    let go to throw) and Switch: tap for the next weapon, or hold / drag to
+##    open the weapon wheel and let go over a weapon to pick it.
 ## Each finger is tracked by its touch index, so you can move, look and
 ## shoot at the same time. Only shown on touch screen devices.
 
@@ -25,7 +27,20 @@ const BUTTONS := {
 	"reload": {"offset": Vector2(-120, -370), "radius": 50.0, "label": "RELOAD"},
 	"switch": {"offset": Vector2(-300, -280), "radius": 48.0, "label": "SWITCH"},
 	"aim": {"offset": Vector2(-270, -440), "radius": 48.0, "label": "AIM"},
+	"grenade": {"offset": Vector2(-110, -505), "radius": 50.0, "label": "GRENADE"},
 }
+
+# Weapon wheel (opened from the Switch button).
+const WHEEL_HOLD_TIME := 0.22       # seconds held before the wheel opens
+const WHEEL_DRAG_OPEN := 24.0       # ...or this far dragged (pixels)
+const WHEEL_SELECT_DRAG := 35.0     # drag at least this far to pick a slot
+const WHEEL_OUTER := 230.0
+const WHEEL_INNER := 85.0
+const WHEEL_FONT_SIZE := 20
+const COLOR_WHEEL := Color(0, 0, 0, 0.45)
+const COLOR_WHEEL_PICK := Color(1, 0.8, 0.3, 0.55)
+const COLOR_DISABLED := Color(1, 1, 1, 0.25)
+const Weapons := preload("res://weapon_stats.gd")
 
 ## Show the controls even without a touch screen (handy for testing on PC).
 @export var force_show := false
@@ -48,11 +63,23 @@ const MAX_LOOK_STEP := 120.0
 var _fingers := {}
 var _joy_center := Vector2.ZERO
 var _joy_knob := Vector2.ZERO
+var _wheel_open := false
+var _wheel_pick := -1          # weapon slot under the finger, -1 = none
+var _switch_start := Vector2.ZERO
+var _switch_time := 0.0        # seconds the Switch button has been held
 
 
 func _ready() -> void:
 	visible = force_show or DisplayServer.is_touchscreen_available()
 	resized.connect(queue_redraw)
+
+
+func _process(delta: float) -> void:
+	# Holding Switch for a moment opens the weapon wheel.
+	if _fingers.has("switch") and not _wheel_open:
+		_switch_time += delta
+		if _switch_time >= WHEEL_HOLD_TIME:
+			_open_wheel()
 
 
 func _input(event: InputEvent) -> void:
@@ -81,7 +108,14 @@ func _touch_down(index: int, pos: Vector2) -> void:
 		"reload":
 			player.start_reload()
 		"switch":
-			player.next_weapon(1)
+			_fingers["switch"] = {"index": index, "pos": pos}
+			_switch_start = pos
+			_switch_time = 0.0
+			_wheel_open = false
+			_wheel_pick = -1
+		"grenade":
+			_fingers["grenade"] = {"index": index, "pos": pos}
+			player.start_grenade()
 		"aim":
 			player.toggle_aim()
 		_:
@@ -102,9 +136,12 @@ func _touch_down(index: int, pos: Vector2) -> void:
 ## the game pauses, since finger lifts aren't seen while paused).
 func reset() -> void:
 	_fingers.clear()
+	_wheel_open = false
+	_wheel_pick = -1
 	if player != null:
 		player.touch_move = Vector2.ZERO
 		player.touch_shoot = false
+		player.cancel_grenade()
 	queue_redraw()
 
 
@@ -116,6 +153,11 @@ func _touch_up(index: int, pos: Vector2) -> void:
 			player.touch_move = Vector2.ZERO
 		"shoot":
 			player.touch_shoot = false
+		"grenade":
+			player.throw_grenade()
+		"switch":
+			_release_switch(pos)
+	queue_redraw()
 
 
 func _touch_drag(index: int, pos: Vector2) -> void:
@@ -133,6 +175,12 @@ func _touch_drag(index: int, pos: Vector2) -> void:
 			# x = strafe, y = forward/back (up on screen = forward), like WASD.
 			player.touch_move = offset / JOY_RADIUS
 			queue_redraw()
+		"switch":
+			if not _wheel_open and pos.distance_to(_switch_start) >= WHEEL_DRAG_OPEN:
+				_open_wheel()
+			if _wheel_open:
+				_wheel_pick = _wheel_slot_at(pos - _switch_start)
+				queue_redraw()
 		"look":
 			# Measure the movement ourselves instead of using event.relative,
 			# and skip the event where a finger was re-identified.
@@ -160,6 +208,79 @@ func _role_for(index: int, pos: Vector2) -> Array:
 			or pos.distance_to(_fingers[by_index].pos) < REMAP_DISTANCE):
 		return [by_index, true]
 	return [nearest, false]
+
+
+# --- Weapon wheel -------------------------------------------------------------
+
+func _open_wheel() -> void:
+	_wheel_open = true
+	queue_redraw()
+
+
+## True while the weapon wheel is on screen.
+func is_wheel_open() -> bool:
+	return _wheel_open
+
+
+# Switch released: a quick tap cycles to the next weapon; with the wheel open,
+# the weapon under the finger is picked (nothing if the finger is still
+# near the button).
+func _release_switch(pos: Vector2) -> void:
+	if _wheel_open:
+		var slot := _wheel_slot_at(pos - _switch_start)
+		if slot >= 0:
+			player.switch_to(slot)
+	else:
+		player.next_weapon(1)
+	_wheel_open = false
+	_wheel_pick = -1
+
+
+## The weapon slot in direction "drag" (from where the finger went down),
+## or -1 if the drag is too short or that slot's weapon isn't owned.
+## Slot 0 is straight up, then clockwise.
+func _wheel_slot_at(drag: Vector2) -> int:
+	if drag.length() < WHEEL_SELECT_DRAG:
+		return -1
+	var count := Weapons.LIST.size()
+	var angle := fposmod(drag.angle() + PI / 2.0, TAU)  # 0 = up, clockwise
+	var slot := roundi(angle / (TAU / count)) % count
+	return slot if player.has_weapon(slot) else -1
+
+
+func _wheel_center() -> Vector2:
+	return size * 0.5
+
+
+func _wheel_slot_center(slot: int, radius: float) -> Vector2:
+	var count := Weapons.LIST.size()
+	var a := -PI / 2.0 + slot * TAU / count
+	return _wheel_center() + Vector2(cos(a), sin(a)) * radius
+
+
+func _draw_wheel(font: Font) -> void:
+	var count := Weapons.LIST.size()
+	var c := _wheel_center()
+	var step := TAU / count
+	for slot in count:
+		var a0 := -PI / 2.0 + (slot - 0.5) * step
+		var pts := PackedVector2Array()
+		for k in 9:
+			var a := a0 + step * k / 8.0
+			pts.append(c + Vector2(cos(a), sin(a)) * WHEEL_OUTER)
+		for k in 9:
+			var a := a0 + step * (8 - k) / 8.0
+			pts.append(c + Vector2(cos(a), sin(a)) * WHEEL_INNER)
+		var owned: bool = player.has_weapon(slot)
+		draw_colored_polygon(pts, COLOR_WHEEL_PICK if slot == _wheel_pick else COLOR_WHEEL)
+		pts.append(pts[0])
+		draw_polyline(pts, COLOR_LINE if slot == player.weapon_index else Color(1, 1, 1, 0.2), 2.0)
+		var label_pos := _wheel_slot_center(slot, (WHEEL_OUTER + WHEEL_INNER) * 0.5)
+		var w: Dictionary = Weapons.LIST[slot]
+		draw_string(font, label_pos + Vector2(-60, -2), w.name, HORIZONTAL_ALIGNMENT_CENTER, 120,
+				WHEEL_FONT_SIZE, Color.WHITE if owned else COLOR_DISABLED)
+		draw_string(font, label_pos + Vector2(-60, 20), str(slot + 1), HORIZONTAL_ALIGNMENT_CENTER, 120,
+				WHEEL_FONT_SIZE - 4, Color(1, 1, 1, 0.6) if owned else COLOR_DISABLED)
 
 
 ## The joystick's fixed spot near the bottom-left corner.
@@ -206,9 +327,20 @@ func _draw() -> void:
 			continue
 		var b: Dictionary = BUTTONS[button_name]
 		var c := _button_center(button_name)
-		var held: bool = (button_name == "shoot" and _fingers.has("shoot")) \
+		var held: bool = (button_name in ["shoot", "grenade", "switch"] and _fingers.has(button_name)) \
 				or (button_name == "aim" and player.is_aiming())
 		draw_circle(c, b.radius, COLOR_PRESSED if held else COLOR_FILL)
 		draw_arc(c, b.radius, 0.0, TAU, 48, COLOR_LINE, 2.0)
-		draw_string(font, Vector2(c.x - b.radius, c.y + FONT_SIZE * 0.35), b.label,
-				HORIZONTAL_ALIGNMENT_CENTER, b.radius * 2.0, FONT_SIZE)
+		if button_name == "grenade":
+			# Label and how many are left; dimmed when there are none.
+			var text_color := Color.WHITE if player.grenades > 0 else COLOR_DISABLED
+			draw_string(font, Vector2(c.x - b.radius, c.y + 2), b.label,
+					HORIZONTAL_ALIGNMENT_CENTER, b.radius * 2.0, FONT_SIZE - 5, text_color)
+			draw_string(font, Vector2(c.x - b.radius, c.y + 28), "x%d" % player.grenades,
+					HORIZONTAL_ALIGNMENT_CENTER, b.radius * 2.0, FONT_SIZE, text_color)
+		else:
+			draw_string(font, Vector2(c.x - b.radius, c.y + FONT_SIZE * 0.35), b.label,
+					HORIZONTAL_ALIGNMENT_CENTER, b.radius * 2.0, FONT_SIZE)
+
+	if _wheel_open:
+		_draw_wheel(font)

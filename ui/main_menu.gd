@@ -1,10 +1,10 @@
 extends Control
-## Main menu: Play, Settings and Quit.
+## Main menu: Play (goes on to the map selection screen), Settings and Quit.
 ## The title shown here is the project name (Project Settings >
 ## Application > Config > Name, in project.godot), which is also the window
 ## and browser tab title. Change it there to rename the game.
 
-const GAME_SCENE := "res://main.tscn"
+const MAP_SELECT_SCENE := "res://ui/map_select.tscn"
 
 @onready var title_label: Label = %Title
 @onready var best_label: Label = %Best
@@ -20,6 +20,7 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	title_label.text = ProjectSettings.get_setting("application/config/name", "Last Stand")
 	if Settings.best_score > 0:
+		# The best over all maps; each map's own best is on the map screen.
 		best_label.text = "Best: %d   (wave %d)" % [Settings.best_score, Settings.best_wave]
 	else:
 		best_label.text = ""
@@ -49,8 +50,4 @@ func _focus_default() -> void:
 func _on_play() -> void:
 	for button: Button in [play_button, settings_button, quit_button]:
 		button.disabled = true
-	loading_label.visible = true
-	# Let "Loading..." draw before the level loads (that takes a moment).
-	await get_tree().process_frame
-	await get_tree().process_frame
-	get_tree().change_scene_to_file(GAME_SCENE)
+	get_tree().change_scene_to_file(MAP_SELECT_SCENE)

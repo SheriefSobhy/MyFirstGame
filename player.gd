@@ -1,9 +1,9 @@
 extends CharacterBody3D
 ## First-person player: movement, mouse/touch look, weapons and health.
 ## The weapons' stats live in weapon_stats.gd. This script handles shooting,
-## reloading, switching, aiming (down the sights, or the sniper scope) and
-## pickups, plus the "feel" effects: head bob, weapon sway, recoil, camera
-## shake and footsteps.
+## reloading, switching, aiming (down the sights, or the sniper scope),
+## throwing grenades and pickups, plus the "feel" effects: head bob, weapon
+## sway, recoil, camera shake and footsteps.
 
 signal health_changed(health: int)
 ## reserve is -1 when the weapon has unlimited spare ammo.
@@ -12,12 +12,14 @@ signal weapon_changed(weapon_name: String)
 signal scope_changed(scoped: bool)   # sniper scope overlay on/off
 ## Any aiming: sights or scope. sight is the weapon's "iron", "red_dot" or "scope".
 signal aim_changed(aiming: bool, sight: String)
+signal grenades_changed(count: int)
 signal message(text: String)  # short HUD notice, e.g. "Picked up Shotgun"
 signal died
 signal hit_taken  # god mode: hit without losing health
 
 const Weapons := preload("res://weapon_stats.gd")
 const WeaponModel := preload("res://weapon_model.gd")
+const Grenade := preload("res://effects/grenade.gd")
 
 const WALK_SPEED := 5.0
 const RUN_SPEED := 8.5
@@ -38,6 +40,17 @@ const MAX_SPARKS_PER_SHOT := 2  # shotgun: limit wall sparks (phones)
 const SWITCH_DOWN_TIME := 0.15
 const SWITCH_UP_TIME := 0.2
 const DRY_FIRE_SOUND := preload("res://assets/sounds/metalClick.ogg")
+
+# Grenades.
+const START_GRENADES := 3
+const MAX_GRENADES := 5
+const THROW_SPEED := 15.0       # m/s along the throw direction
+const THROW_UP_ANGLE := 12.0    # degrees above where the camera looks
+const THROW_COOLDOWN := 0.8
+const PREVIEW_DOTS := 36        # dots drawn along the throw arc
+const PREVIEW_STEP := 0.02      # seconds of flight between arc samples
+const PREVIEW_MAX_TIME := 3.0
+const PIN_SOUND := preload("res://assets/sounds/metalClick.ogg")
 
 # Feel tuning.
 const BOB_SPEED := 1.6          # head-bob cycles per metre walked
@@ -66,6 +79,7 @@ const FOOTSTEP_SOUNDS := [
 var health := MAX_HEALTH
 var is_dead := false
 var weapon_index := 0       # slot in Weapons.LIST
+var grenades := START_GRENADES
 
 # Set by the on-screen touch controls (see touch_controls.gd).
 var touch_move := Vector2.ZERO   # joystick direction, length 0..1
@@ -98,6 +112,12 @@ var _weapon_tween: Tween     # reload / switch / pump animation
 var _sound_tween: Tween      # reload sounds
 var _fov_tween: Tween
 
+# Grenade throwing.
+var _grenade_held := false   # G / GRENADE held: the arc preview is shown
+var _throw_cooldown := 0.0
+var _preview: MultiMeshInstance3D
+var _preview_marker: MeshInstance3D
+
 # Feel state.
 var _bob_time := 0.0       # advances while walking; drives head bob and footsteps
 var _bob_blend := 0.0      # 0 = standing still, 1 = full bob
@@ -126,13 +146,14 @@ func _ready() -> void:
 	muzzle_flash.visible = false
 	for i in Weapons.LIST.size():
 		var w: Dictionary = Weapons.LIST[i]
-		_owned.append(i == 0)  # start with the pistol only
+		_owned.append(w.start_owned)  # pistol and the new guns; the rest are pickups
 		_mag.append(w.mag_size)
 		_reserve.append(w.reserve)
 		_add_view_model(w)
 	# The gun is drawn close to the camera; its shadow would look odd.
 	WeaponModel.no_shadows(weapon_recoil)
 	_show_weapon(0)
+	_build_throw_preview()
 	# On touch devices the mouse is never captured; touch controls are used instead.
 	if not DisplayServer.is_touchscreen_available():
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -190,6 +211,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		next_weapon(1)
 	elif event.is_action_pressed("weapon_prev"):
 		next_weapon(-1)
+	elif event.is_action_pressed("grenade"):
+		start_grenade()
+	elif event.is_action_released("grenade"):
+		throw_grenade()
 	elif event.is_action_pressed("aim"):
 		_aim_wanted = true
 	elif event.is_action_released("aim"):
@@ -211,6 +236,9 @@ func _process(delta: float) -> void:
 	if want_aim != _aiming:
 		_set_aiming(want_aim)
 	_update_feel(delta)
+	_throw_cooldown -= delta
+	if _grenade_held:
+		_update_throw_preview()
 
 
 func _physics_process(delta: float) -> void:
@@ -234,6 +262,7 @@ func _physics_process(delta: float) -> void:
 	var speed := RUN_SPEED if Input.is_action_pressed("sprint") else WALK_SPEED
 	if _aiming:
 		speed = WALK_SPEED * ADS_MOVE_SCALE
+	speed *= current_weapon().move_scale  # heavy guns (LMG) slow you down
 	velocity.x = direction.x * speed
 	velocity.z = direction.z * speed
 	move_and_slide()
@@ -342,7 +371,7 @@ func shoot() -> void:
 	muzzle_flash.rotation.z = randf() * TAU
 	muzzle_flash.scale = Vector3.ONE * w.flash_size * randf_range(0.8, 1.2)
 	_flash_timer = FLASH_TIME
-	shoot_sound.pitch_scale = randf_range(0.95, 1.05)
+	shoot_sound.pitch_scale = w.shot_pitch * randf_range(0.95, 1.05)
 	shoot_sound.play()
 	_recoil = minf(_recoil + w.recoil, maxf(1.5, w.recoil))
 	_shake = maxf(_shake, w.shake)
@@ -560,8 +589,8 @@ func give_weapon(index: int) -> bool:
 	return true
 
 
-## Called by ammo boxes: spare ammo for every weapon the player owns.
-## Returns false (and the box stays) if everything is already full.
+## Called by ammo boxes: spare ammo for every weapon the player owns, and
+## one grenade. Returns false (and the box stays) if everything is already full.
 func give_ammo() -> bool:
 	if is_dead:
 		return false
@@ -569,6 +598,10 @@ func give_ammo() -> bool:
 	for i in _owned.size():
 		if _owned[i] and _add_reserve(i):
 			added = true
+	if grenades < MAX_GRENADES:
+		grenades += 1
+		grenades_changed.emit(grenades)
+		added = true
 	if added:
 		message.emit("+ Ammo")
 		_emit_ammo()
@@ -587,6 +620,7 @@ func _add_reserve(index: int) -> bool:
 func emit_status() -> void:
 	weapon_changed.emit(current_weapon().name)
 	_emit_ammo()
+	grenades_changed.emit(grenades)
 
 
 func _emit_ammo() -> void:
@@ -614,6 +648,7 @@ func take_damage(amount: int) -> void:
 	if health == 0:
 		is_dead = true
 		_set_aiming(false)
+		cancel_grenade()
 		died.emit()
 
 
@@ -640,6 +675,162 @@ func _play_reload_sound(stream: AudioStream) -> void:
 	reload_sound.stream = stream
 	reload_sound.play()
 
+
+## Extra camera shake from outside (e.g. a nearby explosion), 0..~1.2.
+func add_shake(amount: float) -> void:
+	_shake = maxf(_shake, amount)
+
+
+# --- Grenades ---------------------------------------------------------------
+
+## G pressed / GRENADE button touched: pull the pin and show the throw arc.
+func start_grenade() -> void:
+	if is_dead or _grenade_held or grenades <= 0 or _throw_cooldown > 0.0:
+		return
+	_grenade_held = true
+	_play_reload_sound(PIN_SOUND)
+	_update_throw_preview()
+	_preview.visible = true
+
+
+## G released / finger lifted off GRENADE: throw it along the previewed arc.
+func throw_grenade() -> void:
+	if not _grenade_held:
+		return
+	_grenade_held = false
+	_hide_throw_preview()
+	if is_dead or grenades <= 0:
+		return
+	grenades -= 1
+	_throw_cooldown = THROW_COOLDOWN
+	grenades_changed.emit(grenades)
+	var g: RigidBody3D = Grenade.new()
+	g.thrower = self
+	get_tree().current_scene.add_child(g)
+	g.global_position = _throw_origin()
+	g.linear_velocity = _throw_velocity()
+	g.angular_velocity = Vector3(randf_range(-8, 8), randf_range(-8, 8), randf_range(-8, 8))
+	# A quick dip of the gun while the other hand throws.
+	if not _switching and _reload_timer <= 0.0 and _fire_cooldown <= 0.0:
+		_kill_weapon_tween()
+		_weapon_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		_weapon_tween.tween_property(weapon_reload, "position", Vector3(0.0, -0.06, 0.03), 0.1)
+		_weapon_tween.parallel().tween_property(weapon_reload, "rotation", Vector3(deg_to_rad(-12), 0.0, deg_to_rad(-8)), 0.1)
+		_weapon_tween.tween_property(weapon_reload, "position", Vector3.ZERO, 0.25)
+		_weapon_tween.parallel().tween_property(weapon_reload, "rotation", Vector3.ZERO, 0.25)
+
+
+## Lets go of a held grenade without throwing it (pause, death).
+func cancel_grenade() -> void:
+	_grenade_held = false
+	_hide_throw_preview()
+
+
+func is_holding_grenade() -> bool:
+	return _grenade_held
+
+
+# Where the grenade leaves the hand: a little right of and below the eyes,
+# pulled back to the camera if that spot is inside a wall.
+func _throw_origin() -> Vector3:
+	var b := camera.global_basis
+	var from := camera.global_position
+	var to := from + b * Vector3(0.24, -0.2, -0.3)
+	var q := PhysicsRayQueryParameters3D.create(from, to, SHOT_MASK | 2, [get_rid()])
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	return from if not hit.is_empty() else to
+
+
+func _throw_velocity() -> Vector3:
+	var b := camera.global_basis
+	var dir := (-b.z).rotated(b.x, deg_to_rad(THROW_UP_ANGLE)).normalized()
+	return dir * THROW_SPEED + velocity
+
+
+# The arc preview: a row of small glowing dots and a ring where it lands.
+func _build_throw_preview() -> void:
+	var dot_mat := StandardMaterial3D.new()
+	dot_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	dot_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	dot_mat.albedo_color = Color(1.0, 0.85, 0.35, 0.85)
+	var dot := SphereMesh.new()
+	dot.radius = 0.035
+	dot.height = 0.07
+	dot.radial_segments = 6
+	dot.rings = 3
+	dot.material = dot_mat
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = dot
+	mm.instance_count = PREVIEW_DOTS
+	_preview = MultiMeshInstance3D.new()
+	_preview.multimesh = mm
+	_preview.top_level = true
+	_preview.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_preview.visible = false
+	add_child(_preview)
+
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.38
+	ring.outer_radius = 0.46
+	ring.rings = 24
+	ring.ring_segments = 4
+	ring.material = dot_mat
+	_preview_marker = MeshInstance3D.new()
+	_preview_marker.mesh = ring
+	_preview_marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_preview_marker.top_level = true
+	_preview_marker.visible = false
+	add_child(_preview_marker)
+
+
+func _hide_throw_preview() -> void:
+	if _preview:
+		_preview.visible = false
+		_preview_marker.visible = false
+
+
+## Simulates the throw (same start, speed and gravity as the real grenade)
+## up to its first hit. Returns {"points": [...], "hit": Dictionary}.
+func throw_arc() -> Dictionary:
+	var space := get_world_3d().direct_space_state
+	var pos := _throw_origin()
+	var vel := _throw_velocity()
+	var gravity := get_gravity()
+	var points: Array[Vector3] = [pos]
+	var hit := {}
+	var t := 0.0
+	while t < PREVIEW_MAX_TIME:
+		var next := pos + vel * PREVIEW_STEP
+		vel += gravity * PREVIEW_STEP
+		var q := PhysicsRayQueryParameters3D.create(pos, next, SHOT_MASK | 2, [get_rid()])
+		hit = space.intersect_ray(q)
+		if not hit.is_empty():
+			points.append(hit.position)
+			break
+		pos = next
+		points.append(pos)
+		t += PREVIEW_STEP
+	return {"points": points, "hit": hit}
+
+
+func _update_throw_preview() -> void:
+	var arc := throw_arc()
+	var points: Array[Vector3] = arc.points
+	var mm := _preview.multimesh
+	# Spread the dots evenly over the arc (skip the point in the hand).
+	var count := points.size()
+	for i in PREVIEW_DOTS:
+		var k := clampi(int(lerpf(1.0, count - 1, float(i) / (PREVIEW_DOTS - 1))), 0, count - 1)
+		mm.set_instance_transform(i, Transform3D(Basis(), points[k]))
+	var hit: Dictionary = arc.hit
+	_preview_marker.visible = not hit.is_empty()
+	if not hit.is_empty():
+		# The ring lies flat in its XZ plane: turn its Y axis to the surface normal.
+		var n: Vector3 = hit.normal
+		var up := Vector3.FORWARD if absf(n.y) > 0.99 else Vector3.UP
+		var x := up.cross(n).normalized()
+		_preview_marker.global_transform = Transform3D(Basis(x, n, x.cross(n)), hit.position + n * 0.03)
 
 # Head bob, footsteps, weapon sway, recoil and camera shake.
 func _update_feel(delta: float) -> void:

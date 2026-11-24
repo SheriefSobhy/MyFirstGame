@@ -2,7 +2,8 @@ extends Node
 ## Background music, autoloaded as "Music" so it keeps playing across scene
 ## changes and while the game is paused. Plays on the "Music" audio bus, whose
 ## volume is set in the settings screen. Switching tracks fades between them.
-## Both tracks loop (set in their .import files).
+## Every track loops (set in their .import files). Each map can have its
+## own gameplay track (main.gd's `music`); GAME_TRACK is the default.
 
 const MENU_TRACK := preload("res://assets/music/menu_menace.ogg")
 const GAME_TRACK := preload("res://assets/music/game_zombies_march.ogg")
@@ -25,8 +26,8 @@ func play_menu() -> void:
 	_play(MENU_TRACK)
 
 
-func play_game() -> void:
-	_play(GAME_TRACK)
+func play_game(track: AudioStream = null) -> void:
+	_play(track if track != null else GAME_TRACK)
 
 
 func current_track() -> AudioStream:

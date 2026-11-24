@@ -16,8 +16,8 @@ const BOB_HEIGHT := 0.08
 const SPIN_SPEED := 1.6     # radians per second
 
 @export var kind := Kind.AMMO
-## Slot in weapon_stats.gd (1 = rifle, 2 = shotgun, 3 = sniper).
-@export_range(0, 3) var weapon_index := 1
+## Slot in weapon_stats.gd (1 = assault rifle, 2 = shotgun, 3 = sniper).
+@export_range(0, 7) var weapon_index := 1
 @export var respawn_time := 30.0
 
 var _visual: Node3D

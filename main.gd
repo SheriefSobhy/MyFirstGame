@@ -4,7 +4,9 @@ extends Node3D
 ## Retry and going back to the main menu.
 ##
 ## Waves: wave 1 has START_ENEMIES enemies and every wave adds
-## ENEMIES_PER_WAVE more, each a little faster. Enemies spawn one at a time,
+## ENEMIES_PER_WAVE more, each a little faster. New enemy types join the mix
+## as the waves go on (see wave_kinds()), and every BOSS_EVERY-th wave is a
+## boss wave with one Brute Boss (with a health bar on the HUD). Enemies spawn one at a time,
 ## with at most max_enemies in the yard at once. After a wave is cleared the
 ## player gets a short break (and some health back) before the next one.
 
@@ -17,7 +19,7 @@ const MAX_SPEED_SCALE := 2.0     # ...up to twice the wave 1 speed
 const SPAWN_INTERVAL := 1.2      # seconds between spawns within a wave
 const BREAK_TIME := 6.0          # seconds between waves
 const WAVE_HEAL := 25            # health given back for clearing a wave
-const KILL_POINTS := 10
+const KILL_POINTS := 10         # normal zombie; other types have their own (enemy_types.gd)
 const WAVE_POINTS := 50          # x the wave number, for clearing a wave
 const MAX_ENEMIES := 12      # cap so the arena (and phones) don't overflow
 const PHONE_MAX_ENEMIES := 8
@@ -27,8 +29,25 @@ const BULLET_HOLE_SCENE := preload("res://effects/bullet_hole.tscn")
 const SPARKS_SCENE := preload("res://effects/impact_sparks.tscn")
 const BLOOD_SCENE := preload("res://effects/blood_hit.tscn")
 const HIT_FLASH_MATERIAL := preload("res://effects/hit_flash_material.tres")
+const EnemyTypes := preload("res://enemy_types.gd")
+
+# When each enemy type starts to appear.
+const RUNNER_WAVE := 3
+const SOLDIER_WAVE := 4
+const BRUTE_WAVE := 5           # the first brute is wave 5's boss
+const EXPLODER_WAVE := 6
+const BOSS_EVERY := 5
+const BOSS_HP_PER_WAVE := 40    # extra boss health for each later boss wave
+const BOSS_WAVE_SHARE := 0.6    # boss waves have fewer other enemies
+const Explosion := preload("res://effects/explosion.gd")
+const Grenade := preload("res://effects/grenade.gd")
 
 enum Phase { FIGHT, BREAK, OVER }
+
+## Which map this scene is (maps.gd id): the best score is saved per map.
+@export var map_id := "yard"
+## Gameplay music for this map (empty = the default track).
+@export var music: AudioStream
 
 var score := 0
 var kills := 0
@@ -38,6 +57,8 @@ var phase := Phase.FIGHT
 var max_enemies := MAX_ENEMIES
 
 var _to_spawn := 0     # enemies of this wave not spawned yet
+var _spawn_queue: Array[String] = []   # their kinds, in spawn order
+var _boss: Node = null
 var _alive := 0        # spawned and not dead yet
 var _break_left := 0.0
 var _break_shown := -1
@@ -61,12 +82,13 @@ func _ready() -> void:
 	# Looping ambient wind, and the gameplay music.
 	wind.stream.loop = true
 	wind.play()
-	Music.play_game()
+	Music.play_game(music)
 
 	# Player -> HUD
 	player.health_changed.connect(hud.set_health)
 	player.ammo_changed.connect(hud.set_ammo)
 	player.weapon_changed.connect(hud.set_weapon)
+	player.grenades_changed.connect(hud.set_grenades)
 	player.scope_changed.connect(hud.set_scoped)
 	player.aim_changed.connect(hud.set_aiming)
 	player.message.connect(hud.show_message)
@@ -79,6 +101,7 @@ func _ready() -> void:
 	player.weapon_changed.connect(func(_name: String) -> void: hud.touch_controls.queue_redraw())
 	player.scope_changed.connect(func(_on: bool) -> void: hud.touch_controls.queue_redraw())
 	player.aim_changed.connect(func(_on: bool, _sight: String) -> void: hud.touch_controls.queue_redraw())
+	player.grenades_changed.connect(func(_n: int) -> void: hud.touch_controls.queue_redraw())
 	spawn_timer.wait_time = SPAWN_INTERVAL
 	spawn_timer.timeout.connect(_on_spawn_tick)
 
@@ -115,11 +138,53 @@ static func speed_in_wave(n: int) -> float:
 	return minf(1.0 + SPEED_PER_WAVE * (n - 1), MAX_SPEED_SCALE)
 
 
+## The enemy kinds in wave n (in spawn order): mostly normal zombies, with
+## runners from wave 3, soldiers from 4, brutes from 5 (as the boss) and
+## exploders from 6. Every 5th wave starts with the Brute Boss.
+static func wave_kinds(n: int) -> Array[String]:
+	var boss := is_boss_wave(n)
+	var count := enemies_in_wave(n)
+	if boss:
+		count = ceili(count * BOSS_WAVE_SHARE)
+	var special: Array[String] = []
+	if n >= RUNNER_WAVE:
+		for i in maxi(1, int(count * 0.3)):
+			special.append("runner")
+	if n >= SOLDIER_WAVE:
+		for i in mini(1 + (n - SOLDIER_WAVE) / 2, 4):
+			special.append("soldier")
+	if n > BRUTE_WAVE and not boss:
+		for i in mini(1 + (n - BRUTE_WAVE - 1) / 4, 3):
+			special.append("brute")
+	if n >= EXPLODER_WAVE:
+		for i in mini(1 + (n - EXPLODER_WAVE) / 2, 4):
+			special.append("exploder")
+	var kinds: Array[String] = special
+	for i in maxi(count - special.size(), 2):
+		kinds.append("normal")
+	kinds.shuffle()
+	if boss:
+		kinds.push_front("boss")
+	return kinds
+
+
+static func is_boss_wave(n: int) -> bool:
+	return n % BOSS_EVERY == 0
+
+
+static func boss_hp(n: int) -> int:
+	return EnemyTypes.TYPES.boss.hp + BOSS_HP_PER_WAVE * (n / BOSS_EVERY - 1)
+
+
 func start_wave(n: int) -> void:
 	wave = n
 	phase = Phase.FIGHT
-	_to_spawn = enemies_in_wave(n)
-	hud.show_banner("Wave %d" % n, "%d enemies" % _to_spawn)
+	_spawn_queue = wave_kinds(n)
+	_to_spawn = _spawn_queue.size()
+	if is_boss_wave(n):
+		hud.show_banner("Wave %d" % n, "BOSS WAVE  ·  %d enemies" % _to_spawn)
+	else:
+		hud.show_banner("Wave %d" % n, "%d enemies" % _to_spawn)
 	hud.set_wave(wave, _to_spawn + _alive)
 	spawn_timer.start()
 
@@ -136,14 +201,22 @@ func _on_spawn_tick() -> void:
 
 func spawn_enemy() -> void:
 	var enemy := ENEMY_SCENE.instantiate()
+	enemy.kind = _spawn_queue.pop_front() if not _spawn_queue.is_empty() else "normal"
 	enemy.speed_scale = speed_in_wave(wave)
+	if enemy.kind == "boss":
+		enemy.hp_override = boss_hp(wave)
+		enemy.health_changed.connect(hud.set_boss_health)
+		_boss = enemy
 	var point: Node3D = _pick_spawn_point()
 	var offset := Vector3(randf_range(-SPAWN_SPREAD, SPAWN_SPREAD), 0.0, randf_range(-SPAWN_SPREAD, SPAWN_SPREAD))
 	enemy.position = point.position + offset
-	enemy.died.connect(_on_enemy_died)
+	enemy.died.connect(_on_enemy_died.bind(enemy))
 	enemies.add_child(enemy)
 	_to_spawn -= 1
 	_alive += 1
+	if enemy.kind == "boss":
+		hud.show_boss(enemy.stats.name, enemy.hp, enemy.max_hp)
+		hud.show_message("The Brute Boss is here!")
 
 
 # A random spawn point that isn't right next to the player.
@@ -153,11 +226,17 @@ func _pick_spawn_point() -> Node3D:
 	return (far if not far.is_empty() else spawn_points).pick_random()
 
 
-func _on_enemy_died() -> void:
+func _on_enemy_died(enemy: Node) -> void:
 	_alive -= 1
 	kills += 1
-	score += KILL_POINTS
+	# Exploders that blow themselves up give no points.
+	if enemy.killed_by_player:
+		score += enemy.stats.points
 	hud.set_score(score)
+	if enemy == _boss:
+		_boss = null
+		hud.show_message("Boss down!  +%d" % enemy.stats.points)
+		get_tree().create_timer(1.0, false).timeout.connect(hud.hide_boss)
 	if phase != Phase.FIGHT:
 		return
 	hud.set_wave(wave, _to_spawn + _alive)
@@ -183,6 +262,9 @@ func _wave_cleared() -> void:
 func _apply_quality() -> void:
 	var vp := get_viewport()
 	var flash_light: Light3D = player.get_node("%FlashLight")
+	# Maps can mark some of their lamps as extras that Low quality turns off.
+	for lamp: Node in get_tree().get_nodes_in_group("optional_lights"):
+		lamp.visible = Settings.quality != Settings.Quality.LOW
 	match Settings.quality:
 		Settings.Quality.LOW:
 			vp.scaling_3d_scale = 0.5
@@ -227,6 +309,26 @@ func _prewarm_effects() -> void:
 		var node: Node3D = scene.instantiate()
 		add_child(node)
 		warm.append(node)
+	# Grenade explosion (no sound or scorch mark) and the grenade model.
+	var blast := Explosion.new()
+	blast.with_sound = false
+	add_child(blast)
+	warm.append(blast)
+	var grenade_model := Grenade.build_model()
+	add_child(grenade_model)
+	warm.append(grenade_model)
+	# Every enemy type (models, colours and glow), outside the enemy group.
+	for kind: String in EnemyTypes.TYPES:
+		if kind == "normal":
+			continue
+		var e: Node3D = ENEMY_SCENE.instantiate()
+		e.kind = kind
+		e.silent = true
+		e.remove_from_group("enemies")
+		e.process_mode = Node.PROCESS_MODE_DISABLED
+		e.get_node("CollisionShape3D").disabled = true
+		add_child(e)
+		warm.append(e)
 	var flash_quad := MeshInstance3D.new()
 	flash_quad.mesh = QuadMesh.new()
 	flash_quad.material_override = HIT_FLASH_MATERIAL
@@ -258,8 +360,8 @@ func _on_player_died() -> void:
 	phase = Phase.OVER
 	spawn_timer.stop()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	var new_best: bool = Settings.submit_score(score, waves_survived)
-	hud.show_game_over(waves_survived, kills, score, Settings.best_score, new_best)
+	var new_best: bool = Settings.submit_score(score, waves_survived, map_id)
+	hud.show_game_over(waves_survived, kills, score, Settings.best_score_for(map_id), new_best)
 	get_tree().paused = true  # freezes everything except the HUD and music
 
 
