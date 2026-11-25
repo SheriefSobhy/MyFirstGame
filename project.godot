@@ -10,10 +10,13 @@ config_version=5
 
 [application]
 
-config/name="Last Stand"
+config/name="Dead Perimeter"
 run/main_scene="res://ui/main_menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
-config/icon="res://icon.svg"
+config/icon="res://art/icons/icon_512.png"
+boot_splash/bg_color=Color(0, 0, 0, 1)
+boot_splash/image="res://art/splash.png"
+boot_splash/fullsize=true
 
 [audio]
 

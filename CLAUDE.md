@@ -1,4 +1,4 @@
-# Last Stand — project notes
+# Dead Perimeter — project notes
 
 A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 (GitHub Pages from `docs/`), Android (debug APK) and Windows.
@@ -195,7 +195,7 @@ used headless only (`blender -b --factory-startup --python ...`).
 
 ## Build and publish
 
-- `build_all.bat`: Android APK → `builds/LastStand.apk`, Windows →
-  `builds/windows/LastStand.exe` (git-ignored). No commit.
+- `build_all.bat`: Android APK → `builds/DeadPerimeter.apk`, Windows →
+  `builds/windows/DeadPerimeter.exe` (git-ignored). No commit.
 - `publish.bat`: web export to `docs/`, commit everything, push (GitHub Pages).
 - `tools/rebake.bat`: lightmaps + navmeshes after level geometry changes.

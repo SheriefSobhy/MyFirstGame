@@ -46,7 +46,7 @@ var _reset_timer := 0.0
 func _ready() -> void:
 	get_tree().paused = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	title_label.text = ProjectSettings.get_setting("application/config/name", "Last Stand")
+	title_label.text = ProjectSettings.get_setting("application/config/name", "Dead Perimeter")
 	# A web page can't close itself, so there's no Quit button in the browser.
 	quit_button.visible = not OS.has_feature("web")
 

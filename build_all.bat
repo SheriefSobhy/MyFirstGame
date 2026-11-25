@@ -17,21 +17,21 @@ if not exist builds\.gdignore type nul > builds\.gdignore
 
 set "FAILED="
 
-echo === Exporting Android APK to builds\LastStand.apk ===
-if exist builds\LastStand.apk del /q builds\LastStand.apk
-"%GODOT%" --headless --path . --export-debug "Android" builds/LastStand.apk
+echo === Exporting Android APK to builds\DeadPerimeter.apk ===
+if exist builds\DeadPerimeter.apk del /q builds\DeadPerimeter.apk
+"%GODOT%" --headless --path . --export-debug "Android" builds/DeadPerimeter.apk
 if errorlevel 1 (
     set "FAILED=%FAILED% Android"
-) else if not exist builds\LastStand.apk (
+) else if not exist builds\DeadPerimeter.apk (
     set "FAILED=%FAILED% Android"
 )
 
-echo === Exporting Windows exe to builds\windows\LastStand.exe ===
-if exist builds\windows\LastStand.exe del /q builds\windows\LastStand.exe
-"%GODOT%" --headless --path . --export-release "Windows Desktop" builds/windows/LastStand.exe
+echo === Exporting Windows exe to builds\windows\DeadPerimeter.exe ===
+if exist builds\windows\DeadPerimeter.exe del /q builds\windows\DeadPerimeter.exe
+"%GODOT%" --headless --path . --export-release "Windows Desktop" builds/windows/DeadPerimeter.exe
 if errorlevel 1 (
     set "FAILED=%FAILED% Windows"
-) else if not exist builds\windows\LastStand.exe (
+) else if not exist builds\windows\DeadPerimeter.exe (
     set "FAILED=%FAILED% Windows"
 )
 
@@ -41,6 +41,6 @@ if defined FAILED (
 )
 
 echo === Done. ===
-echo   builds\LastStand.apk
-echo   builds\windows\LastStand.exe
+echo   builds\DeadPerimeter.apk
+echo   builds\windows\DeadPerimeter.exe
 endlocal

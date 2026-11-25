@@ -38,7 +38,7 @@ func _run() -> void:
 	change_scene_to_file(MENU)
 	await frames(5)
 	var menu := current_scene
-	check(menu.title_label.text == "Last Stand", "menu shows the game title (got '%s')" % menu.title_label.text)
+	check(menu.title_label.text == "Dead Perimeter", "menu shows the game title (got '%s')" % menu.title_label.text)
 	check(menu.play_button.visible and menu.settings_button.visible and menu.quit_button.visible,
 			"menu has Play, Settings and Quit")
 	check(music.current_track() == music.MENU_TRACK, "menu music plays")

@@ -67,9 +67,33 @@ func _ready() -> void:
 	# Tests (tool scripts) skip the tutorial unless they ask for it.
 	if _under_test():
 		tutorial_done = true
+	else:
+		_migrate_old_saves()
 	_load()
 	_apply_audio()
 	_apply_fps_cap()
+
+
+## The game was renamed (Last Stand -> Ashline -> Dead Perimeter) and Windows
+## keeps saves in a folder named after the project. If this folder has no
+## saves, copy them once from the old folder.
+func _migrate_old_saves() -> void:
+	if not OS.has_feature("windows"):
+		return
+	var files := ["settings.cfg", "save.cfg", "progress.cfg"]
+	for f in files:
+		if FileAccess.file_exists("user://" + f):
+			return
+	var base := ProjectSettings.globalize_path("user://").trim_suffix("/").get_base_dir()
+	for old in ["Last Stand", "Ashline"]:
+		var found := false
+		for f in files:
+			var src: String = base.path_join(old).path_join(f)
+			if FileAccess.file_exists(src):
+				if DirAccess.copy_absolute(src, ProjectSettings.globalize_path("user://" + f)) == OK:
+					found = true
+		if found:
+			return
 
 
 func _under_test() -> bool:
