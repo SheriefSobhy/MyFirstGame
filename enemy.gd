@@ -116,6 +116,8 @@ var state := State.CHASE
 var silent := false
 ## false when an exploder blew itself up (no points for the player).
 var killed_by_player := true
+## true when it was killed by a Nuke power-up: no cash and no drop.
+var no_reward := false
 ## How stuck it is now (0 fine, 1 re-pathed, 2 sidestepped, 3 relocated), and
 ## how many times each happened (for tests).
 var stuck_level := 0
@@ -547,6 +549,7 @@ func take_damage(amount: int, hit_position := Vector3.ZERO, hit_normal := Vector
 		return
 	hp -= amount
 	health_changed.emit(maxi(hp, 0), max_hp)
+	_last_headshot = headshot
 	_spawn_hit_effect(hit_position, hit_normal, headshot)
 	_flash()
 	hit_player.stream = HIT_SOUNDS.pick_random()
@@ -629,6 +632,11 @@ func head_sphere() -> Dictionary:
 
 
 ## True if a bullet from `from` along `dir` (normalized) goes through the head.
+## True if the last hit (the killing one, once dead) was a headshot.
+func last_hit_was_headshot() -> bool:
+	return _last_headshot
+
+
 func is_head_hit(from: Vector3, dir: Vector3) -> bool:
 	if state == State.DEAD:
 		return false

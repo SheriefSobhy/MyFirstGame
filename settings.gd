@@ -26,6 +26,7 @@ var quality: int = Quality.HIGH
 var damage_numbers := true   # floating damage numbers on hits
 var haptics := true          # phone vibration on shots, kills, explosions and damage
 var aim_assist := true       # touch only: slower look over enemies, pull when aiming
+var debug_unlock_all := false # testing: every weapon from the start, every level unlock (weapons, maps)
 
 ## Best score and wave per map id (see maps.gd): {id: {"score": int, "wave": int}}.
 var bests := {}
@@ -66,6 +67,7 @@ func save_settings() -> void:
 	cfg.set_value("gameplay", "damage_numbers", damage_numbers)
 	cfg.set_value("gameplay", "haptics", haptics)
 	cfg.set_value("gameplay", "aim_assist", aim_assist)
+	cfg.set_value("debug", "unlock_all", debug_unlock_all)
 	cfg.save(SETTINGS_PATH)
 
 
@@ -77,12 +79,17 @@ func submit_score(score: int, waves: int, map_id := "yard") -> bool:
 	b = {"score": maxi(b.score, score), "wave": maxi(b.wave, waves)}
 	bests[map_id] = b
 	_update_overall()
+	save_bests()
+	return new_best
+
+
+## Writes the best scores to user://save.cfg.
+func save_bests() -> void:
 	var cfg := ConfigFile.new()
 	for id: String in bests:
 		cfg.set_value("best_" + id, "score", bests[id].score)
 		cfg.set_value("best_" + id, "wave", bests[id].wave)
 	cfg.save(SAVE_PATH)
-	return new_best
 
 
 func best_score_for(map_id: String) -> int:
@@ -118,6 +125,7 @@ func _load() -> void:
 		damage_numbers = bool(cfg.get_value("gameplay", "damage_numbers", damage_numbers))
 		haptics = bool(cfg.get_value("gameplay", "haptics", haptics))
 		aim_assist = bool(cfg.get_value("gameplay", "aim_assist", aim_assist))
+		debug_unlock_all = bool(cfg.get_value("debug", "unlock_all", debug_unlock_all))
 	var save := ConfigFile.new()
 	if save.load(SAVE_PATH) == OK:
 		for section in save.get_sections():

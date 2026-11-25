@@ -1,9 +1,12 @@
 extends Control
 ## Map selection, shown after Play on the main menu: one card per map in
-## maps.gd with its picture, description and best score. Picking a card loads
-## that map; Back returns to the main menu.
+## maps.gd with its picture, description, best score and stars (3 per map).
+## Maps your level hasn't unlocked show the level they need. Picking a card
+## loads that map; Back returns to the main menu.
 
 const Maps := preload("res://maps.gd")
+const Progression := preload("res://progression_config.gd")
+const StarRow := preload("res://ui/star_row.gd")
 const MENU_SCENE := "res://ui/main_menu.tscn"
 
 @onready var cards: HBoxContainer = %Cards
@@ -76,11 +79,30 @@ func _make_card(m: Dictionary) -> Control:
 	best.add_theme_font_size_override("font_size", 20)
 	box.add_child(best)
 
+	# Stars: reach wave 5 / 10 / 15 (progression_config.gd STAR_WAVES).
+	var star_row := HBoxContainer.new()
+	star_row.add_theme_constant_override("separation", 12)
+	box.add_child(star_row)
+	var stars := StarRow.new(Progress.stars(m.id), 28.0)
+	stars.name = "Stars"
+	star_row.add_child(stars)
+	var star_hint := Label.new()
+	star_hint.text = "Reach wave %s" % " / ".join(Progression.STAR_WAVES.map(func(w: int) -> String: return str(w)))
+	star_hint.add_theme_font_size_override("font_size", 16)
+	star_hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
+	star_row.add_child(star_hint)
+
 	var play := Button.new()
 	play.name = "Play"
-	play.text = "Play"
 	play.custom_minimum_size = Vector2(0, 64)
 	play.add_theme_font_size_override("font_size", 30)
+	if Progress.is_map_unlocked(m.id):
+		play.text = "Play"
+	else:
+		# Locked until the player's level is high enough.
+		play.text = "Locked: Level %d" % Progression.map_unlock_level(m.id)
+		play.disabled = true
+		pic.modulate = Color(0.35, 0.35, 0.35)
 	play.pressed.connect(_on_play.bind(m))
 	box.add_child(play)
 	play_buttons[m.id] = play
@@ -88,6 +110,8 @@ func _make_card(m: Dictionary) -> Control:
 
 
 func _on_play(m: Dictionary) -> void:
+	if not Progress.is_map_unlocked(m.id):
+		return
 	for b: Button in play_buttons.values():
 		b.disabled = true
 	back_button.disabled = true

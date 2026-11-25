@@ -17,7 +17,9 @@ const ENEMIES_PER_WAVE := 2      # extra enemies each wave
 const SPEED_PER_WAVE := 0.08     # +8% walking speed each wave...
 const MAX_SPEED_SCALE := 2.0     # ...up to twice the wave 1 speed
 const SPAWN_INTERVAL := 1.2      # seconds between spawns within a wave
-const BREAK_TIME := 6.0          # seconds between waves
+const Economy := preload("res://economy.gd")
+const MatchEconomy := preload("res://match_economy.gd")
+const BREAK_TIME := Economy.BREAK_TIME  # seconds between waves (waits while the shop is open)
 const WAVE_HEAL := 25            # health given back for clearing a wave
 const KILL_POINTS := 10         # normal zombie; other types have their own (enemy_types.gd)
 const WAVE_POINTS := 50          # x the wave number, for clearing a wave
@@ -55,6 +57,8 @@ var wave := 0
 var waves_survived := 0
 var phase := Phase.FIGHT
 var max_enemies := MAX_ENEMIES
+## Cash, the shop, power-ups (match_economy.gd).
+var economy: MatchEconomy
 
 var _to_spawn := 0     # enemies of this wave not spawned yet
 var _spawn_queue: Array[String] = []   # their kinds, in spawn order
@@ -116,6 +120,8 @@ func _ready() -> void:
 	hud.set_health(player.health)
 	player.emit_status()
 	hud.set_score(score)
+	_setup_economy()
+	_setup_progress()
 
 	if DisplayServer.is_touchscreen_available():
 		max_enemies = PHONE_MAX_ENEMIES
@@ -127,6 +133,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	hud.update_powerups(economy.active)
 	if phase != Phase.BREAK:
 		return
 	_break_left -= delta
@@ -135,6 +142,50 @@ func _process(delta: float) -> void:
 		_break_shown = seconds
 		hud.set_break(wave + 1, seconds)
 	if _break_left <= 0.0:
+		start_wave(wave + 1)
+
+
+# Cash, the shop, armor and power-ups. Weapons are bought in the shop now,
+# so the maps' weapon pickups are taken out of play (ammo boxes stay).
+func _setup_economy() -> void:
+	economy = MatchEconomy.new()
+	economy.name = "Economy"
+	economy.player = player
+	add_child(economy)
+	economy.cash_changed.connect(hud.set_cash)
+	economy.powerup_collected.connect(func(kind: String) -> void:
+		hud.show_message(Economy.POWERUP_INFO[kind].name.to_upper() + "!"))
+	player.armor_changed.connect(hud.set_armor)
+	hud.set_cash(economy.cash)
+	hud.set_armor(player.armor)
+	hud.shop.economy = economy
+	hud.shop.player = player
+	hud.shop_ready.connect(_on_shop_ready)
+	var pickups := get_node_or_null("Pickups")
+	if pickups:
+		for p: Node in pickups.get_children():
+			if p.kind == p.Kind.WEAPON:
+				p.remove_from_play()
+
+
+# Persistent progression (progress.gd): XP, missions, stars and achievements
+# count during the match; the HUD pops up level-ups and the rest.
+func _setup_progress() -> void:
+	Progress.start_match(map_id)
+	Progress.leveled_up.connect(hud.show_level_up)
+	Progress.mission_completed.connect(hud.on_mission_completed)
+	Progress.achievement_unlocked.connect(hud.on_achievement)
+	Progress.star_earned.connect(hud.on_star_earned)
+
+
+# The match is over (Game Over, or Main Menu from the pause menu).
+func _end_progress() -> Dictionary:
+	return Progress.end_match(waves_survived, kills, economy.total_earned)
+
+
+# READY in the shop: skip the rest of the break.
+func _on_shop_ready() -> void:
+	if phase == Phase.BREAK:
 		start_wave(wave + 1)
 
 
@@ -195,6 +246,11 @@ func start_wave(n: int) -> void:
 		hud.show_banner("Wave %d" % n, "%d enemies" % _to_spawn)
 	hud.set_wave(wave, _to_spawn + _alive)
 	spawn_timer.start()
+	hud.set_shop_available(false)
+	economy.new_wave()
+	Progress.on_wave_started(n)
+	# Exploded barrels come back for the new wave.
+	get_tree().call_group("explosive_barrels", "respawn")
 
 
 func _on_spawn_tick() -> void:
@@ -339,7 +395,11 @@ func _on_enemy_died(enemy: Node) -> void:
 	# Exploders that blow themselves up give no points.
 	if enemy.killed_by_player:
 		score += enemy.stats.points
-		hud.feedback.on_kill()  # kill sound, streak popup, vibration
+		if not enemy.no_reward:  # nuked: no cash, no drop, no streak
+			hud.feedback.on_kill()  # kill sound, streak popup, vibration
+			economy.award_kill(enemy, hud.feedback.streak)
+			economy.maybe_drop(enemy)
+			Progress.on_kill(enemy.kind, enemy.last_hit_was_headshot())
 	hud.set_score(score)
 	if enemy == _boss:
 		_boss = null
@@ -361,7 +421,10 @@ func _wave_cleared() -> void:
 	phase = Phase.BREAK
 	_break_left = BREAK_TIME
 	_break_shown = -1
-	hud.show_banner("Wave %d cleared" % wave, "", BREAK_TIME - 0.6)
+	economy.award_wave(wave)
+	Progress.on_wave_cleared(wave)
+	hud.set_shop_available(true)
+	hud.show_banner("Wave %d cleared" % wave, "+$%d  ·  Shop open" % Economy.wave_cash(wave), BREAK_TIME - 0.6)
 
 
 # Graphics quality from the settings screen (Low / Medium / High): shadows,
@@ -422,6 +485,11 @@ func _prewarm_effects() -> void:
 	blast.with_sound = false
 	add_child(blast)
 	warm.append(blast)
+	# A power-up token (glow, emissive coin and its 3D label).
+	var token := preload("res://effects/powerup_drop.gd").new()
+	token.process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(token)
+	warm.append(token)
 	var grenade_model := Grenade.build_model()
 	add_child(grenade_model)
 	warm.append(grenade_model)
@@ -471,7 +539,8 @@ func _on_player_died() -> void:
 	spawn_timer.stop()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var new_best: bool = Settings.submit_score(score, waves_survived, map_id)
-	hud.show_game_over(waves_survived, kills, score, Settings.best_score_for(map_id), new_best)
+	hud.show_game_over(waves_survived, kills, score, Settings.best_score_for(map_id), new_best, economy.total_earned)
+	hud.show_progress(_end_progress())
 	get_tree().paused = true  # freezes everything except the HUD and music
 
 
@@ -481,5 +550,6 @@ func _on_retry() -> void:
 
 
 func _on_main_menu() -> void:
+	_end_progress()  # leaving mid-match still pays for the waves so far
 	get_tree().paused = false
 	get_tree().change_scene_to_file(MENU_SCENE)

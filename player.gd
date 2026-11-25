@@ -17,13 +17,17 @@ signal grenades_changed(count: int)
 signal message(text: String)  # short HUD notice, e.g. "Picked up Shotgun"
 signal died
 signal hit_taken  # god mode: hit without losing health
+signal armor_changed(armor: int)
 ## A shot hit an enemy (all pellets on it added up). For the hit marker and
 ## damage numbers. killed = this shot killed it.
 signal enemy_hit(enemy: Node3D, damage: int, point: Vector3, headshot: bool, killed: bool)
 
 const Weapons := preload("res://weapon_stats.gd")
 const Haptics := preload("res://effects/haptics.gd")
+const Economy := preload("res://economy.gd")
 const WeaponModel := preload("res://weapon_model.gd")
+const WeaponSkins := preload("res://weapon_skins.gd")
+const Progression := preload("res://progression_config.gd")
 const Grenade := preload("res://effects/grenade.gd")
 
 const WALK_SPEED := 5.0
@@ -96,6 +100,10 @@ var health := MAX_HEALTH
 var is_dead := false
 var weapon_index := 0       # slot in Weapons.LIST
 var grenades := START_GRENADES
+## Absorbs part of each hit (economy.gd ARMOR_ABSORB) until it runs out.
+var armor := 0
+## Insta-Kill power-up: every bullet kills (except the Boss). Set by match_economy.gd.
+var insta_kill := false
 
 # Set by the on-screen touch controls (see touch_controls.gd).
 var touch_move := Vector2.ZERO   # joystick direction, length 0..1
@@ -111,6 +119,7 @@ var _aim_time := 0.0               # seconds since aiming in
 
 # Per-weapon state, indexed like Weapons.LIST.
 var _owned: Array[bool] = []
+var _upgrades: Array[Dictionary] = []  # shop upgrade levels: {"damage", "mag", "reload"}
 var _mag: Array[int] = []        # rounds in the magazine
 var _reserve: Array[int] = []    # spare rounds (-1 = unlimited)
 var _views: Array[Node3D] = []   # first-person models (only the current one is shown)
@@ -125,6 +134,7 @@ var _flash_timer := 0.0
 var _trigger_ready := true   # semi-auto: the trigger was released since the last shot
 var _reload_queued := false  # reload pressed while pumping / cycling the bolt
 var _switching := false
+var _switch_target := 0       # the weapon being switched to
 var _aim_wanted := false     # right mouse held, or the touch AIM button toggled on
 var _aiming := false         # aiming with any weapon (sights or scope)
 var _scoped := false         # aiming with the sniper scope (overlay shown)
@@ -169,8 +179,10 @@ func _ready() -> void:
 	muzzle_flash.visible = false
 	for i in Weapons.LIST.size():
 		var w: Dictionary = Weapons.LIST[i]
-		_owned.append(w.start_owned)  # pistol and the new guns; the rest are pickups
-		_mag.append(w.mag_size)
+		# Pistol and Assault Rifle; the rest are bought in the shop (economy.gd).
+		_owned.append(w.name in Economy.START_WEAPONS or Settings.debug_unlock_all)
+		_upgrades.append({"damage": 0, "mag": 0, "reload": 0})
+		_mag.append(mag_size(i))
 		_reserve.append(w.reserve)
 		_add_view_model(w)
 	# The gun is drawn close to the camera; its shadow would look odd.
@@ -193,6 +205,7 @@ func _add_view_model(w: Dictionary) -> void:
 	var s: float = w.view_length / aabb.size.x
 	model.transform = Transform3D(Basis(Vector3.UP, PI / 2.0).scaled(Vector3.ONE * s), w.view_offset)
 	model.visible = false
+	WeaponSkins.apply(model, Progress.skin_of(w.name))  # the Armory skin
 	gun_holder.add_child(model)
 	_views.append(model)
 	_muzzles.append(model.transform * info.tip)
@@ -426,7 +439,9 @@ func shoot() -> void:
 		var target: Object = hit.collider
 		if target.has_method("take_damage"):
 			var head: bool = target.has_method("is_head_hit") and target.is_head_hit(camera.global_position, dir)
-			var dmg: int = w.damage * (HEADSHOT_MULTIPLIER if head else 1)
+			var dmg: int = roll_damage(weapon_index) * (HEADSHOT_MULTIPLIER if head else 1)
+			if insta_kill and "hp" in target and not target.get("kind") == "boss":
+				dmg = maxi(dmg, target.hp)  # Insta-Kill power-up (not the Boss)
 			if enemy_hits.has(target):
 				enemy_hits[target].damage += dmg
 				enemy_hits[target].headshot = enemy_hits[target].headshot or head
@@ -438,8 +453,9 @@ func shoot() -> void:
 	for target: Object in enemy_hits:
 		var h: Dictionary = enemy_hits[target]
 		target.take_damage(h.damage, h.point, h.normal, h.headshot)  # enemy: blood + hit reaction
-		var killed: bool = "hp" in target and target.hp <= 0
-		enemy_hit.emit(target, h.damage, h.point, h.headshot, killed)
+		if target.has_method("is_head_hit"):  # enemies (not barrels)
+			var killed: bool = target.hp <= 0
+			enemy_hit.emit(target, h.damage, h.point, h.headshot, killed)
 
 	# The view climbs a little (after the bullets left, so they go where you aimed).
 	head.rotation.x = minf(head.rotation.x + deg_to_rad(w.view_kick), deg_to_rad(89.0))
@@ -481,22 +497,23 @@ func start_reload() -> void:
 	if is_dead or _switching or _reload_timer > 0.0:
 		return
 	var w := current_weapon()
-	if _mag[weapon_index] >= w.mag_size or _reserve[weapon_index] == 0:
+	if _mag[weapon_index] >= mag_size(weapon_index) or _reserve[weapon_index] == 0:
 		return
 	if _fire_cooldown > 0.0:
 		_reload_queued = true  # still pumping / cycling the bolt: reload right after
 		return
 	_aim_wanted = false
-	_reload_timer = w.reload_time
+	_reload_timer = reload_time(weapon_index)
 	_emit_ammo()
 
 	_sound_tween = create_tween()
 	for entry: Array in w.reload_sounds:
-		_sound_tween.parallel().tween_callback(_play_reload_sound.bind(entry[1])).set_delay(entry[0])
+		# Faster reloads (upgrades) play the sounds faster too.
+		_sound_tween.parallel().tween_callback(_play_reload_sound.bind(entry[1])).set_delay(entry[0] * _reload_timer / w.reload_time)
 
 	# Reload animation: tilt the gun down, pause, bring it back up.
 	_kill_weapon_tween()
-	var t: float = w.reload_time
+	var t: float = _reload_timer
 	_weapon_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_weapon_tween.tween_property(weapon_reload, "rotation", Vector3(deg_to_rad(-35), deg_to_rad(10), deg_to_rad(30)), 0.3)
 	_weapon_tween.parallel().tween_property(weapon_reload, "position", Vector3(0.0, -0.08, 0.04), 0.3)
@@ -507,7 +524,7 @@ func start_reload() -> void:
 
 func _finish_reload() -> void:
 	var w := current_weapon()
-	var need: int = w.mag_size - _mag[weapon_index]
+	var need: int = mag_size(weapon_index) - _mag[weapon_index]
 	if _reserve[weapon_index] >= 0:
 		need = mini(need, _reserve[weapon_index])
 		_reserve[weapon_index] -= need
@@ -525,10 +542,14 @@ func _cancel_reload() -> void:
 # --- Switching --------------------------------------------------------------
 
 ## Switch to the weapon in `index` (0-based slot) if the player has it.
+## A switch already under way (e.g. to a weapon just bought in the shop, which
+## pauses the game mid-switch) is replaced by the new one.
 func switch_to(index: int) -> void:
-	if index == weapon_index or index < 0 or index >= _owned.size() \
+	var current := _switch_target if _switching else weapon_index
+	if index == current or index < 0 or index >= _owned.size() \
 			or not _owned[index] or is_dead:
 		return
+	_switch_target = index
 	_cancel_reload()
 	_aim_wanted = false
 	_set_aiming(false)
@@ -714,7 +735,7 @@ func give_weapon(index: int) -> bool:
 	if _owned[index]:
 		return _add_reserve(index)
 	_owned[index] = true
-	_mag[index] = w.mag_size
+	_mag[index] = mag_size(index)
 	_reserve[index] = w.reserve
 	message.emit("Picked up %s" % w.name)
 	switch_to(index)
@@ -753,6 +774,88 @@ func emit_status() -> void:
 	weapon_changed.emit(current_weapon().name)
 	_emit_ammo()
 	grenades_changed.emit(grenades)
+	armor_changed.emit(armor)
+
+
+## Max Ammo / the shop: every owned weapon's magazine and spare ammo to full.
+## Returns false if everything was already full.
+func refill_ammo() -> bool:
+	var added := false
+	for i in _owned.size():
+		if not _owned[i]:
+			continue
+		var w: Dictionary = Weapons.LIST[i]
+		var full_reserve: int = w.max_reserve if w.max_reserve >= 0 else -1
+		if _mag[i] < mag_size(i) or _reserve[i] != full_reserve:
+			added = true
+		if i != weapon_index or _reload_timer <= 0.0:
+			_mag[i] = mag_size(i)
+		_reserve[i] = full_reserve
+	_emit_ammo()
+	return added
+
+
+## Adds grenades up to MAX_GRENADES. Returns how many were added.
+func add_grenades(count: int) -> int:
+	var added := mini(count, MAX_GRENADES - grenades)
+	if added > 0:
+		grenades += added
+		grenades_changed.emit(grenades)
+	return added
+
+
+# --- Upgrades: the shop's (this match, economy.gd) on top of the Armory's ----
+# --- (permanent, progression_config.gd) ------------------------------------
+
+## Weapon `index`'s `stat` ("damage", "mag" or "reload") with its permanent
+## upgrades and `match_level` shop upgrades (-1 = the ones bought this match).
+## Damage can come out fractional (see roll_damage()).
+func stat_value(index: int, stat: String, match_level := -1) -> float:
+	var w: Dictionary = Weapons.LIST[index]
+	if match_level < 0:
+		match_level = _upgrades[index][stat]
+	var perm: int = Progress.upgrade_level(w.name, stat)
+	match stat:
+		"damage":
+			return Economy.upgraded_damage(w.damage, match_level) * (1.0 + Progression.PERM_DAMAGE * perm)
+		"mag":
+			return ceilf(Economy.upgraded_mag(w.mag_size, match_level) * (1.0 + Progression.PERM_MAG * perm) - 0.001)
+		_:
+			return Economy.upgraded_reload(w.reload_time, match_level) * (1.0 - Progression.PERM_RELOAD * perm)
+
+
+## Damage per bullet of weapon `index` with its upgrades (rounded).
+func weapon_damage(index: int) -> int:
+	return roundi(stat_value(index, "damage"))
+
+
+## The damage of one bullet: a fractional damage like 2.4 does 3 on 40% of
+## the bullets and 2 on the rest.
+func roll_damage(index: int) -> int:
+	var d := stat_value(index, "damage")
+	return floori(d) + (1 if randf() < d - floorf(d) else 0)
+
+
+func mag_size(index: int) -> int:
+	return int(stat_value(index, "mag"))
+
+
+func reload_time(index: int) -> float:
+	return stat_value(index, "reload")
+
+
+## Level (0..UPGRADE_LEVELS) of upgrade `stat` ("damage", "mag" or "reload").
+func upgrade_level(index: int, stat: String) -> int:
+	return _upgrades[index][stat]
+
+
+## One more level of `stat` for weapon `index`. Returns false if maxed.
+func upgrade(index: int, stat: String) -> bool:
+	if _upgrades[index][stat] >= Economy.UPGRADE_LEVELS:
+		return false
+	_upgrades[index][stat] += 1
+	_emit_ammo()
+	return true
 
 
 func _emit_ammo() -> void:
@@ -776,6 +879,15 @@ func take_damage(amount: int) -> void:
 	if GOD_MODE:
 		hit_taken.emit()  # red flash only
 		return
+	if armor > 0:
+		# Armor takes its share of the hit while it lasts.
+		var absorbed := mini(roundi(amount * Economy.ARMOR_ABSORB), armor)
+		armor -= absorbed
+		amount -= absorbed
+		armor_changed.emit(armor)
+		if amount <= 0:
+			hit_taken.emit()  # still a red flash
+			return
 	health = maxi(health - amount, 0)
 	health_changed.emit(health)
 	if health == 0:
@@ -783,6 +895,15 @@ func take_damage(amount: int) -> void:
 		_set_aiming(false)
 		cancel_grenade()
 		died.emit()
+
+
+## Adds armor, up to economy.gd MAX_ARMOR. Returns false if it was already full.
+func add_armor(amount: int) -> bool:
+	if is_dead or armor >= Economy.MAX_ARMOR:
+		return false
+	armor = mini(armor + amount, Economy.MAX_ARMOR)
+	armor_changed.emit(armor)
+	return true
 
 
 ## Restores health (e.g. after clearing a wave), up to MAX_HEALTH.

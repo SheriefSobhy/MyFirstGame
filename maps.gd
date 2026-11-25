@@ -6,6 +6,7 @@ extends RefCounted
 ## Fields:
 ##  id          save key, and main.gd's map_id in that scene
 ##  name        shown on the map selection screen
+##  short       short name (daily missions: "Reach wave 8 on Town")
 ##  description one line under the name
 ##  scene       the game scene to load
 ##  thumbnail   preview picture (made by tools/make_thumbnails.gd)
@@ -14,6 +15,7 @@ extends RefCounted
 const LIST := [
 	{
 		"id": "yard",
+		"short": "Yard",
 		"name": "Industrial Yard",
 		"description": "A walled yard of containers, crates and barrels in the afternoon sun.",
 		"scene": "res://main.tscn",
@@ -22,6 +24,7 @@ const LIST := [
 	},
 	{
 		"id": "town",
+		"short": "Town",
 		"name": "Abandoned Town",
 		"description": "Small streets, empty houses and wrecked cars at dusk.",
 		"scene": "res://maps/town.tscn",
@@ -30,6 +33,7 @@ const LIST := [
 	},
 	{
 		"id": "warehouse",
+		"short": "Warehouse",
 		"name": "Warehouse Night",
 		"description": "Dark aisles of shelves and forklifts, and a loading yard outside.",
 		"scene": "res://maps/warehouse.tscn",

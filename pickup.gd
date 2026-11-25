@@ -74,6 +74,15 @@ func _collect(player: Node) -> void:
 		_respawn_timer = respawn_time
 
 
+## Hidden and switched off for the whole match (main.gd does this to the
+## weapon pickups: weapons are bought in the shop instead).
+func remove_from_play() -> void:
+	_set_active(false)
+	_respawn_timer = 0.0
+	set_process(false)
+	set_physics_process(false)
+
+
 func _set_active(on: bool) -> void:
 	_active = on
 	_visual.visible = on

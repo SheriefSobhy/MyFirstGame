@@ -33,6 +33,16 @@ static func kill() -> AudioStreamWAV:
 		return (thump * 0.8 + chime * 0.35) * attack, 0.4)
 
 
+## Rising three-note arpeggio for picking up a power-up.
+static func powerup() -> AudioStreamWAV:
+	return _build("powerup", func(t: float) -> float:
+		var note := mini(int(t / 0.09), 2)
+		var freq: float = [660.0, 830.0, 990.0][note]
+		var x := t - note * 0.09
+		var env := minf(x / 0.005, 1.0) * exp(-x * (6.0 if note == 2 else 14.0))
+		return (sin(TAU * freq * t) * 0.6 + sin(TAU * freq * 2.0 * t) * 0.25) * env, 0.6)
+
+
 ## "Lub-dub": two soft low thumps.
 static func heartbeat() -> AudioStreamWAV:
 	return _build("heart", func(t: float) -> float:

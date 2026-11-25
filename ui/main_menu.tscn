@@ -16,6 +16,36 @@ fill = 1
 fill_from = Vector2(0.5, 0.35)
 fill_to = Vector2(1.1, 1.1)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_xpbg"]
+bg_color = Color(0, 0, 0, 0.6)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_xpfill"]
+bg_color = Color(1, 0.8, 0.35, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_daily"]
+content_margin_left = 20.0
+content_margin_top = 14.0
+content_margin_right = 20.0
+content_margin_bottom = 14.0
+bg_color = Color(0.06, 0.05, 0.05, 0.85)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.8, 0.35, 0.5)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
 [node name="MainMenu" type="Control"]
 layout_mode = 3
 anchors_preset = 15
@@ -44,13 +74,13 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -300.0
-offset_top = -310.0
-offset_right = 300.0
-offset_bottom = 310.0
+offset_left = -600.0
+offset_top = -345.0
+offset_right = 600.0
+offset_bottom = 345.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 10
 alignment = 1
 
 [node name="Title" type="Label" parent="Box"]
@@ -58,49 +88,143 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.78, 0.45, 1)
 theme_override_constants/outline_size = 10
-theme_override_font_sizes/font_size = 96
+theme_override_font_sizes/font_size = 80
 text = "Last Stand"
 horizontal_alignment = 1
 
 [node name="Subtitle" type="Label" parent="Box"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 0.7)
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 22
 text = "Hold the yard. Survive the waves."
 horizontal_alignment = 1
 
 [node name="Best" type="Label" parent="Box"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 22
 text = "Best: 0"
 horizontal_alignment = 1
 
+[node name="LevelRow" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="LevelLabel" type="Label" parent="Box/LevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.35, 1)
+theme_override_font_sizes/font_size = 28
+text = "Level 1"
+
+[node name="XpBar" type="ProgressBar" parent="Box/LevelRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(380, 20)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_styles/background = SubResource("StyleBoxFlat_xpbg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_xpfill")
+max_value = 300.0
+show_percentage = false
+
+[node name="XpLabel" type="Label" parent="Box/LevelRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(170, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.75)
+theme_override_font_sizes/font_size = 20
+text = "0 / 300 XP"
+
+[node name="CoinsLabel" type="Label" parent="Box/LevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.35, 1)
+theme_override_font_sizes/font_size = 28
+text = "0 coins"
+
 [node name="Spacer" type="Control" parent="Box"]
-custom_minimum_size = Vector2(0, 12)
+custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 
-[node name="PlayButton" type="Button" parent="Box"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(300, 72)
+[node name="Columns" type="HBoxContainer" parent="Box"]
 layout_mode = 2
-size_flags_horizontal = 4
+theme_override_constants/separation = 36
+alignment = 1
+
+[node name="Buttons" type="VBoxContainer" parent="Box/Columns"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="PlayButton" type="Button" parent="Box/Columns/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 72)
+layout_mode = 2
 theme_override_font_sizes/font_size = 36
 text = "Play"
 
-[node name="SettingsButton" type="Button" parent="Box"]
+[node name="ArmoryButton" type="Button" parent="Box/Columns/Buttons"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(300, 64)
+custom_minimum_size = Vector2(320, 58)
 layout_mode = 2
-size_flags_horizontal = 4
+text = "Armory"
+
+[node name="AchievementsButton" type="Button" parent="Box/Columns/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 58)
+layout_mode = 2
+text = "Achievements"
+
+[node name="SettingsButton" type="Button" parent="Box/Columns/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 58)
+layout_mode = 2
 text = "Settings"
 
-[node name="QuitButton" type="Button" parent="Box"]
+[node name="QuitButton" type="Button" parent="Box/Columns/Buttons"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(300, 64)
+custom_minimum_size = Vector2(320, 58)
 layout_mode = 2
-size_flags_horizontal = 4
 text = "Quit"
+
+[node name="DailyPanel" type="PanelContainer" parent="Box/Columns"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(560, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_daily")
+
+[node name="Daily" type="VBoxContainer" parent="Box/Columns/DailyPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="DailyHeader" type="HBoxContainer" parent="Box/Columns/DailyPanel/Daily"]
+layout_mode = 2
+
+[node name="DailyTitle" type="Label" parent="Box/Columns/DailyPanel/Daily/DailyHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.8, 0.35, 1)
+theme_override_font_sizes/font_size = 28
+text = "Daily Missions"
+
+[node name="ResetLabel" type="Label" parent="Box/Columns/DailyPanel/Daily/DailyHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.55)
+theme_override_font_sizes/font_size = 18
+text = "New in 0h 00m"
+
+[node name="MissionList" type="VBoxContainer" parent="Box/Columns/DailyPanel/Daily"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="LoginLabel" type="Label" parent="Box/Columns/DailyPanel/Daily"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.6)
+theme_override_font_sizes/font_size = 18
+text = "Login streak: day 1 of 7"
 
 [node name="Loading" type="Label" parent="Box"]
 unique_name_in_owner = true

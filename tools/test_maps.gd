@@ -31,6 +31,7 @@ func check(ok: bool, what: String) -> void:
 func frames(n: int) -> void:
 	for i in n:
 		await physics_frame
+		await process_frame  # scene changes finish at the end of a process frame
 
 
 func seconds(t: float) -> void:
@@ -40,6 +41,9 @@ func seconds(t: float) -> void:
 func _run() -> void:
 	_backup_saves()
 	root.get_node("Settings").clear_bests()
+	# Every map unlocked (the level locks: test_progression.gd). Progress uses
+	# a test save under a tool script.
+	root.get_node("Progress").xp = preload("res://progression_config.gd").xp_for_level(8)
 	check(Maps.LIST.size() == 3 and Maps.LIST[0].id == "yard" and Maps.LIST[0].scene == "res://main.tscn",
 			"3 maps, the current yard is map 1")
 	for m: Dictionary in Maps.LIST:

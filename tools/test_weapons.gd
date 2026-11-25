@@ -38,6 +38,10 @@ func seconds(t: float) -> void:
 
 
 func _run() -> void:
+	# The normal start (pistol + rifle), whatever the debug setting says.
+	var settings := root.get_node("Settings")
+	var debug_unlock: bool = settings.debug_unlock_all
+	settings.debug_unlock_all = false
 	change_scene_to_file("res://main.tscn")
 	await frames(10)
 	main = current_scene
@@ -62,16 +66,16 @@ func _run() -> void:
 	await _test_ammo_box()
 	await _test_touch_layout()
 
+	settings.debug_unlock_all = debug_unlock
 	print("\n%s: %d failure(s)" % ["OK" if failures == 0 else "FAILED", failures])
 	quit(1 if failures > 0 else 0)
 
 
 func _test_start_state() -> void:
 	check(player.weapon_index == 0, "starts with the pistol")
-	check(player.has_weapon(0) and not player.has_weapon(1) and not player.has_weapon(2) \
-			and not player.has_weapon(3), "rifle, shotgun and sniper still need their pickups")
-	for idx in [4, 5, 6, 7]:
-		check(player.has_weapon(idx), "%s is available from the start" % Weapons.LIST[idx].name)
+	check(player.has_weapon(0) and player.has_weapon(1), "starts with the pistol and the assault rifle")
+	for idx in range(2, Weapons.LIST.size()):
+		check(not player.has_weapon(idx), "%s has to be bought in the shop" % Weapons.LIST[idx].name)
 	check(Weapons.LIST.size() == 8, "8 weapons in total")
 	check(player.grenades == 3, "starts with 3 grenades")
 	check(hud.grenade_label.text == "Grenades: 3", "HUD shows grenade count (got '%s')" % hud.grenade_label.text)
@@ -132,18 +136,18 @@ func _test_pistol() -> void:
 	check(player.ammo() == 12 and player.reserve() == -1, "pistol reloads to 12, reserve stays unlimited")
 
 
+# Weapons are bought in the shop: the maps' weapon pickups are out of play.
+# Then the test gives every weapon (as buying them does) for the tests below.
 func _test_weapon_pickups() -> void:
-	for idx in [1, 2, 3]:
-		var p: Node3D = main.get_node("Pickups").get_child(idx - 1)
-		_put_player(p.global_position)
-		await frames(5)
-		check(player.has_weapon(idx), "walking over %s gives %s" % [p.name, Weapons.LIST[idx].name])
-		check(not p._active, "%s disappears after pickup" % p.name)
+	var shotgun_pickup: Node3D = main.get_node("Pickups/ShotgunPickup")
+	check(not shotgun_pickup._active and not shotgun_pickup._visual.visible, "weapon pickups are hidden (weapons are in the shop)")
+	_put_player(shotgun_pickup.global_position)
+	await frames(5)
+	check(not player.has_weapon(2), "walking over a weapon pickup's spot gives nothing")
+	for idx in range(2, Weapons.LIST.size()):
+		player.give_weapon(idx)
 		await seconds(0.5)
-		check(player.weapon_index == idx, "switches to the new %s" % Weapons.LIST[idx].name)
-	await seconds(1.0)
-	var rifle_pickup: Node = main.get_node("Pickups/RiflePickup")
-	check(not rifle_pickup._active, "weapon pickups don't respawn")
+		check(player.has_weapon(idx) and player.weapon_index == idx, "getting the %s switches to it" % Weapons.LIST[idx].name)
 	_put_player(Vector3(0, 0, 10))
 
 

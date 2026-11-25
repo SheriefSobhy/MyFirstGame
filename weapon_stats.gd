@@ -12,7 +12,7 @@ extends RefCounted
 ##                  fingers reach ~8 cm further along left_hand_forward
 ##  left_hand_forward / left_hand_back   left hand direction (wrist->knuckles / back of hand)
 ##  pickup_length   size of the floating pickup in the arena, in metres
-##  start_owned     true = the player has it from the start (no pickup needed)
+##  (which weapons you start with, and the others' shop prices, are in economy.gd)
 ##  move_scale      walking / running speed while holding it (1 = normal)
 ##  automatic       true = hold to keep firing, false = one shot per press
 ##  damage          per bullet (enemies have 3 HP)
@@ -58,7 +58,6 @@ const LIST := [
 		"left_hand_forward": Vector3(0.5, 0.35, -1.0),
 		"left_hand_back": Vector3(-0.8, -0.6, 0.0),
 		"pickup_length": 0.35,
-		"start_owned": true,
 		"move_scale": 1.0,
 		"automatic": false,
 		"damage": 2,
@@ -105,7 +104,6 @@ const LIST := [
 		"left_hand_forward": Vector3(0.25, 0.45, -1.0),
 		"left_hand_back": Vector3(-0.7, -1.0, 0.1),
 		"pickup_length": 0.95,
-		"start_owned": false,
 		"move_scale": 1.0,
 		"automatic": true,
 		"damage": 1,
@@ -152,7 +150,6 @@ const LIST := [
 		"left_hand_forward": Vector3(0.25, 0.45, -1.0),
 		"left_hand_back": Vector3(-0.7, -1.0, 0.1),
 		"pickup_length": 1.0,
-		"start_owned": false,
 		"move_scale": 1.0,
 		"automatic": false,
 		"damage": 1,
@@ -201,7 +198,6 @@ const LIST := [
 		"left_hand_forward": Vector3(0.25, 0.45, -1.0),
 		"left_hand_back": Vector3(-0.7, -1.0, 0.1),
 		"pickup_length": 1.15,
-		"start_owned": false,
 		"move_scale": 1.0,
 		"automatic": false,
 		"damage": 6,
@@ -249,7 +245,6 @@ const LIST := [
 		"left_hand_forward": Vector3(0.25, 0.45, -1.0),
 		"left_hand_back": Vector3(-0.7, -1.0, 0.1),
 		"pickup_length": 0.7,
-		"start_owned": true,
 		"move_scale": 1.05,
 		"automatic": true,
 		"damage": 1,
@@ -297,7 +292,6 @@ const LIST := [
 		"left_hand_forward": Vector3(0.25, 0.45, -1.0),
 		"left_hand_back": Vector3(-0.7, -1.0, 0.1),
 		"pickup_length": 0.95,
-		"start_owned": true,
 		"move_scale": 0.95,
 		"automatic": true,
 		"damage": 2,
@@ -345,7 +339,6 @@ const LIST := [
 		"left_hand_forward": Vector3(0.25, 0.45, -1.0),
 		"left_hand_back": Vector3(-0.7, -1.0, 0.1),
 		"pickup_length": 1.05,
-		"start_owned": true,
 		"move_scale": 0.72,
 		"automatic": true,
 		"damage": 2,
@@ -393,7 +386,6 @@ const LIST := [
 		"left_hand_forward": Vector3(0.5, 0.35, -1.0),
 		"left_hand_back": Vector3(-0.8, -0.6, 0.0),
 		"pickup_length": 0.4,
-		"start_owned": true,
 		"move_scale": 1.0,
 		"automatic": false,
 		"damage": 6,

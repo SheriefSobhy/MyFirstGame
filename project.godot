@@ -15,10 +15,15 @@ run/main_scene="res://ui/main_menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[audio]
+
+general/text_to_speech=true
+
 [autoload]
 
 Settings="*res://settings.gd"
 Music="*res://music.gd"
+Progress="*res://progress.gd"
 
 [display]
 

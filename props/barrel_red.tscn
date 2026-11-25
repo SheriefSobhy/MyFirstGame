@@ -1,12 +1,14 @@
 [gd_scene format=3]
 
 [ext_resource type="PackedScene" path="res://assets/models/polyhaven/Barrel_01/Barrel_01_1k.gltf" id="1_model"]
+[ext_resource type="Script" path="res://effects/explosive_barrel.gd" id="2_script"]
 
 [sub_resource type="CylinderShape3D" id="Shape_main"]
 height = 0.88
 radius = 0.28
 
 [node name="BarrelRed" type="StaticBody3D"]
+script = ExtResource("2_script")
 
 [node name="Model" parent="." instance=ExtResource("1_model")]
 

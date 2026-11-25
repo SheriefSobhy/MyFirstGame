@@ -39,6 +39,17 @@ static func detonate(source: Node3D, pos: Vector3, radius: float, max_damage: in
 		if dmg > 0 and _in_sight(space, center, chest, exclude):
 			enemy.take_damage(dmg, chest, (chest - center).normalized())
 
+	# Explosive barrels in range go up a moment later (chain reactions).
+	for barrel: Node3D in tree.get_nodes_in_group("explosive_barrels"):
+		if barrel == source or barrel.exploded:
+			continue
+		var mid := barrel.global_position + Vector3.UP * 0.5
+		if center.distance_to(mid) < radius:
+			var ex := exclude.duplicate()
+			ex.append((barrel as CollisionObject3D).get_rid())
+			if _in_sight(space, center, mid, ex):
+				barrel.ignite()
+
 	if is_instance_valid(player) and not player.get("is_dead"):
 		var body := player.global_position + Vector3.UP * 1.0
 		var d := center.distance_to(body)

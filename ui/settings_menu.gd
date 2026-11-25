@@ -4,6 +4,8 @@ extends Control
 
 signal closed
 
+var _reset_armed := false
+
 const QUALITY_HINTS := [
 	"No shadows, no fog, half resolution. Fastest.",
 	"Hard shadows, fog, reduced resolution.",
@@ -24,6 +26,7 @@ const QUALITY_HINTS := [
 	"damage_numbers": %DamageNumbers as CheckButton,
 	"haptics": %Vibration as CheckButton,
 	"aim_assist": %AimAssist as CheckButton,
+	"debug_unlock_all": %DebugUnlock as CheckButton,
 }
 
 
@@ -47,6 +50,9 @@ func _ready() -> void:
 		var button: CheckButton = toggles[key]
 		button.toggled.connect(func(on: bool) -> void: Settings.set_value(key, on))
 	%AimAssist.tooltip_text = "Touch controls only: slower turning over enemies, and a gentle pull towards them when you aim"
+	%DebugUnlock.tooltip_text = "For testing: start the next match with every weapon, and every level unlock (weapons, maps)"
+	%DebugReset.tooltip_text = "For testing: back to level 1 with no coins, upgrades, skins, stars, achievements or best scores"
+	%DebugReset.pressed.connect(_on_debug_reset)
 	back_button.pressed.connect(close)
 	visibility_changed.connect(func() -> void:
 		if visible:
@@ -68,6 +74,25 @@ func close() -> void:
 	closed.emit()
 
 
+# Two presses: the first asks, the second (within a few seconds) resets.
+func _on_debug_reset() -> void:
+	var button: Button = %DebugReset
+	if not _reset_armed:
+		_reset_armed = true
+		button.text = "Press again to reset!"
+		get_tree().create_timer(3.0, true).timeout.connect(_disarm_reset)
+		return
+	Progress.reset_all()
+	_reset_armed = false
+	button.text = "Progress reset"
+
+
+func _disarm_reset() -> void:
+	_reset_armed = false
+	if is_instance_valid(self):
+		(%DebugReset as Button).text = "Debug: reset progress"
+
+
 func _on_quality(index: int) -> void:
 	Settings.set_value("quality", index)
 	_refresh_labels()
@@ -82,6 +107,8 @@ func _refresh() -> void:
 		quality_buttons[i].set_pressed_no_signal(i == Settings.quality)
 	for key: String in toggles:
 		(toggles[key] as CheckButton).set_pressed_no_signal(Settings.get(key))
+	# Resetting is for the menus, not the middle of a match.
+	(%DebugReset as Button).visible = not Progress.in_match()
 	_refresh_labels()
 
 
