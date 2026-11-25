@@ -3,6 +3,9 @@ extends SceneTree
 ## - converts the CSG boxes to MeshInstance3D + StaticBody3D with lightmap UV2
 ## - generates pallet / electric pole / fence / wire / rubble / grime meshes
 ## - merges the skyline buildings into ONE vertex-coloured mesh (1 draw call)
+## - replaces the box walls, shed, containers, barriers and metal crates with
+##   pieces of the Blender level kit (tools/kit_builder.gd); their box
+##   colliders stay
 ## - adds the LightmapGI node
 ## Safe to re-run: it deletes what it generated before and rebuilds it.
 ## Run: godot --headless --path . --script res://tools/build_level.gd
@@ -21,6 +24,7 @@ const M_WIRE := preload("res://materials/wire.tres")
 const M_RUBBLE := preload("res://materials/rubble.tres")
 const M_SKYLINE := preload("res://materials/skyline.tres")
 const M_PUDDLE := preload("res://materials/puddle.tres")
+const Kit := preload("res://tools/kit_builder.gd")
 
 const TIRE_GLTF := "res://assets/models/polyhaven/old_tyre/old_tyre_1k.gltf"
 const TRASH_GLTF := "res://assets/models/polyhaven/trashbag/trashbag_1k.gltf"
@@ -57,6 +61,7 @@ func _process(_delta: float) -> bool:
 	main.move_child(detail, main.get_node("NavigationRegion3D").get_index() + 1)
 	_place_grime(detail, main)
 	_place_rubble_and_trash(detail, main)
+	_build_kit(level, detail, main)
 	var outside := _add(main, Node3D.new(), "Outside", main)
 	main.move_child(outside, detail.get_index() + 1)
 	_build_skyline(outside, main)
@@ -582,3 +587,55 @@ func _wire(st: SurfaceTool, a: Vector3, b: Vector3, sag: float) -> void:
 			st.add_vertex(p0 + o0)
 			st.add_vertex(p1 + o1)
 			st.add_vertex(p0 + o1)
+
+
+# ---------------------------------------------------------------- level kit
+
+## Bodies whose box mesh is replaced by a kit piece: [piece, size of the box,
+## tint]. The box collider stays; the piece is placed at the box's bottom centre.
+const KIT_BODIES := {
+	"Warehouse": ["shed", Vector3(8, 6, 5), Color(0.95, 0.88, 0.8)],
+	"ContainerRed": ["container", Vector3(6.1, 2.6, 2.44), Color(1.25, 0.55, 0.42)],
+	"ContainerBlue": ["container", Vector3(6.1, 2.6, 2.44), Color(0.55, 0.78, 1.15)],
+	"BarrierA": ["barrier", Vector3(3, 1, 0.5), Color.WHITE],
+	"BarrierB": ["barrier_broken", Vector3(3, 1, 0.5), Color.WHITE],
+	"MetalCrate1": ["crate", Vector3(1.2, 1.2, 1.2), Color.WHITE],
+	"MetalCrate2": ["crate", Vector3(1.2, 1.2, 1.2), Color(0.85, 0.95, 0.8)],
+	"MetalCrate3": ["crate", Vector3(1.2, 1.2, 1.2), Color.WHITE],
+	"MetalCrate4": ["crate", Vector3(1.2, 1.2, 1.2), Color(0.85, 0.95, 0.8)],
+	"MetalCrate5": ["crate", Vector3(1.2, 1.2, 1.2), Color.WHITE],
+}
+## The kit pieces' own sizes (piece space) for the bodies above.
+const PIECE_SIZE := {"shed": Vector3(8, 6, 5), "container": Vector3(6.1, 2.6, 2.44),
+	"barrier": Vector3(3, 1, 0.6), "barrier_broken": Vector3(3, 1, 0.6), "crate": Vector3(1.2, 1.2, 1.2)}
+const WALL_BODIES := ["WallNorth", "WallSouth", "WallEast", "WallWest"]
+
+
+func _build_kit(level: Node3D, detail: Node3D, main: Node) -> void:
+	var kit := Kit.new()
+	for n: String in KIT_BODIES.keys() + WALL_BODIES:
+		var body: Node3D = level.get_node(n)
+		var mesh := body.get_node_or_null("Mesh")
+		if mesh:
+			body.remove_child(mesh)
+			mesh.free()
+	for n: String in KIT_BODIES:
+		var body: Node3D = level.get_node(n)
+		var spec: Array = KIT_BODIES[n]
+		var size: Vector3 = spec[1]
+		var fit: Vector3 = size / PIECE_SIZE[spec[0]]
+		var xf := body.transform * Transform3D(Basis.from_scale(fit), Vector3(0, -size.y / 2, 0))
+		kit.add(spec[0], xf, spec[2])
+	# Perimeter walls (1 m thick, 4 m tall, centred on +-12.5).
+	var c := 12.5
+	kit.wall_run(Vector3(-c, 0, -c), Vector3(c, 0, -c), "wall_yard", "pillar_yard")
+	kit.wall_run(Vector3(-c, 0, c), Vector3(c, 0, c), "wall_yard", "pillar_yard")
+	kit.wall_run(Vector3(c, 0, -c), Vector3(c, 0, c), "wall_yard", "pillar_yard", [], Color.WHITE, false)
+	kit.wall_run(Vector3(-c, 0, -c), Vector3(-c, 0, c), "wall_yard", "pillar_yard", [], Color.WHITE, false)
+	# Wall details on the inner faces.
+	kit.mount("sign_danger", Vector3(c - 0.5, 2.3, 3.0), Vector3.LEFT)
+	kit.mount("ac_unit", Vector3(-c + 0.5, 2.0, -3.5), Vector3.RIGHT)
+	kit.mount("lamp_wall", Vector3(4.0, 3.2, c - 0.5), Vector3.FORWARD)
+	kit.mount("pipe_h", Vector3(-6.0, 3.3, c - 0.5), Vector3.FORWARD, Color.WHITE, Vector3(9.0, 1, 1))
+	kit.downpipe(Vector3(-1.4, 0, c - 0.5), Vector3.FORWARD, 3.3)
+	kit.build(detail, main, "Kit", {"lightmap": true, "file_prefix": "yard_kit"})

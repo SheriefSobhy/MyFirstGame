@@ -29,6 +29,7 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 | Maps list | `maps.gd` |
 | Settings + best scores | `settings.gd` (autoload `Settings`), `ui/settings_menu.*` |
 | Music | `music.gd` (autoload `Music`) |
+| Level kit (Blender-made walls, frames, roofs, pipes, signs...) | `tools/blender/build_kit.py` → `assets/models/kit/kit.glb` + `assets/textures/kit/`, placed by `tools/kit_builder.gd`, material `materials/kit.tres` (`kit_surface.gdshader`) |
 | Build / bake / test scripts | `tools/` |
 
 ## Balance numbers
@@ -124,6 +125,37 @@ Tests: `test_progression`, `test_economy`, `test_game_loop`, `test_maps`,
 - `test_navigation` counts an enemy as stuck as soon as its own 2 s stuck
   check fires; enemies that can't reach the player (too tight for their size)
   must *wait* at the end of their path, or behind one already waiting there.
+
+## Level kit (Blender)
+
+Blender 5.3 is at `C:Program FilesBlender FoundationBlender 5.3lender.exe`,
+used headless only (`blender -b --factory-startup --python ...`).
+
+- `tools/blender/build_kit.bat` runs `build_kit.py`: composes the 1024 texture
+  atlas (brick, concrete, corrugated, metal, wood cells + 8 rendered signs)
+  from the CC0 textures, models every piece (LOD0 with bevels/trims/small
+  parts, `<name>_lod1` without), bakes AO with Cycles into `kit_ao.png`, and
+  exports `kit.glb` (build-time only: excluded from exports).
+- Vertex data the shader relies on: UV = cell-local repeating UV, UV2 = AO
+  atlas UV, COLOR.a = (cell + 8 * palette index + 0.5) / 128. Keep `CELLS` and
+  `PAL` in `build_kit.py` in sync with `CELLS` / `PALETTE` in
+  `kit_surface.gdshader`. glTF import mangles vertex RGB, so per-instance
+  tints are written by `kit_builder.gd` (rgb = tint / 2).
+- `kit_builder.gd` merges placed pieces into 14 m chunks (one draw call each,
+  one material), moves the AO UV to CUSTOM0 (UV2 stays free for the yard
+  lightmap), and adds LOD1 chunks with visibility ranges (town 24 m,
+  warehouse 22 m; the yard has no LOD1). Wall details (signs, pipes, AC
+  units, lamps) only exist in LOD0.
+- Kit visuals never collide: the box colliders stay where they were (walls
+  keep full-height colliders, so broken tops are kept under ~0.9 m deep).
+- After changing the kit: `build_kit.bat`, then `build_level.gd` and
+  `build_maps.gd`, then `tools/rebake.bat`.
+- `rebake.bat` imports headless first: the editor crashed (signal 11) when it
+  had to VRAM-compress new textures itself (GPU compressor on this Intel GPU).
+- Size: the kit added ~5 MB to the APK (atlas textures ~2.8 MB, merged meshes
+  ~1.7 MB, a larger yard lightmap).
+- `tools/map_shots.gd -- --shots <dir> --bench` (with a window): screenshots
+  from fixed views per map, and FPS / draw calls / triangles per quality.
 
 ## Build and publish
 

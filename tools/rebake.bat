@@ -7,6 +7,9 @@ rem   Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://t
 setlocal
 cd /d "%~dp0.."
 set "GODOT=C:\Godot\Godot_v4.7.2-stable_win64_console.exe"
+rem Import new/changed files headless first (CPU texture compression): the
+rem editor compresses VRAM textures on the GPU, which crashed it on this PC.
+"%GODOT%" --headless --path . --import
 "%GODOT%" --editor --path . -- --autobake
 "%GODOT%" --headless --path . --script res://tools/bake_navmesh.gd
 rem Store the lightmap uncompressed: the HDR VRAM formats (BPTC / ASTC-HDR)

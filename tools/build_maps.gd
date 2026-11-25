@@ -14,8 +14,11 @@ extends SceneTree
 ## - No lightmaps: a few real-time lamps, and the extra ones are in the
 ##   "optional_lights" group, which Low quality switches off (main.gd).
 ## - Collisions are plain boxes.
+## - Walls, roof, barriers, dumpsters, container, signs and pipes are pieces of
+##   the Blender level kit (tools/kit_builder.gd, tools/blender/build_kit.py).
 ## The source models live in assets/models/map_sources/ (not exported).
 
+const Kit := preload("res://tools/kit_builder.gd")
 const GEN := "res://level/generated/"
 const SRC := "res://assets/models/map_sources/"
 const M_VCOLOR_PATH := "res://materials/map_vertex_color.tres"
@@ -314,6 +317,13 @@ const CARS := ["sedan", "suv", "van", "police", "truck", "taxi", "hatchbackSport
 const HOUSE_SCALE := 3.3
 const LAMP_SCALE := 4.4
 const TOWN_EDGE := 23.0
+## Kit pieces switch to their plain LOD1 meshes (and wall details disappear)
+## beyond this distance (visibility ranges, see tools/kit_builder.gd).
+const TOWN_LOD_DISTANCE := 24.0
+const WAREHOUSE_LOD_DISTANCE := 22.0
+## How far each house's front wall sits behind the front of its box (porches,
+## roofs and balconies stick out further), so wall details sit on the wall.
+const HOUSE_FRONT_INSET := {}
 
 
 func _build_town() -> Node3D:
@@ -356,9 +366,6 @@ func _build_town() -> Node3D:
 		"edge_dirt_start": 21.5, "edge_dirt_end": 23.0, "uv_scale": 0.3})
 	var m_pavement := _surface("res://materials/concrete_wall.tres", "town_pavement", {
 		"tint": Color(0.95, 0.9, 0.85), "uv_scale": 0.35, "dirt_strength": 0.0})
-	var m_wall := _surface("res://materials/brick_wall.tres", "town_wall", {"tint": Color(0.85, 0.8, 0.8)})
-	var m_barrier: Material = load("res://materials/concrete_wall.tres")
-	var m_metal: Material = load("res://materials/metal_crate.tres")
 
 	# Ground: one collider, asphalt tiles, and pavement/lots in the four corners.
 	_blocker(level, root, "Floor", Vector3(50, 1, 50), Vector3(0, -0.5, 0))
@@ -371,12 +378,19 @@ func _build_town() -> Node3D:
 					Vector2(maxf(a.x, c.x), maxf(a.y, c.y)), Vector2(9.5, 9.5), m_pavement, 0.012)
 	_road_markings(detail, root)
 
-	# Perimeter walls, high enough to hide that the world ends.
+	# Perimeter walls, high enough to hide that the world ends: box colliders,
+	# and kit brick wall segments with pillars (a few of them broken).
+	var kit := Kit.new()
 	for w in [["WallN", Vector3(48, 3.2, 1), Vector3(0, 1.6, -TOWN_EDGE - 0.5)],
 			["WallS", Vector3(48, 3.2, 1), Vector3(0, 1.6, TOWN_EDGE + 0.5)],
 			["WallW", Vector3(1, 3.2, 48), Vector3(-TOWN_EDGE - 0.5, 1.6, 0)],
 			["WallE", Vector3(1, 3.2, 48), Vector3(TOWN_EDGE + 0.5, 1.6, 0)]]:
-		_solid(level, root, w[0], w[1], w[2], m_wall)
+		_blocker(level, root, w[0], w[1], w[2])
+	var e := TOWN_EDGE + 0.5
+	kit.wall_run(Vector3(-e, 0, -e), Vector3(e, 0, -e), "wall_town", "pillar_town", [2, 8])
+	kit.wall_run(Vector3(-e, 0, e), Vector3(e, 0, e), "wall_town", "pillar_town", [4])
+	kit.wall_run(Vector3(e, 0, -e), Vector3(e, 0, e), "wall_town", "pillar_town", [7], Color.WHITE, false)
+	kit.wall_run(Vector3(-e, 0, -e), Vector3(-e, 0, e), "wall_town", "pillar_town", [1, 9], Color.WHITE, false)
 
 	# Houses: three per block, facing the streets, with an alley between two of
 	# them that leads to the back gardens (where some enemies spawn).
@@ -393,6 +407,7 @@ func _build_town() -> Node3D:
 				var model: String = HOUSES[k % HOUSES.size()]
 				var box := _batch_model(b, SRC + "quaternius/%s.glb" % model, _place(s[0], s[1], HOUSE_SCALE), HOUSE_TINTS[k % HOUSE_TINTS.size()])
 				_blocker(level, root, "House%d" % k, Vector3(box.size.x - 0.2, box.size.y, box.size.z - 0.2), box.get_center())
+				_house_details(kit, model, box, s[1], k)
 				k += 1
 			_batch_mesh(b, detail, root, "Houses%d%d" % [sx + 1, sz + 1], "town_houses_%d%d" % [sx + 1, sz + 1])
 
@@ -415,7 +430,11 @@ func _build_town() -> Node3D:
 
 	# Concrete barriers at the west end of the main street.
 	for i in 4:
-		_solid(level, root, "Barrier%d" % i, Vector3(0.6, 1.0, 2.2), Vector3(-21.5, 0.5, -3.3 + i * 2.2), m_barrier, randf_range(-8, 8))
+		var yaw := randf_range(-8, 8)
+		var at := Vector3(-21.5, 0.0, -3.3 + i * 2.2)
+		_blocker(level, root, "Barrier%d" % i, Vector3(0.6, 1.0, 2.2), at + Vector3(0, 0.5, 0), yaw)
+		kit.add("barrier_broken" if i == 2 else "barrier",
+				Transform3D(Basis(Vector3.UP, deg_to_rad(yaw + 90.0)) * Basis.from_scale(Vector3(2.2 / 3.0, 1, 1)), at))
 
 	# Street lights (4 lit at the crossing, 2 more that Low quality turns off),
 	# a stop sign and a traffic light, merged into one mesh.
@@ -435,8 +454,9 @@ func _build_town() -> Node3D:
 	_batch_mesh(sb, detail, root, "StreetFurniture", "town_street")
 
 	# Cover and clutter: dumpsters, barrels, crates, tyres, pallets.
-	_solid(level, root, "Dumpster1", Vector3(1.9, 1.3, 1.1), Vector3(-9.0, 0.65, -5.6), m_metal, 3.0)
-	_solid(level, root, "Dumpster2", Vector3(1.9, 1.3, 1.1), Vector3(13.5, 0.65, 5.6), m_metal, -4.0)
+	for d: Array in [["Dumpster1", Vector3(-9.0, 0, -5.6), 3.0], ["Dumpster2", Vector3(13.5, 0, 5.6), -4.0]]:
+		_blocker(level, root, d[0], Vector3(1.9, 1.3, 1.1), d[1] + Vector3(0, 0.65, 0), d[2])
+		kit.add("dumpster", _place(d[1], d[2]), Color(0.8, 0.9, 0.8) if d[0] == "Dumpster1" else Color(0.7, 0.8, 1.2))
 	var clutter := [
 		["res://props/barrel_rust.tscn", Vector3(6.2, 0, 8.6), 0.0], ["res://props/barrel_rust.tscn", Vector3(7.0, 0, 9.3), 40.0],
 		["res://props/barrel_red.tscn", Vector3(-6.5, 0, -10.5), 0.0], ["res://props/wood_crate.tscn", Vector3(-12.0, 0, 5.2), 15.0],
@@ -454,6 +474,7 @@ func _build_town() -> Node3D:
 		mi.mesh = load("res://level/generated/skyline_%s.res" % side)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_add(detail, mi, "Skyline" + side, root)
+	kit.build(detail, root, "Kit", {"lod_distance": TOWN_LOD_DISTANCE, "file_prefix": "town_kit"})
 
 	var spawns := [
 		Vector3(18.5, 0, 0), Vector3(-19.0, 0, 0), Vector3(0, 0, -18.5), Vector3(0, 0, 18.5),
@@ -466,6 +487,33 @@ func _build_town() -> Node3D:
 	]
 	_finish_map(root, Vector3(0, 0, 7.0), 0.0, spawns, pickups)
 	return root
+
+
+## Kit details on a house's street side: a shop sign on some, downpipes at
+## the front corners, an AC unit on others. `box` is the house's world box,
+## `yaw` its rotation (its front faces +Z rotated by yaw).
+func _house_details(kit: Kit, model: String, box: AABB, yaw: float, k: int) -> void:
+	var front := Basis(Vector3.UP, deg_to_rad(yaw)) * Vector3.BACK
+	front = front.round()
+	var side := front.cross(Vector3.UP)
+	var half := (box.size * 0.5).dot(front.abs())
+	var width := (box.size * 0.5).dot(side.abs())
+	var inset: float = HOUSE_FRONT_INSET.get(model, 0.0)
+	var face := box.get_center() + front * (half - inset)
+	face.y = 0.0
+	var two_story := model.begins_with("2Story")
+	# Downpipes at both front corners, up to the eaves.
+	for s in [-1.0, 1.0]:
+		kit.downpipe(face + side * s * (width - 0.35), front, 5.6 if two_story else 2.9)
+	match k % 4:
+		0:
+			kit.mount(["sign_garage", "sign_pharmacy"][(k / 4) % 2], face + Vector3(0, 2.75, 0), front)
+		1:
+			kit.mount(["sign_diner", "sign_hotel"][(k / 4) % 2], face + side * (width * 0.45) + Vector3(0, 2.6, 0), front)
+		2:
+			kit.mount("ac_unit", face - side * (width * 0.4) + Vector3(0, 2.2, 0), front)
+		3:
+			kit.mount("lamp_wall", face + side * 1.2 + Vector3(0, 2.4, 0), front)
 
 
 func _glow_bulb(parent: Node, root: Node, n: String, pos: Vector3) -> void:
@@ -550,11 +598,6 @@ func _build_warehouse() -> Node3D:
 		"tint": Color(0.75, 0.75, 0.78), "edge_dirt_start": 11.0, "edge_dirt_end": 13.0, "uv_scale": 0.3})
 	var m_yard := _surface("res://materials/concrete_floor.tres", "wh_yard", {
 		"tint": Color(0.45, 0.45, 0.5), "edge_dirt_start": 12.0, "edge_dirt_end": 14.0})
-	var m_wall := _surface("res://materials/container_red.tres", "wh_wall", {
-		"tint": Color(0.6, 0.66, 0.72), "macro_tint": Color(0.7, 0.72, 0.75)})
-	var m_concrete: Material = load("res://materials/concrete_wall.tres")
-	var m_roof: Material = load("res://materials/metal_crate.tres")
-	var m_cont: Material = load("res://materials/container_blue.tres")
 
 	_blocker(level, root, "Floor", Vector3(42, 1, 30), Vector3(3, -0.5, 0))
 	_floor_tiles(detail, root, "Floor", Vector2(WH_W, -WH_Z), Vector2(WH_E, WH_Z), Vector2(6.0, 6.5), m_floor)
@@ -564,19 +607,21 @@ func _build_warehouse() -> Node3D:
 	# nothing tries to walk on top of it).
 	var wall_len := WH_E - WH_W + 1.0
 	var mid_x := (WH_W + WH_E) * 0.5
-	_solid(level, root, "WallW", Vector3(0.5, WH_H, 2 * WH_Z + 1), Vector3(WH_W - 0.25, WH_H / 2, 0), m_wall)
-	_solid(level, root, "WallN", Vector3(wall_len, WH_H, 0.5), Vector3(mid_x, WH_H / 2, -WH_Z - 0.25), m_wall)
-	_solid(level, root, "WallS", Vector3(wall_len, WH_H, 0.5), Vector3(mid_x, WH_H / 2, WH_Z + 0.25), m_wall)
+	_blocker(level, root, "WallW", Vector3(0.5, WH_H, 2 * WH_Z + 1), Vector3(WH_W - 0.25, WH_H / 2, 0))
+	_blocker(level, root, "WallN", Vector3(wall_len, WH_H, 0.5), Vector3(mid_x, WH_H / 2, -WH_Z - 0.25))
+	_blocker(level, root, "WallS", Vector3(wall_len, WH_H, 0.5), Vector3(mid_x, WH_H / 2, WH_Z + 0.25))
 	var side := WH_Z - DOOR_HALF
-	_solid(level, root, "WallE1", Vector3(0.5, WH_H, side + 0.5), Vector3(WH_E + 0.25, WH_H / 2, -DOOR_HALF - (side + 0.5) / 2), m_wall)
-	_solid(level, root, "WallE2", Vector3(0.5, WH_H, side + 0.5), Vector3(WH_E + 0.25, WH_H / 2, DOOR_HALF + (side + 0.5) / 2), m_wall)
-	_solid(level, root, "DoorHeader", Vector3(0.5, 2.0, 2 * DOOR_HALF), Vector3(WH_E + 0.25, WH_H - 1.0, 0), m_wall)
-	_solid(root, root, "Roof", Vector3(wall_len + 0.5, 0.3, 2 * WH_Z + 1.5), Vector3(mid_x, WH_H + 0.15, 0), m_roof)
+	_blocker(level, root, "WallE1", Vector3(0.5, WH_H, side + 0.5), Vector3(WH_E + 0.25, WH_H / 2, -DOOR_HALF - (side + 0.5) / 2))
+	_blocker(level, root, "WallE2", Vector3(0.5, WH_H, side + 0.5), Vector3(WH_E + 0.25, WH_H / 2, DOOR_HALF + (side + 0.5) / 2))
+	_blocker(level, root, "DoorHeader", Vector3(0.5, 2.0, 2 * DOOR_HALF), Vector3(WH_E + 0.25, WH_H - 1.0, 0))
+	_blocker(root, root, "Roof", Vector3(wall_len + 0.5, 0.3, 2 * WH_Z + 1.5), Vector3(mid_x, WH_H + 0.15, 0))
 	# Loading yard walls.
 	var yard_len := YARD_E - WH_E + 1.0
-	_solid(level, root, "YardWallN", Vector3(yard_len, 2.8, 0.5), Vector3((WH_E + YARD_E) / 2 + 0.5, 1.4, -WH_Z - 0.75), m_concrete)
-	_solid(level, root, "YardWallS", Vector3(yard_len, 2.8, 0.5), Vector3((WH_E + YARD_E) / 2 + 0.5, 1.4, WH_Z + 0.75), m_concrete)
-	_solid(level, root, "YardWallE", Vector3(0.5, 2.8, 2 * WH_Z + 2), Vector3(YARD_E + 0.75, 1.4, 0), m_concrete)
+	_blocker(level, root, "YardWallN", Vector3(yard_len, 2.8, 0.5), Vector3((WH_E + YARD_E) / 2 + 0.5, 1.4, -WH_Z - 0.75))
+	_blocker(level, root, "YardWallS", Vector3(yard_len, 2.8, 0.5), Vector3((WH_E + YARD_E) / 2 + 0.5, 1.4, WH_Z + 0.75))
+	_blocker(level, root, "YardWallE", Vector3(0.5, 2.8, 2 * WH_Z + 2), Vector3(YARD_E + 0.75, 1.4, 0))
+	var kit := Kit.new()
+	_warehouse_kit(kit)
 
 	# Pallet racks: steel frames with pallets and boxes, one merged mesh.
 	var rb := _batch()
@@ -601,7 +646,8 @@ func _build_warehouse() -> Node3D:
 	_batch_mesh(fb, detail, root, "Vehicles", "wh_vehicles")
 
 	# Shipping container and clutter outside; crates and barrels inside.
-	_solid(level, root, "Container", Vector3(6.0, 2.6, 2.45), Vector3(16.5, 1.3, -10.2), m_cont)
+	_blocker(level, root, "Container", Vector3(6.0, 2.6, 2.45), Vector3(16.5, 1.3, -10.2))
+	kit.add("container", Transform3D(Basis.from_scale(Vector3(6.0 / 6.1, 1, 1)), Vector3(16.5, 0, -10.2)), Color(0.5, 0.75, 1.2))
 	var clutter := [
 		["res://props/wood_crate.tscn", Vector3(-8.8, 0, -2.6), 10.0], ["res://props/wood_crate.tscn", Vector3(-8.0, 0, -3.5), -5.0],
 		["res://props/military_crate.tscn", Vector3(-5.0, 0, 3.8), 90.0], ["res://props/barrel_rust.tscn", Vector3(2.6, 0, 4.2), 0.0],
@@ -657,9 +703,10 @@ func _build_warehouse() -> Node3D:
 	flood_glow.mesh = fq
 	flood_glow.position = pole + Vector3(-0.62, 6.0, 0)
 	_add(detail, flood_glow, "FloodGlow", root)
-	# A wall lamp over the door outside.
-	_glow_bulb(detail, root, "DoorLampBulb", Vector3(WH_E + 0.6, 5.6, 0))
+	# A wall lamp over the door outside (its housing is in the kit).
+	_glow_bulb(detail, root, "DoorLampBulb", Vector3(WH_E + 0.5 + 0.45, 5.52, 0))
 	_omni(lights, root, "DoorLamp", Vector3(WH_E + 1.0, 5.3, 0), Color(1.0, 0.7, 0.45), 1.6, 8.0, true)
+	kit.build(detail, root, "Kit", {"lod_distance": WAREHOUSE_LOD_DISTANCE, "file_prefix": "warehouse_kit"})
 
 	var spawns := [
 		Vector3(20.5, 0, -11.5), Vector3(20.5, 0, 11.5), Vector3(18.5, 0, 3.2),
@@ -673,6 +720,78 @@ func _build_warehouse() -> Node3D:
 	]
 	_finish_map(root, Vector3(5.0, 0, 0.5), PI / 2.0, spawns, pickups)
 	return root
+
+
+## The warehouse shell from kit pieces: clad walls (with high windows), steel
+## columns, the loading door frame and header, roof sheets on trusses, the
+## yard's concrete walls, pipes, signs and lamps.
+func _warehouse_kit(kit: Kit) -> void:
+	var clad := Color(0.78, 0.88, 1.0)
+	var t := 0.25  # half the wall thickness
+	# North and south walls (x from WH_W-0.5 to WH_E+0.5), west wall.
+	for z in [-WH_Z - t, WH_Z + t]:
+		_wh_wall_run(kit, Vector3(WH_W - 0.5, 0, z), Vector3(WH_E + 0.5, 0, z), clad)
+	_wh_wall_run(kit, Vector3(WH_W - t, 0, -WH_Z - 0.5), Vector3(WH_W - t, 0, WH_Z + 0.5), clad)
+	# East wall either side of the loading door, the door frame and header.
+	for s in [-1.0, 1.0]:
+		_wh_wall_run(kit, Vector3(WH_E + t, 0, s * (WH_Z + 0.5)), Vector3(WH_E + t, 0, s * DOOR_HALF), clad, false)
+	kit.add("wh_door_frame", _place(Vector3(WH_E + t, 0, 0), 90.0))
+	kit.add("wh_header", _place(Vector3(WH_E + t, WH_H - 2.0, 0), 90.0), clad)
+	# Steel columns on the inside, every 4 m along the long walls.
+	var x := WH_W + 4.0
+	while x < WH_E - 1.0:
+		kit.mount("wh_column", Vector3(x, 0, -WH_Z), Vector3.BACK)
+		kit.mount("wh_column", Vector3(x, 0, WH_Z), Vector3.FORWARD)
+		x += 4.0
+	for z in [-6.0, 6.0]:
+		kit.mount("wh_column", Vector3(WH_W, 0, z), Vector3.RIGHT)
+	# Roof: corrugated sheets on top, trusses under them.
+	var x0 := WH_W - 0.75
+	var x1 := WH_E + 0.75
+	var nz := 7
+	var nx := 7
+	for i in nx:
+		for j in nz:
+			var sx := (x1 - x0) / nx
+			var sz := (2 * WH_Z + 1.5) / nz
+			kit.add("roof_sheet", Transform3D(Basis.from_scale(Vector3(sx / 4.0, 1, sz / 4.0)),
+					Vector3(x0 + sx * (i + 0.5), WH_H + 0.3, -WH_Z - 0.75 + sz * (j + 0.5))), Color(0.7, 0.75, 0.8))
+	x = WH_W + 2.0
+	while x < WH_E:
+		kit.add("truss", _place(Vector3(x, WH_H, 0), 0.0))
+		x += 4.0
+	# Pipes along the inside of the north wall, with drops to the floor.
+	kit.mount("pipe_h", Vector3(-4.0, 5.6, -WH_Z), Vector3.BACK, Color.WHITE, Vector3(22.0, 1, 1))
+	for px in [-14.6, 6.6]:
+		kit.downpipe(Vector3(px, 0, -WH_Z), Vector3.BACK, 5.6)
+	kit.mount("ac_unit", Vector3(-2.0, 1.4, WH_Z), Vector3.FORWARD, Color(0.8, 0.8, 0.75))
+	# Signs: over the door outside and inside, and on the yard wall.
+	kit.mount("sign_loading", Vector3(WH_E + 2 * t, 5.25, -2.6), Vector3.RIGHT)
+	kit.mount("lamp_wall", Vector3(WH_E + 2 * t, 5.6, 0), Vector3.RIGHT)
+	kit.mount("sign_exit", Vector3(WH_E, 5.2, 0), Vector3.LEFT)
+	kit.mount("sign_exit", Vector3(WH_W, 2.6, 0), Vector3.RIGHT)
+	kit.mount("sign_danger", Vector3(YARD_E + 0.5, 1.7, -5.0), Vector3.LEFT)
+	# Downpipes on the outside corners by the yard.
+	for s in [-1.0, 1.0]:
+		kit.downpipe(Vector3(WH_E + 2 * t, 0, s * (WH_Z - 0.4)), Vector3.RIGHT, WH_H - 0.3)
+	# Loading yard walls: concrete, a couple of broken segments.
+	var yz := WH_Z + 0.75
+	var ye := YARD_E + 0.75
+	kit.wall_run(Vector3(WH_E + 0.5, 0, -yz), Vector3(ye, 0, -yz), "wall_low", "pillar_low", [1])
+	kit.wall_run(Vector3(WH_E + 0.5, 0, yz), Vector3(ye, 0, yz), "wall_low", "pillar_low", [])
+	kit.wall_run(Vector3(ye, 0, -yz), Vector3(ye, 0, yz), "wall_low", "pillar_low", [4], Color.WHITE, false)
+
+
+## Warehouse wall from a to b: 4 m clad segments, every other one with windows.
+func _wh_wall_run(kit: Kit, a: Vector3, b: Vector3, tint: Color, windows := true) -> void:
+	var d := b - a
+	var n := maxi(1, roundi(d.length() / 4.0))
+	var s := d.length() / n
+	var dir := d.normalized()
+	var rot := Basis(Vector3.UP, atan2(-dir.z, dir.x))
+	for i in n:
+		var piece := "wh_wall_window" if windows and i % 2 == 1 else "wh_wall"
+		kit.add(piece, Transform3D(rot * Basis.from_scale(Vector3(s / 4.0, 1, 1)), a + dir * s * (i + 0.5)), tint)
 
 
 # One rack segment from x0 to x1 at row z: uprights every ~3 m, three beam

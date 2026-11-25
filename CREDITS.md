@@ -186,3 +186,4 @@ These were made for this project, so no license applies:
 - The baked lighting (`main.lmbake`, `main.exr`), made with Godot's LightmapGI.
 - The map pictures on the map selection screen (`ui/thumbnails/`), rendered from the game by `tools/make_thumbnails.gd`.
 - The hit marker tick, headshot ring, kill sound and heartbeat are synthesized in code by `effects/synth_sounds.gd` (no audio files).
+- The modular level kit (`assets/models/kit/kit.glb`: walls, pillars, shed, containers, barriers, crates, dumpsters, roof trusses, pipes, signs) and its textures (`assets/textures/kit/`), made in Blender by `tools/blender/build_kit.py`. The atlas cells are resized copies of the CC0 Poly Haven textures listed above (factory brick, concrete wall 008, rusty corrugated iron, rusty metal 02, rough wood); the sign faces and the baked ambient occlusion are generated.

@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://materials/kit_surface.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/textures/kit/kit_albedo.jpg" id="2_albedo"]
+[ext_resource type="Texture2D" path="res://assets/textures/kit/kit_normal.jpg" id="3_normal"]
+[ext_resource type="Texture2D" path="res://assets/textures/kit/kit_ao.png" id="4_ao"]
+[ext_resource type="Texture2D" path="res://assets/textures/generated/noise_rgb.png" id="5_noise"]
+
+[resource]
+shader = ExtResource("1_shader")
+shader_parameter/albedo_atlas = ExtResource("2_albedo")
+shader_parameter/normal_atlas = ExtResource("3_normal")
+shader_parameter/ao_atlas = ExtResource("4_ao")
+shader_parameter/noise_tex = ExtResource("5_noise")
