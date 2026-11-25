@@ -86,6 +86,14 @@ Tests: `test_progression`, `test_economy`, `test_game_loop`, `test_maps`,
 - Tests that write best scores back up and restore `user://save.cfg`.
 - In test helpers, wait for `process_frame` as well as `physics_frame` after
   a scene change (it completes at the end of a process frame).
+- The navigation map belongs to the window, so a new map scene (or Retry)
+  inherits a non-zero iteration id from the previous one. Only trust path /
+  closest-point queries once `main.navmesh_ready()` is true (it compares
+  against the id recorded when the scene loaded). Getting this wrong made
+  Bosses spawn off their navmesh in a too-narrow gap on the Town map.
+- `test_navigation` counts an enemy as stuck as soon as its own 2 s stuck
+  check fires; enemies that can't reach the player (too tight for their size)
+  must *wait* at the end of their path, or behind one already waiting there.
 
 ## Build and publish
 

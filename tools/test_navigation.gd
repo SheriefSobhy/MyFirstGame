@@ -69,6 +69,18 @@ func check(ok: bool, what: String) -> void:
 func frames(n: int) -> void:
 	for i in n:
 		await physics_frame
+		await process_frame  # scene changes finish at the end of a process frame
+
+
+# Until the navigation map has synced with every region of the map (the
+# small enemies', the Brute's and the Boss's), so path queries see them all.
+# Checking too early made every path come back empty now and then.
+func _wait_for_navmesh(main: Node) -> void:
+	for i in 600:
+		if main.navmesh_ready():  # synced since this scene loaded, every region on it
+			return
+		await physics_frame
+	check(false, "%s: the navigation map syncs within 600 frames" % main.map_id)
 
 
 func _run() -> void:
@@ -89,6 +101,7 @@ func _test_map(m: Dictionary) -> void:
 	main.get_node("SpawnTimer").stop()
 	main.phase = main.Phase.OVER  # no wave logic: this test spawns the enemies
 	_clear_enemies(main)
+	await _wait_for_navmesh(main)
 	var player: CharacterBody3D = main.get_node("Player")
 	var regions: Array[NavigationRegion3D] = []
 	for nav: Dictionary in Types.NAV_MESHES:

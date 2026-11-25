@@ -15,15 +15,19 @@ extends CharacterBody3D
 ## colour (sparks for the exploder) and on death is thrown back and falls
 ## away from the shot.
 ##
-## Navigation: Brutes and the Boss walk on the large navmesh (layer 2), the
-## rest on the small one (enemy_types.gd nav_layer). Avoidance keeps them from
+## Navigation: each size walks on its own navmesh (enemy_types.gd NAV_MESHES:
+## small enemies, the Brute, the Boss). Avoidance keeps them from
 ## pushing each other into walls. An enemy that stops making progress first
 ## recalculates its path (STUCK_REPATH), then sidesteps (STUCK_SLIDE), and
-## finally asks main.gd to move it to a hidden spawn point (STUCK_RESPAWN).
+## finally asks main.gd to move it to a hidden spawn point (STUCK_RESPAWN);
+## if it is off its navmesh (OFF_MESH_RELOCATE) it asks for that right away.
+## When the player is somewhere too tight for it, it waits at the end of its
+## path, or just behind another enemy already waiting there (WAIT_NEAR_END).
 
 signal died
 signal health_changed(hp: int, max_hp: int)
-## Still stuck after STUCK_RESPAWN seconds: main.gd calls relocate().
+## Still stuck after STUCK_RESPAWN seconds (or stuck off its navmesh):
+## main.gd calls relocate().
 signal stuck
 
 enum State { CHASE, ATTACK, HIT, DEAD, AIM, SHOOT, ARMED }
@@ -49,6 +53,9 @@ const STUCK_RESPAWN := 10.0       # ... before moving to a hidden spawn point
 const SLIDE_TIME := 0.8           # length of a sidestep
 const NEAR_PLAYER := 1.5          # within attack range + this, crowding isn't "stuck"
 const GHOST_TIME := 1.5           # seconds it walks through other enemies to break a jam
+const WAIT_NEAR_END := 3.0        # m: this close to the end of a path that can't reach the
+                                  # player, and blocked by another enemy = wait there
+const OFF_MESH_RELOCATE := 0.6    # m off its navmesh while stuck = relocate it right away
 
 # Soldier.
 const SOLDIER_MIN_RANGE := 7.0    # backs away if the player is closer
@@ -324,7 +331,10 @@ func _walk_to(target: Vector3, delta: float, speed_mult := 1.0) -> void:
 	_wants_move = true
 	_speed_mult = speed_mult
 	var dir: Vector3
-	var use_avoidance := _slide_time <= 0.0 and _ghost_time <= 0.0
+	# Not getting anywhere (a progress check failed): stop letting avoidance
+	# hold it back (it can make one crawl round enemies standing nearby
+	# without ever getting past); if it runs into one, ghosting takes over.
+	var use_avoidance := _slide_time <= 0.0 and _ghost_time <= 0.0 and _stuck_time <= 0.0
 	if _slide_time > 0.0:
 		# Sidestepping out of a stuck spot.
 		_slide_time -= delta
@@ -336,6 +346,16 @@ func _walk_to(target: Vector3, delta: float, speed_mult := 1.0) -> void:
 		if _repath_timer <= 0.0 or target.distance_to(agent.target_position) > REPATH_MOVE:
 			agent.target_position = target
 			_repath_timer = REPATH_TIME
+		# The path stops short of the target (it's somewhere too tight for this
+		# enemy) and another enemy is already waiting at its end: wait behind
+		# it rather than keep pushing into it.
+		var end := agent.get_final_position()
+		if not agent.get_current_navigation_path().is_empty() \
+				and _flat_distance(end, target) > maxf(stats.attack_range, 1.0) \
+				and _flat_distance(global_position, end) < WAIT_NEAR_END and _pressed_against_enemy():
+			_wants_move = false
+			_stop()
+			return
 		var to_next := agent.get_next_path_position() - global_position
 		to_next.y = 0.0
 		if agent.is_navigation_finished() or to_next.length() < 0.05:
@@ -432,9 +452,24 @@ func _update_stuck(delta: float) -> void:
 		_set_stuck_level(2)
 		_start_slide()
 	elif _stuck_time >= STUCK_REPATH and stuck_level < 1:
+		if _off_navmesh() > OFF_MESH_RELOCATE:
+			# Off its navmesh (e.g. a Boss wedged in a gap too narrow for it):
+			# a new path or a sidestep won't get it out. Straight to main.gd's
+			# relocation.
+			_set_stuck_level(3)
+			stuck.emit()
+			return
 		_set_stuck_level(1)
 		_repath_timer = 0.0  # a new path query on the next step
 		_spot = Vector3.INF  # soldiers also pick a new firing spot
+
+
+# How far it is from its own navmesh (0 if main.gd can't tell).
+func _off_navmesh() -> float:
+	var main := get_tree().current_scene
+	if main and main.has_method("off_navmesh"):
+		return main.off_navmesh(global_position, Types.nav_layer(kind))
+	return 0.0
 
 
 # Jammed in with other enemies (e.g. two Brutes meeting in a gap only one of

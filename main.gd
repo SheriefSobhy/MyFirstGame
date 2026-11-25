@@ -26,6 +26,7 @@ const WAVE_POINTS := 50          # x the wave number, for clearing a wave
 const MAX_ENEMIES := 12      # cap so the arena (and phones) don't overflow
 const PHONE_MAX_ENEMIES := 8
 const SPAWN_SPREAD := 1.0    # random offset around a spawn point
+const SPAWN_OFF_MESH := 0.3  # m: further than this from its navmesh = not a place to spawn
 const SAFE_SPAWN_DISTANCE := 10.0  # no spawning closer than this to the player
 const BULLET_HOLE_SCENE := preload("res://effects/bullet_hole.tscn")
 const SPARKS_SCENE := preload("res://effects/impact_sparks.tscn")
@@ -69,6 +70,8 @@ var _break_shown := -1
 var _nav_regions := {}       # navigation layer -> its NavigationRegion3D
 var _player_start := Vector3.ZERO
 var _spawns_by_layer := {}   # navigation layer -> spawn points usable on it
+var _nav_iteration_start := 0  # navigation map iteration when this scene loaded
+var _nav_ready := false        # see navmesh_ready()
 
 @onready var player: CharacterBody3D = $Player
 @onready var hud: CanvasLayer = $HUD
@@ -86,6 +89,10 @@ func _ready() -> void:
 	# baked lightmap (main.lmbake). If you change the level, run
 	# tools/rebake.bat to bake both again.
 	_add_navmeshes()
+	# The navigation map belongs to the window, so it is the same one the
+	# previous scene (or the last Retry) used: its iteration id is already
+	# past 0. Path queries are only trusted after it has synced again.
+	_nav_iteration_start = NavigationServer3D.map_get_iteration_id(get_world_3d().navigation_map)
 	_player_start = player.global_position
 
 	# Looping ambient wind, and the gameplay music.
@@ -274,7 +281,12 @@ func spawn_enemy() -> void:
 	var layer := EnemyTypes.nav_layer(enemy.kind)
 	var point: Node3D = _pick_spawn_point(layer)
 	var offset := Vector3(randf_range(-SPAWN_SPREAD, SPAWN_SPREAD), 0.0, randf_range(-SPAWN_SPREAD, SPAWN_SPREAD))
-	enemy.position = _on_navmesh(point.global_position + offset, layer)
+	var pos := _on_navmesh(point.global_position + offset, layer)
+	if off_navmesh(pos, layer) > SPAWN_OFF_MESH:
+		# The offset landed somewhere its navmesh doesn't reach (a gap too
+		# tight for a big enemy): the spawn point itself instead.
+		pos = _on_navmesh(point.global_position, layer)
+	enemy.position = pos
 	enemy.died.connect(_on_enemy_died.bind(enemy))
 	enemy.stuck.connect(_on_enemy_stuck.bind(enemy))
 	enemies.add_child(enemy)
@@ -300,8 +312,8 @@ func _spawn_points_for(layer: int) -> Array[Node]:
 	if _spawns_by_layer.has(layer):
 		return _spawns_by_layer[layer]
 	var map := get_world_3d().navigation_map
-	if NavigationServer3D.map_get_iteration_id(map) == 0:
-		return spawn_points  # navmesh not ready yet
+	if not navmesh_ready():
+		return spawn_points  # navmesh not ready yet (not remembered)
 	var ok: Array[Node] = []
 	for p: Node3D in spawn_points:
 		# The path must start at the spawn point (it isn't in a pocket cut out of
@@ -311,21 +323,51 @@ func _spawn_points_for(layer: int) -> Array[Node]:
 				and Vector2(path[0].x - p.global_position.x, path[0].z - p.global_position.z).length() < SPAWN_SPREAD + 0.5:
 			ok.append(p)
 	if ok.is_empty():
-		ok = spawn_points
+		push_warning("No spawn point connects to the player start on navigation layer %d" % layer)
+		return spawn_points  # not remembered: try again next time
 	_spawns_by_layer[layer] = ok
 	return ok
 
 
+## True once the navigation map has synced with this scene's navmeshes (every
+## size's region), so path and closest-point queries can be trusted.
+## A scene change takes two syncs (the first one doesn't have the new regions'
+## polygons yet), so it asks the map itself: a short path on every layer near
+## the player start must come back. Once true it stays true.
+func navmesh_ready() -> bool:
+	if _nav_ready:
+		return true
+	var map := get_world_3d().navigation_map
+	if NavigationServer3D.map_get_iteration_id(map) <= _nav_iteration_start:
+		return false
+	for layer: int in _nav_regions:
+		var region: NavigationRegion3D = _nav_regions[layer]
+		var from := NavigationServer3D.region_get_closest_point(region.get_rid(), _player_start)
+		var path := NavigationServer3D.map_get_path(map, from, from + Vector3(0.3, 0.0, 0.3), true, layer)
+		if path.is_empty():
+			return false
+	_nav_ready = true
+	return true
+
+
 # The closest point to `pos` on that layer's navmesh (if there is one near).
 func _on_navmesh(pos: Vector3, layer: int) -> Vector3:
-	var region: NavigationRegion3D = _nav_regions.get(layer, $NavigationRegion3D)
-	var map := get_world_3d().navigation_map
-	if NavigationServer3D.map_get_iteration_id(map) == 0:
+	if not navmesh_ready():
 		return pos
+	var region: NavigationRegion3D = _nav_regions.get(layer, $NavigationRegion3D)
 	var p := NavigationServer3D.region_get_closest_point(region.get_rid(), pos)
 	if Vector2(p.x - pos.x, p.z - pos.z).length() > 2.0:
 		return pos
 	return Vector3(p.x, pos.y, p.z)
+
+
+## How far `pos` is from that layer's navmesh (0 when the navmesh isn't ready).
+func off_navmesh(pos: Vector3, layer: int) -> float:
+	if not navmesh_ready():
+		return 0.0
+	var region: NavigationRegion3D = _nav_regions.get(layer, $NavigationRegion3D)
+	var p := NavigationServer3D.region_get_closest_point(region.get_rid(), pos)
+	return Vector2(p.x - pos.x, p.z - pos.z).length()
 
 
 # The scene's NavigationRegion3D holds the small enemies' navmesh (layer 1).
