@@ -1,6 +1,10 @@
 extends CharacterBody3D
 ## An animated enemy. Its `kind` picks the stats, model, colours and sounds
-## from enemy_types.gd (set it before adding the enemy to the scene):
+## from enemy_types.gd (set it before adding the enemy to the scene). The
+## model is a Mixamo character at the detail level of the graphics quality,
+## with retargeted animations (walk, attack, death, idle; hit reactions are
+## procedural: a knockback and a lean back of the whole model).
+##
 ##  - normal, runner, brute, boss: walk to the player around obstacles
 ##    (navmesh), punch when close, stagger when shot (brutes don't, but they
 ##    still flinch), and play a death animation.
@@ -12,8 +16,8 @@ extends CharacterBody3D
 ##
 ## Every type has a head hitbox (head_sphere / is_head_hit; the gun doubles
 ## the damage), is knocked back and flinches when hit, sprays blood in its
-## colour (sparks for the exploder) and on death is thrown back and falls
-## away from the shot.
+## colour (sparks for the exploder) and on death is thrown back along the
+## shot while its death animation plays.
 ##
 ## Navigation: each size walks on its own navmesh (enemy_types.gd NAV_MESHES:
 ## small enemies, the Brute, the Boss). Avoidance keeps them from
@@ -68,7 +72,8 @@ const SHOT_MOVING_PENALTY := 0.3  # less likely to hit a moving player
 const SHOT_RANGE := 40.0
 const SHOT_TIME := 0.5            # length of the shoot pose after firing
 const TRACER_TIME := 0.08
-const GUN_SCALE := 0.045          # pistol in the hand (the rig's bones are 100x)
+const RIFLE_LENGTH := 0.8         # m, the soldier's rifle
+const RIFLE_GRIP := 0.3           # where the right hand holds it (0 = stock, 1 = muzzle)
 const SIGHT_MASK := 3             # walls and props block the soldier's view and shots
 const AIM_POSE_TIME := 0.05       # frame of the shoot animation held while aiming
 const GLINT_SIZE := 0.5           # the blinking red warning light at the muzzle (m)
@@ -103,7 +108,7 @@ const HIT_SOUNDS := [
 	preload("res://assets/sounds/impactPunch_medium_001.ogg"),
 	preload("res://assets/sounds/impactPunch_medium_002.ogg"),
 ]
-const PISTOL_MODEL := preload("res://assets/models/quaternius/ultimate_guns/pistol.glb")
+const RIFLE_MODEL := preload("res://assets/models/quaternius/ultimate_guns/ak_rifle.glb")
 const SOLDIER_SHOT := preload("res://assets/sounds/gunshot_pistol.wav")
 const SOLDIER_WARNING := preload("res://assets/sounds/enemies/soldier_warning.ogg")
 const EXPLODER_BEEP := preload("res://assets/sounds/enemies/exploder_beep.ogg")
@@ -167,6 +172,8 @@ var _glow_materials: Array[StandardMaterial3D] = []
 var _muzzle: Node3D
 var _gun: Node3D
 var _skel: Skeleton3D
+var _hand_r := -1                 # soldier: hand bones (the rifle is aimed along them)
+var _hand_l := -1
 var _laser: MeshInstance3D
 var _glint: MeshInstance3D
 var _tracer: MeshInstance3D
@@ -200,14 +207,22 @@ func _enter_tree() -> void:
 	stats = Types.TYPES[kind]
 	max_hp = hp_override if hp_override > 0 else stats.hp
 	hp = max_hp
-	var model: Node3D = $Model
-	if stats.model != null:
-		remove_child(model)
-		model.free()
-		model = stats.model.instantiate()
-		model.name = "Model"
-		add_child(model)
-		move_child(model, 1)
+	# The Mixamo character at the detail level of the graphics quality, with
+	# its retargeted animations (enemy_types.gd model_scene / anim_library).
+	var placeholder: Node3D = $Model
+	remove_child(placeholder)
+	placeholder.free()
+	var model: Node3D = Types.model_scene(kind, Settings.effective_quality()).instantiate()
+	model.name = "Model"
+	add_child(model)
+	move_child(model, 1)
+	_skel = model.find_children("*", "Skeleton3D", true, false)[0]
+	var player := AnimationPlayer.new()
+	player.name = "AnimationPlayer"
+	model.add_child(player)
+	# Tracks are "Skeleton3D:<bone>", from the skeleton's parent.
+	player.root_node = player.get_path_to(_skel.get_parent())
+	player.add_animation_library("", Types.anim_library(kind))
 	# The characters face +Z; enemies move along -Z.
 	model.transform = Transform3D(Basis(Vector3.UP, PI).scaled(Vector3.ONE * stats.model_scale), Vector3.ZERO)
 	var capsule := CapsuleShape3D.new()
@@ -222,12 +237,6 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	_player = get_tree().get_first_node_in_group("player")
 	_recolor()
-	for a: String in [stats.anims.walk, stats.anims.get("idle", "")]:
-		if a != "" and anim.has_animation(a):
-			anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
-	var idle := _idle_anim()
-	if idle != "":
-		anim.get_animation(idle).loop_mode = Animation.LOOP_LINEAR
 	if dummy:
 		_play_dummy_anim(-1.0)
 	else:
@@ -313,8 +322,14 @@ func _physics_process(delta: float) -> void:
 			_end_ghost()
 
 
+# The walk plays at the pace that matches the ground speed (the clip's
+# "ground_speed", scaled with the model), but at most anim_speed.walk_max
+# times faster than it was made (a shambling clip sped up 4x looks silly;
+# a little foot sliding doesn't show).
 func _walk_anim_speed() -> float:
-	return stats.speed * speed_scale / stats.walk_anim_ref
+	var a := anim.get_animation(stats.anims.walk)
+	var ground: float = a.get_meta("ground_speed", 1.0) * stats.model_scale
+	return clampf(stats.speed * speed_scale / maxf(ground, 0.05), 0.4, stats.anim_speed.walk_max)
 
 
 func _player_alive() -> bool:
@@ -587,19 +602,14 @@ func _dummy_move(delta: float) -> void:
 
 
 func _play_dummy_anim(blend: float) -> void:
-	var idle := _idle_anim()
-	if dummy_walk or idle == "":
+	if dummy_walk:
 		anim.play(stats.anims.walk, blend, _walk_anim_speed())
 	else:
-		anim.play(idle, blend)
+		_play_idle(blend)
 
 
-# A standing animation: the type's own, or the shared rig's neutral idle.
-func _idle_anim() -> String:
-	for a: String in [stats.anims.get("idle", ""), "CharacterArmature|Idle_Neutral"]:
-		if a != "" and anim.has_animation(a):
-			return a
-	return ""
+func _play_idle(blend: float) -> void:
+	anim.play(stats.anims.idle, blend, stats.anim_speed.idle)
 
 
 func _chase(delta: float) -> void:
@@ -702,18 +712,15 @@ func _flinch(amount: int, headshot: bool) -> void:
 
 # --- Head hitbox ----------------------------------------------------------------
 
-# The head is a sphere from the "Head" bone to the top of the head ("Head_end",
-# or the top of the collision capsule for rigs without it). It follows the
-# animation; it is only worked out when a bullet hits, so it costs nothing
-# per frame.
+# The head is a sphere from the "Head" bone to the top of the head (Mixamo's
+# "HeadTop_End", or the top of the collision capsule for rigs without it). It
+# follows the animation; it is only worked out when a bullet hits, so it
+# costs nothing per frame.
 func _setup_head() -> void:
 	if _skel == null:
-		var found := $Model.find_children("*", "Skeleton3D", true, false)
-		if found.is_empty():
-			return
-		_skel = found[0]
+		return
 	_head_bone = _skel.find_bone("Head")
-	_head_end_bone = _skel.find_bone("Head_end")
+	_head_end_bone = _skel.find_bone("HeadTop_End")
 	if _head_bone >= 0 and _head_end_bone < 0:
 		var head_y := (_skel.global_transform * _skel.get_bone_global_pose(_head_bone).origin).y - global_position.y
 		_head_length = maxf(stats.height - head_y, 0.15)
@@ -783,27 +790,28 @@ func _set_state(new_state: State) -> void:
 				anim.play(stats.anims.walk, 0.2, _walk_anim_speed())
 		State.ATTACK:
 			_attack_landed = false
-			_play_from_start(stats.anims.attack, 0.1)
+			# Start the clip so its strike (the "hit_time" found by
+			# tools/mixamo_anims.gd) lands when the damage is dealt.
+			var rate: float = stats.anim_speed.attack
+			var strike: float = anim.get_animation(stats.anims.attack).get_meta("hit_time", 0.0)
+			anim.play(stats.anims.attack, 0.1, rate)
+			anim.seek(maxf(strike - stats.attack_hit_time * rate, 0.0), true)
 		State.HIT:
+			# Stops walking; the flinch (_flinch) is the hit reaction.
 			_hide_laser()
-			_play_from_start(stats.anims.hit, 0.05)
+			_play_idle(0.1)
 		State.DEAD:
-			_play_from_start(stats.anims.death, 0.1)
-			if stats.fall_over:
-				# Tip over onto the ground (pivots on the feet): backwards,
-				# or forwards when the shot came from behind. Faster after a
-				# headshot or a big hit, with a small bounce.
-				var forward := -global_basis.z
-				forward.y = 0.0
-				var fall := 88.0
-				if _last_hit_dir.dot(forward.normalized()) > 0.3:
-					fall = -88.0
-				var quick := 0.7 if _last_headshot or _last_hit_force > 2.5 else 1.0
-				var tween := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-				tween.tween_interval(0.1 * quick)
-				tween.tween_property(self, "rotation:x", deg_to_rad(fall), 0.42 * quick)
-				tween.tween_property(self, "rotation:x", deg_to_rad(fall * 0.88), 0.1).set_ease(Tween.EASE_OUT)
-				tween.tween_property(self, "rotation:x", deg_to_rad(fall), 0.1)
+			# A headshot or a big hit drops it a little faster.
+			var quick := 1.25 if _last_headshot or _last_hit_force > 2.5 else 1.0
+			anim.play(stats.anims.death, 0.1, stats.anim_speed.death * quick)
+			anim.seek(0.0, true)
+			# The clip falls backwards: shot from behind, the body spins
+			# round first so it still falls away from the shot.
+			var forward := -global_basis.z
+			forward.y = 0.0
+			if _last_hit_dir.dot(forward.normalized()) > 0.3:
+				var spin := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+				spin.tween_property(self, "rotation:y", rotation.y + PI, 0.3)
 		State.AIM:
 			# Raise the gun and hold it there while the laser shows.
 			_play_from_start(stats.anims.shoot, 0.0)
@@ -1008,20 +1016,28 @@ func _fire() -> void:
 	_sfx.play()
 
 
-# A pistol in the right hand, with a marker at the muzzle, plus the laser
-# and tracer meshes (hidden until used).
+# A rifle in the right hand (held at its grip), with a marker at the muzzle,
+# plus the laser and tracer meshes (hidden until used).
 func _add_gun() -> void:
-	_skel = $Model.find_children("*", "Skeleton3D", true, false)[0]
 	var hand := BoneAttachment3D.new()
-	hand.bone_name = "Fist.R"
+	hand.bone_name = "RightHand"
 	_skel.add_child(hand)
-	_gun = PISTOL_MODEL.instantiate()
-	_gun.scale = Vector3.ONE * GUN_SCALE
+	# _gun is the pivot in the hand (turned by _orient_gun); the rifle sits on
+	# it with its grip at the pivot.
+	_gun = Node3D.new()
 	hand.add_child(_gun)
-	WeaponModel.no_shadows(_gun)
+	var rifle: Node3D = RIFLE_MODEL.instantiate()
+	_gun.add_child(rifle)
+	WeaponModel.no_shadows(rifle)
+	var size := WeaponModel.measure(rifle)
+	var box: AABB = size.aabb
+	_gun.scale = Vector3.ONE * RIFLE_LENGTH / (box.size.x * stats.model_scale)
+	rifle.position = -Vector3(box.position.x + box.size.x * RIFLE_GRIP, box.get_center().y, box.get_center().z)
 	_muzzle = Node3D.new()
-	_muzzle.position = WeaponModel.measure(_gun).tip
-	_gun.add_child(_muzzle)
+	_muzzle.position = size.tip
+	rifle.add_child(_muzzle)
+	_hand_r = _skel.find_bone("RightHand")
+	_hand_l = _skel.find_bone("LeftHand")
 	_laser = _beam(Color(1.0, 0.05, 0.05, 0.75), 0.012)
 	_glint = _make_glint()
 	_tracer = _beam(Color(3.0, 2.4, 1.2, 1.0), 0.03)
@@ -1045,18 +1061,17 @@ func _beam(color: Color, width: float) -> MeshInstance3D:
 	return mi
 
 
-# A soft red light that faces the camera: the laser points straight at the
-# player, so from their view it is mostly this blinking glint.
-# The hand bone doesn't line up with the forearm, so the pistol is turned in
-# code: at the player while aiming or shooting, along the forearm otherwise.
+# The rifle is turned in code: at the player while aiming or shooting,
+# otherwise from the right hand towards the left (the supporting hand on the
+# rifle in the Mixamo rifle animations).
 func _orient_gun() -> void:
 	var dir: Vector3
 	if (state == State.AIM or state == State.SHOOT) and _player != null:
 		dir = _player.global_position + Vector3.UP * 1.2 - _gun.global_position
 	else:
-		var fist := _skel.get_bone_global_pose(_skel.find_bone("Fist.R")).origin
-		var elbow := _skel.get_bone_global_pose(_skel.find_bone("LowerArm.R")).origin
-		dir = _skel.global_basis * (fist - elbow)
+		var right := _skel.get_bone_global_pose(_hand_r).origin
+		var left := _skel.get_bone_global_pose(_hand_l).origin
+		dir = _skel.global_basis * (left - right)
 	if dir.length_squared() < 1e-6:
 		return
 	var x := dir.normalized()
@@ -1068,6 +1083,8 @@ func _orient_gun() -> void:
 	_gun.global_basis = Basis(x, z.cross(x), z) * Basis.from_scale(Vector3.ONE * s)
 
 
+# A soft red light that faces the camera: the laser points straight at the
+# player, so from their view it is mostly this blinking glint.
 func _make_glint() -> MeshInstance3D:
 	var g := Gradient.new()
 	g.set_color(0, Color(1, 1, 1, 1))
@@ -1167,37 +1184,35 @@ func has_exploded() -> bool:
 
 # --- Look and sound -----------------------------------------------------------
 
-# Type colours (and glowing parts) on copies of the model's materials.
+# The type's tint and glow on copies of the model's materials (the Boss is a
+# darker Brute, the Exploder glows orange).
 func _recolor() -> void:
-	if stats.colors.is_empty() and stats.glow.is_empty():
+	if stats.tint == Color.WHITE and stats.glow == null:
 		return
 	for mi: MeshInstance3D in meshes:
 		for s in mi.mesh.get_surface_count():
-			var src := mi.mesh.surface_get_material(s) as StandardMaterial3D
+			var src := mi.mesh.surface_get_material(s) as BaseMaterial3D
 			if src == null:
 				continue
-			var key := src.resource_name
-			if not stats.colors.has(key) and not stats.glow.has(key):
-				continue
-			var m := src.duplicate() as StandardMaterial3D
-			if stats.colors.has(key):
-				m.albedo_color = stats.colors[key]
-			if stats.glow.has(key):
+			var m := src.duplicate() as BaseMaterial3D
+			m.albedo_color = src.albedo_color * stats.tint
+			if stats.glow != null:
 				m.emission_enabled = true
-				m.emission = stats.glow[key]
-				m.emission_energy_multiplier = 1.5
+				m.emission = stats.glow
+				m.emission_energy_multiplier = 1.0
 				_glow_materials.append(m)
 			mi.set_surface_override_material(s, m)
 
 
-# Exploders pulse (faster when about to blow up) and beep; the boss's eyes glow steadily.
+# Exploders pulse orange (faster when about to blow up) and beep; the
+# Boss's glow stays steady.
 func _update_glow(delta: float) -> void:
 	if kind != "exploder" or _exploded:
 		return
 	var rate := 9.0 if state == State.ARMED else 2.0
 	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * rate * TAU * 0.5)
 	for m in _glow_materials:
-		m.emission_energy_multiplier = lerpf(0.3, 3.0, pulse)
+		m.emission_energy_multiplier = lerpf(0.0, 0.7, pulse)
 	if state == State.DEAD:
 		return
 	_beep_timer -= delta
@@ -1214,8 +1229,8 @@ func _update_steps(delta: float) -> void:
 		return
 	_step_timer -= delta
 	if _step_timer <= 0.0:
-		var cycle := anim.get_animation(stats.anims.walk).length
-		_step_timer = cycle * 0.5 / maxf(_walk_anim_speed(), 0.1)
+		var walk := anim.get_animation(stats.anims.walk)
+		_step_timer = walk.length / walk.get_meta("steps", 2) / maxf(_walk_anim_speed(), 0.1)
 		hit_player.stream = stats.steps.pick_random()
 		hit_player.pitch_scale = randf_range(0.6, 0.75)
 		hit_player.play()

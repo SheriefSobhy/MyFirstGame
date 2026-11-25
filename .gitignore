@@ -4,3 +4,6 @@
 
 # Local Android / other builds (not published)
 builds/
+
+# Raw art sources (Mixamo FBX, some > 100 MB): never commit
+art_source/

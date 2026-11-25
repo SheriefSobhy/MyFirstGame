@@ -1,7 +1,6 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://enemy.gd" id="1_enemy"]
-[ext_resource type="PackedScene" path="res://assets/models/quaternius/Character.glb" id="2_model"]
 [ext_resource type="AudioStream" path="res://assets/sounds/zombie_moans.ogg" id="3_moan"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
@@ -16,8 +15,7 @@ script = ExtResource("1_enemy")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.875, 0)
 shape = SubResource("CapsuleShape3D_body")
 
-[node name="Model" parent="." instance=ExtResource("2_model")]
-transform = Transform3D(-1.15, 0, 0, 0, 1.15, 0, 0, 0, -1.15, 0, 0, 0)
+[node name="Model" type="Node3D" parent="."]
 
 [node name="NavigationAgent3D" type="NavigationAgent3D" parent="."]
 path_desired_distance = 0.6

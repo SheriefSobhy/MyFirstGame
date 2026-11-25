@@ -102,20 +102,31 @@ func _test_types() -> void:
 		await frames(2)
 		var s: Dictionary = Types.TYPES[kind]
 		check(e.hp == s.hp and e.max_hp == s.hp, "%s has %d HP" % [kind, s.hp])
-		check(e.get_node("Model/AnimationPlayer").has_animation(s.anims.walk)
-				and e.get_node("Model/AnimationPlayer").has_animation(s.anims.death)
-				and e.get_node("Model/AnimationPlayer").has_animation(s.anims.attack)
-				and e.get_node("Model/AnimationPlayer").has_animation(s.anims.hit),
-				"%s has walk, attack, hit and death animations" % kind)
+		var ap: AnimationPlayer = e.get_node("Model/AnimationPlayer")
+		var anims_ok := true
+		for role: String in s.anims:
+			anims_ok = anims_ok and ap.has_animation(s.anims[role])
+		check(anims_ok and s.anims.has_all(["walk", "attack", "death", "idle"]),
+				"%s has walk, attack, death and idle animations" % kind)
+		check(ap.current_animation == s.anims.walk and ap.is_playing(), "%s walks with its walk animation" % kind)
+		# The retargeted tracks reach the skeleton: the walk moves the bones.
+		var skel: Skeleton3D = e._skel
+		var foot := skel.find_bone("LeftFoot")
+		var before := skel.get_bone_global_pose(foot).origin
+		await seconds(0.3)
+		check(skel.get_bone_global_pose(foot).origin.distance_to(before) > 0.01, "%s's legs move while walking" % kind)
+		# The model's height matches the collision capsule (within 15%).
+		var top: float = (skel.global_transform * skel.get_bone_global_rest(skel.find_bone("HeadTop_End")).origin).y - e.global_position.y
+		check(absf(top - s.height) < s.height * 0.15, "%s's model is as tall as its capsule (%.2f / %.2f m)" % [kind, top, s.height])
 		heights[kind] = (e.get_node("CollisionShape3D").shape as CapsuleShape3D).height
-		if not s.colors.is_empty():
+		if s.tint != Color.WHITE or s.glow != null:
 			var recolored := false
 			for mi: MeshInstance3D in e.meshes:
 				for i in mi.mesh.get_surface_count():
-					var m := mi.get_surface_override_material(i) as StandardMaterial3D
-					if m and s.colors.has(m.resource_name) and m.albedo_color.is_equal_approx(s.colors[m.resource_name]):
+					var m := mi.get_surface_override_material(i) as BaseMaterial3D
+					if m and (s.glow == null or m.emission_enabled):
 						recolored = true
-			check(recolored, "%s gets its own colours" % kind)
+			check(recolored, "%s gets its own tint / glow" % kind)
 		_clear_enemies()
 	check(heights.runner < heights.normal and heights.normal < heights.brute and heights.brute < heights.boss,
 			"sizes: runner < zombie < brute < boss (%s)" % [heights])
@@ -126,7 +137,12 @@ func _test_types() -> void:
 	for v in voices:
 		distinct[v] = true
 	check(distinct.size() >= 5, "types have their own voices (%d different sets)" % distinct.size())
-	check(Types.TYPES.normal.model == null, "the normal zombie keeps its current model")
+	var meshes := {}
+	for kind: String in Types.TYPES:
+		meshes[Types.TYPES[kind].mesh] = true
+	check(meshes.size() == 5, "five different characters (the Boss is a bigger, darker Brute)")
+	for q in 3:
+		check(Types.model_scene("soldier", q) != null, "the soldier has a %s detail level" % Types.LODS[q])
 
 
 func _test_runner() -> void:
@@ -140,8 +156,10 @@ func _test_runner() -> void:
 	check(Vector2(n.velocity.x, n.velocity.z).length() < 2.0, "the normal zombie is slower")
 	e.take_damage(2)
 	check(e.hp <= 0 and e.state == e.State.DEAD, "runner has low health (one pistol shot kills)")
-	await seconds(1.0)
-	check(e.rotation.x > deg_to_rad(70), "a dead runner falls over (%.0f deg)" % rad_to_deg(e.rotation.x))
+	await seconds(2.5)
+	# The death animation ends lying on the ground.
+	var head_y: float = e.head_sphere().center.y - e.global_position.y
+	check(head_y < 0.5, "a dead runner falls to the ground (head %.2f m up)" % head_y)
 	check(n.rotation.x == 0.0, "(the zombie keeps its own death animation)")
 	_clear_enemies()
 

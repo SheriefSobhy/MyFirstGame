@@ -5,7 +5,9 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 
 - Godot: `C:\Godot\Godot_v4.7.2-stable_win64_console.exe`
 - Renderer: GL Compatibility (web/desktop), Mobile on Android. Keep every
-  effect working in Compatibility. All third-party assets are CC0 (CREDITS.md).
+  effect working in Compatibility. Third-party assets are CC0, except the
+  Mixamo enemy characters (CREDITS.md). Raw art goes in `art_source/`
+  (git-ignored: some FBX files are over 100 MB). Never commit raw FBX.
 - Style: plain GDScript, `preload()` constants instead of `class_name`,
   UI mostly built in code, every balance number in a config script.
 
@@ -16,7 +18,7 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 | Main menu → map select → match | `ui/main_menu.*`, `ui/map_select.*`, `ui/loading_screen.*` (tip + progress bar, threaded load), a map scene (`main.tscn`, `maps/*.tscn`) |
 | Match flow (waves, score, spawns, Game Over) | `main.gd` (every map scene runs it; `map_id` picks the save key) |
 | Player, weapons, upgrades, skins on the view models | `player.gd`, `weapon_stats.gd`, `weapon_model.gd`, `fp_arms.gd` |
-| Enemies | `enemy.gd`, `enemy_types.gd` |
+| Enemies | `enemy.gd`, `enemy_types.gd`, models in `assets/models/enemies/` (see "Enemy models") |
 | HUD, pause, Game Over, level-up popup, toasts | `hud.gd` / `hud.tscn`, `combat_feedback.gd`, `touch_controls.gd` |
 | First-match tutorial | `tutorial.gd` (added to the HUD by `main.gd`) |
 | Revive ("Watch ad to revive", placeholder ad) | `ui/revive_screen.gd`, `main.gd` `_on_player_died` |
@@ -192,6 +194,33 @@ used headless only (`blender -b --factory-startup --python ...`).
   ~1.7 MB, a larger yard lightmap).
 - `tools/map_shots.gd -- --shots <dir> --bench` (with a window): screenshots
   from fixed views per map, and FPS / draw calls / triangles per quality.
+
+## Enemy models (Mixamo)
+
+Source: `art_source/mixamo/` (characters with skin + animations without,
+all on the Mixamo skeleton; not in git, `.gdignore`d). `tools/blender/build_enemies.bat`
+rebuilds everything: `tools/mixamo_export.gd` (Godot reads the FBX, incl.
+FBX 6.1 that Blender can't; bones lose the `mixamorig_` prefix) ->
+`build_enemies.py` (Blender: `<id>_high/med/low.glb`, ~15k/7k/3k tris,
+1024/512/256 px WebP; Blender JPEGs fail in Godot's loader) ->
+`tools/mixamo_anims.gd` (VRAM compression on the extracted textures, then
+`<id>_anims.res`).
+
+- `enemy_types.gd` `model_scene(kind, quality)` loads only the LOD for
+  `Settings.effective_quality()`; enemy.gd adds an AnimationPlayer with the
+  library (tracks `Skeleton3D:<bone>`, root = the skeleton's parent).
+- Retargeting is a world-space delta from the T-pose per bone (the anim
+  rigs' rests differ). Looping clips have forward root motion removed;
+  metadata: `ground_speed` (walk playback, capped by `anim_speed.walk_max`),
+  `steps` (footstep thuds), `hit_time` (attack starts so the strike lands at
+  `attack_hit_time`).
+- Death clips fall backwards: shot from behind, the body spins to face the
+  shot first. No hit clip: HIT plays idle + the procedural flinch.
+- Head hitbox: `Head` -> `HeadTop_End`. Soldier rifle on `RightHand`,
+  aimed towards `LeftHand`. Boss = Brute mesh, bigger, `tint` darker.
+- Size: ~11 MB of glb/webp in the repo; ~1.4 MB of animation libraries.
+- `tools/enemy_shots.gd -- --shots <dir> [--maps]` (with a window): each type
+  close up, a line-up, and a gameplay shot per map.
 
 ## Build and publish
 

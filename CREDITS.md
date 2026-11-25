@@ -1,7 +1,8 @@
 # Credits
 
 Every third-party asset in this project is released under
-[CC0 1.0 Universal (public domain)](https://creativecommons.org/publicdomain/zero/1.0/).
+[CC0 1.0 Universal (public domain)](https://creativecommons.org/publicdomain/zero/1.0/),
+except the enemy characters, which come from Adobe Mixamo (see "Enemies" below).
 Credit isn't required, but it's listed here with thanks.
 
 ## Textures and sky: Poly Haven (https://polyhaven.com)
@@ -41,7 +42,6 @@ https://github.com/trebeljahr/quaternius-showcase, whose LICENSES.md lists each 
 
 | Asset | Pack | Source |
 | --- | --- | --- |
-| `Character.glb`: the normal zombie enemy, with Walk, Punch, HitRecieve and Death animations | Cyberpunk Game Kit | https://quaternius.com/packs/cyberpunkgamekit.html |
 | `Swat.glb`: first-person arms. Only the arms are kept and posed onto the current gun in `fp_arms.gd` | Ultimate Modular Men Pack | https://quaternius.com/packs/ultimatemodularcharacters.html |
 | `buildings/Building2_Small`, `Building3_Big`, `Building3_Small`, `Building4`: skyline | Buildings Pack | https://quaternius.com/packs/buildings.html |
 | `buildings/3Story_Slim_Mat`, `4Story_Mat`, `6Story_Stack_Mat`: skyline | Ultimate Buildings Pack | https://quaternius.com/packs/ultimatetexturedbuildings.html |
@@ -72,21 +72,33 @@ These replace the earlier Survival Pack pistol and shotgun and the Sci-Fi Modula
 
 The skyline buildings are merged into four meshes by `tools/build_level.gd`, with their material colours stored as vertex colours.
 
-### Enemy types: Quaternius' Ultimate Animated Character Pack (CC0)
+### Enemies: Adobe Mixamo (https://www.mixamo.com)
 
-The runner, brute, boss, soldier and exploder enemies use characters from Quaternius' **Ultimate Animated Character Pack** (Nov 2019, 50+ animated characters, CC0).
-It was downloaded from OpenGameArt: https://opengameart.org/content/animated-characters-pack
+All six enemy types are Mixamo characters with Mixamo animations. Mixamo
+characters and animations are free to use, royalty-free, in commercial and
+non-commercial games (Adobe's Mixamo FAQ / Adobe General Terms); they are not
+CC0 and may not be redistributed on their own as raw assets. The source FBX
+files live in `art_source/mixamo/`, which is git-ignored and never shipped;
+only the converted, reduced models are in the game.
 
-The FBX files are kept as shipped and imported by Godot. Each character has Walk, Punch, RecieveHit and Shoot_OneHanded animations.
-The pack's "Defeat" animation is a slumped pose, so for these enemies the death is the hit animation plus a fall-over done in code.
-Each type is recoloured in code (`enemy_types.gd`) so it's easy to recognise.
-
-| File (`assets/models/quaternius/characters/`) | Enemy | Changes in game |
+| Source file | Enemy | Changes in game |
 | --- | --- | --- |
-| `Zombie_Female.fbx` | Runner | Small; red shirt, paler skin |
-| `Zombie_Male.fbx` | Brute and Brute Boss | Large; red-brown skin and dark clothes. The boss is bigger and darker, with glowing red eyes |
-| `Soldier_Male.fbx` | Soldier | Holds the game's pistol model (`ultimate_guns/pistol.glb`) |
-| `Worker_Male.fbx` | Exploder | Red hard hat and a glowing, pulsing orange vest |
+| `zombie.fbx` | Zombie | - |
+| `runner.fbx` | Runner | Smaller; plays the running clip, faster |
+| `brute.fbx` | Brute and Brute Boss | Larger, slower and heavier animations. The Boss is bigger still, darker, with a faint red glow |
+| `soldier.fbx` | Soldier | Holds the game's AK model (`ultimate_guns/ak_rifle.glb`) |
+| `exploder.fbx` | Exploder | Pulsing orange glow |
+
+Animations: Zombie Idle, Zombie Walk, Zombie Running, Zombie Attack and
+Zombie Death (all zombie types), Rifle Walk, Firing Rifle and Dying (Soldier).
+Hit reactions are procedural.
+
+Conversion (`tools/blender/build_enemies.bat`): `tools/mixamo_export.gd` reads the
+FBX files with Godot (bones renamed, albedo only, 1024 px), Blender
+(`tools/blender/build_enemies.py`) makes three detail levels (~15k / 7k / 3k
+triangles, 1024 / 512 / 256 px WebP textures) in `assets/models/enemies/`, and
+`tools/mixamo_anims.gd` retargets the animations onto each skeleton (in place,
+forward root motion removed) and sets the textures to VRAM compression.
 
 ### Maps 2 and 3: town and warehouse models (CC0)
 

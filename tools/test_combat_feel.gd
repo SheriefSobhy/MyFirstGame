@@ -211,15 +211,19 @@ func _test_death_throw() -> void:
 	check(e.state == e.State.DEAD, "runner killed")
 	await seconds(0.8)
 	check(e.global_position.z < z0 - 0.3, "the body is thrown back (%.2f m)" % (z0 - e.global_position.z))
-	check(e.rotation.x > deg_to_rad(60), "and falls over backwards (%.0f°)" % rad_to_deg(e.rotation.x))
+	await seconds(1.2)
+	var head_back: float = e.global_position.z - e.head_sphere().center.z
+	check(head_back > 0.6 and e.head_sphere().center.y - e.global_position.y < 0.6,
+			"and falls over backwards, away from the shot (head %.2f m back)" % head_back)
 	_clear_enemies()
 	# Shot from behind: falls forwards.
 	var f := _spawn("runner", player.global_position + Vector3(0, 0, -6), true)
 	await frames(3)
 	f.rotation.y = 0.0  # facing away from the player (it faces -Z)
 	f.take_damage(10, f.global_position + Vector3(0, 1.0, 0.3), Vector3(0, 0, 1))
-	await seconds(0.8)
-	check(f.rotation.x < -deg_to_rad(60), "shot in the back: falls forwards (%.0f°)" % rad_to_deg(f.rotation.x))
+	await seconds(2.0)
+	var head_away: float = f.global_position.z - f.head_sphere().center.z
+	check(head_away > 0.6, "shot in the back: still falls away from the shot (head %.2f m away)" % head_away)
 	_clear_enemies()
 
 

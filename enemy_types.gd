@@ -5,15 +5,21 @@ extends RefCounted
 ##
 ## Fields:
 ##  name            shown on the boss health bar
-##  model           animated character (null = the model already in enemy.tscn)
-##  model_scale     size of the model (the type's height comes from this)
-##  anims           animation names: walk, attack, hit, death (+ shoot)
-##  fall_over       true = on death the body also tips over backwards (for
-##                  models whose death animation doesn't fall to the ground)
-##  walk_anim_ref   ground speed (m/s at speed_scale 1) the walk animation
-##                  was made for; playback is sped up/slowed to match `speed`
-##  colors          material name -> new albedo colour (recolours the model)
-##  glow            material name -> emission colour (glowing parts)
+##  mesh            Mixamo character: assets/models/enemies/<mesh>_<low|med|high>.glb
+##                  (picked by graphics quality, see model_scene) and
+##                  <mesh>_anims.res (its animations). Built from art_source/
+##                  by tools/blender/build_enemies.bat.
+##  model_scale     size of the model (the characters are ~2 m tall at 1.0)
+##  anims           animation names in that library: walk, attack, death,
+##                  idle (+ shoot). Hit reactions are procedural (enemy.gd).
+##  anim_speed      playback rates. walk_max: how much faster than its own
+##                  pace the walk may play to keep up with `speed` (past that
+##                  the feet slide a little instead of the legs blurring);
+##                  attack, death, idle multiply. The attack is started so its
+##                  strike lands at attack_hit_time.
+##  tint            multiplies every material's colour (WHITE = as made)
+##  glow            emission colour over the whole body (null = none); the
+##                  Exploder's pulses
 ##  hp, speed       health and walking speed (m/s)
 ##  attack_range, attack_damage, attack_hit_time, attack_duration   melee
 ##  hit_stun        seconds a hit interrupts it (0 = it never staggers)
@@ -53,21 +59,35 @@ static func nav_mesh_for(kind: String) -> Dictionary:
 static func nav_layer(kind: String) -> int:
 	return nav_mesh_for(kind).layer
 
+
+const MODEL_DIR := "res://assets/models/enemies/"
+## Detail level per Settings.Quality (LOW, MEDIUM, HIGH): ~3k / 7k / 15k
+## triangles with 256 / 512 / 1024 px textures.
+const LODS := ["low", "med", "high"]
+
+
+## The model for a type at a graphics quality (loaded once, then cached by
+## Godot). Only the level in use is loaded.
+static func model_scene(kind: String, quality: int) -> PackedScene:
+	return load("%s%s_%s.glb" % [MODEL_DIR, TYPES[kind].mesh, LODS[clampi(quality, 0, 2)]])
+
+
+static func anim_library(kind: String) -> AnimationLibrary:
+	return load("%s%s_anims.res" % [MODEL_DIR, TYPES[kind].mesh])
+
+# Animation sets (names in the libraries made by tools/mixamo_anims.gd).
+const ZOMBIE_ANIMS := {"walk": "walk", "attack": "attack", "death": "death", "idle": "idle"}
+const RUNNING_ANIMS := {"walk": "run", "attack": "attack", "death": "death", "idle": "idle"}
+
 const TYPES := {
 	"normal": {
 		"name": "Zombie",
-		"model": null,
-		"model_scale": 1.15,
-		"anims": {
-			"walk": "CharacterArmature|Walk",
-			"attack": "CharacterArmature|Punch_Right",
-			"hit": "CharacterArmature|HitRecieve",
-			"death": "CharacterArmature|Death",
-		},
-		"walk_anim_ref": 2.3,
-		"fall_over": false,
-		"colors": {},
-		"glow": {},
+		"mesh": "zombie",
+		"model_scale": 0.86,
+		"anims": ZOMBIE_ANIMS,
+		"anim_speed": {"walk_max": 2.4, "attack": 1.4, "death": 1.1, "idle": 1.0},
+		"tint": Color.WHITE,
+		"glow": null,
 		"hp": 3,
 		"speed": 1.4,
 		"attack_range": 1.4,
@@ -82,23 +102,17 @@ const TYPES := {
 		"growl_pitch": Vector2(0.85, 1.1),
 		"steps": [],
 		"blood": Color(0.45, 0.06, 0.03),
-		"head_size": 0.6,
+		"head_size": 0.75,
 	},
 	# Small, fast and fragile: sprints at the player, hits lightly but often.
 	"runner": {
 		"name": "Runner",
-		"model": preload("res://assets/models/quaternius/characters/Zombie_Female.fbx"),
-		"model_scale": 0.48,
-		"anims": {
-			"walk": "CharacterArmature|Walk",
-			"attack": "CharacterArmature|Punch",
-			"hit": "CharacterArmature|RecieveHit",
-			"death": "CharacterArmature|RecieveHit",
-		},
-		"walk_anim_ref": 1.1,
-		"fall_over": true,
-		"colors": {"Skin": Color(0.55, 0.62, 0.28), "Clothes": Color(0.75, 0.12, 0.1), "DarkClothes": Color(0.45, 0.06, 0.05)},
-		"glow": {},
+		"mesh": "runner",
+		"model_scale": 0.71,
+		"anims": RUNNING_ANIMS,
+		"anim_speed": {"walk_max": 2.2, "attack": 1.9, "death": 1.3, "idle": 1.3},
+		"tint": Color.WHITE,
+		"glow": null,
 		"hp": 2,
 		"speed": 4.2,
 		"attack_range": 1.3,
@@ -117,23 +131,18 @@ const TYPES := {
 		"growl_pitch": Vector2(1.15, 1.35),
 		"steps": [],
 		"blood": Color(0.5, 0.07, 0.03),
-		"head_size": 0.6,
+		"head_size": 0.75,
 	},
 	# Huge, slow and very tough. Doesn't flinch, and each punch hurts a lot.
 	"brute": {
 		"name": "Brute",
-		"model": preload("res://assets/models/quaternius/characters/Zombie_Male.fbx"),
-		"model_scale": 0.85,
-		"anims": {
-			"walk": "CharacterArmature|Walk",
-			"attack": "CharacterArmature|Punch",
-			"hit": "CharacterArmature|RecieveHit",
-			"death": "CharacterArmature|RecieveHit",
-		},
-		"walk_anim_ref": 2.0,
-		"fall_over": true,
-		"colors": {"Skin": Color(0.42, 0.2, 0.17), "Clothes": Color(0.12, 0.11, 0.12), "DarkClothes": Color(0.08, 0.07, 0.08), "Pants": Color(0.2, 0.17, 0.14)},
-		"glow": {},
+		"mesh": "brute",
+		"model_scale": 1.27,
+		"anims": ZOMBIE_ANIMS,
+		# Slow and heavy: the walk never hurries much, swings are slower.
+		"anim_speed": {"walk_max": 1.7, "attack": 1.0, "death": 0.8, "idle": 0.75},
+		"tint": Color.WHITE,
+		"glow": null,
 		"hp": 25,
 		"speed": 1.0,
 		"attack_range": 2.1,
@@ -155,23 +164,17 @@ const TYPES := {
 			preload("res://assets/sounds/enemies/brute_step_3.ogg"),
 		],
 		"blood": Color(0.3, 0.03, 0.02),
-		"head_size": 0.6,
+		"head_size": 0.75,
 	},
-	# Every 5th wave: an even bigger brute with glowing eyes and a health bar.
+	# Every 5th wave: an even bigger, darker brute with a health bar.
 	"boss": {
 		"name": "Brute Boss",
-		"model": preload("res://assets/models/quaternius/characters/Zombie_Male.fbx"),
-		"model_scale": 1.1,
-		"anims": {
-			"walk": "CharacterArmature|Walk",
-			"attack": "CharacterArmature|Punch",
-			"hit": "CharacterArmature|RecieveHit",
-			"death": "CharacterArmature|RecieveHit",
-		},
-		"walk_anim_ref": 2.6,
-		"fall_over": true,
-		"colors": {"Skin": Color(0.3, 0.1, 0.1), "Clothes": Color(0.06, 0.06, 0.07), "DarkClothes": Color(0.05, 0.05, 0.05), "Pants": Color(0.12, 0.1, 0.09), "Brain": Color(0.7, 0.2, 0.25)},
-		"glow": {"Face": Color(1.0, 0.1, 0.05)},
+		"mesh": "brute",
+		"model_scale": 1.62,
+		"anims": ZOMBIE_ANIMS,
+		"anim_speed": {"walk_max": 1.5, "attack": 0.9, "death": 0.7, "idle": 0.65},
+		"tint": Color(0.5, 0.42, 0.42),
+		"glow": Color(0.12, 0.01, 0.0),
 		"hp": 80,
 		"speed": 1.1,
 		"attack_range": 2.6,
@@ -193,26 +196,19 @@ const TYPES := {
 			preload("res://assets/sounds/enemies/brute_step_3.ogg"),
 		],
 		"blood": Color(0.28, 0.02, 0.04),
-		"head_size": 0.6,
+		"head_size": 0.75,
 	},
 	# Keeps its distance and shoots: a red laser and a warning tone first,
 	# then a shot with a visible tracer. Punches if you get too close.
 	"soldier": {
 		"name": "Soldier",
-		"model": preload("res://assets/models/quaternius/characters/Soldier_Male.fbx"),
-		"model_scale": 0.56,
-		"anims": {
-			"walk": "CharacterArmature|Walk",
-			"attack": "CharacterArmature|Punch",
-			"hit": "CharacterArmature|RecieveHit",
-			"death": "CharacterArmature|RecieveHit",
-			"shoot": "CharacterArmature|Shoot_OneHanded",
-			"idle": "CharacterArmature|Idle",
-		},
-		"walk_anim_ref": 1.3,
-		"fall_over": true,
-		"colors": {},
-		"glow": {},
+		"mesh": "soldier",
+		"model_scale": 0.94,
+		# Melee: a rifle jab (the firing clip). Idle: standing with the rifle up.
+		"anims": {"walk": "walk", "attack": "shoot", "death": "death", "idle": "idle", "shoot": "shoot"},
+		"anim_speed": {"walk_max": 2.2, "attack": 0.6, "death": 1.3, "idle": 1.0},
+		"tint": Color.WHITE,
+		"glow": null,
 		"hp": 4,
 		"speed": 2.2,
 		"attack_range": 1.4,
@@ -230,23 +226,17 @@ const TYPES := {
 		"growl_pitch": Vector2(1.2, 1.4),
 		"steps": [],
 		"blood": Color(0.75, 0.02, 0.02),
-		"head_size": 0.6,
+		"head_size": 0.75,
 	},
 	# Glowing, beeping walking bomb: blows up next to the player, or when killed.
 	"exploder": {
 		"name": "Exploder",
-		"model": preload("res://assets/models/quaternius/characters/Worker_Male.fbx"),
-		"model_scale": 0.52,
-		"anims": {
-			"walk": "CharacterArmature|Walk",
-			"attack": "CharacterArmature|Punch",
-			"hit": "CharacterArmature|RecieveHit",
-			"death": "CharacterArmature|RecieveHit",
-		},
-		"walk_anim_ref": 1.2,
-		"fall_over": true,
-		"colors": {"Vest": Color(0.95, 0.35, 0.05), "Shirt": Color(0.95, 0.75, 0.2), "Hat": Color(0.9, 0.1, 0.05)},
-		"glow": {"Vest": Color(1.0, 0.35, 0.05)},
+		"mesh": "exploder",
+		"model_scale": 0.89,
+		"anims": RUNNING_ANIMS,
+		"anim_speed": {"walk_max": 2.2, "attack": 1.0, "death": 1.2, "idle": 1.0},
+		"tint": Color(1.0, 0.9, 0.8),
+		"glow": Color(1.0, 0.33, 0.03),
 		"hp": 2,
 		"speed": 3.3,
 		"attack_range": 2.2,
@@ -264,6 +254,6 @@ const TYPES := {
 		"growl_pitch": Vector2(0.9, 1.1),
 		"steps": [],
 		"blood": null,
-		"head_size": 0.6,
+		"head_size": 0.75,
 	},
 }
