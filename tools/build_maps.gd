@@ -13,8 +13,9 @@ extends SceneTree
 ## - Models (houses, cars, street lights, shelves, forklifts) are merged into
 ##   a few vertex-coloured meshes, one draw call each.
 ## - Floors are split into tiles so each lamp only re-lights nearby tiles.
-## - No lightmaps: a few real-time lamps, and the extra ones are in the
-##   "optional_lights" group, which Low quality switches off (main.gd).
+## - Baked light (LightmapGI, tools/rebake.bat): houses, floors and kit chunks
+##   are lightmapped (low-res, indirect light only); cars, racks and props are
+##   lit by the probes. A few real-time lamps; the extra ones are BAKE_STATIC.
 ## - Collisions are plain boxes.
 ## - Walls, roof, barriers, dumpsters, container, signs and pipes are pieces of
 ##   the Blender level kit (tools/kit_builder.gd, tools/blender/build_kit.py).
@@ -200,7 +201,9 @@ func _floor_tiles(parent: Node, root: Node, prefix: String, from: Vector2, to: V
 			var pm := PlaneMesh.new()
 			pm.size = Vector2(sx, sz)
 			pm.material = mat
+			pm.add_uv2 = true  # lightmap UVs (town, warehouse)
 			mi.mesh = pm
+			mi.gi_mode = GeometryInstance3D.GI_MODE_STATIC
 			mi.position = Vector3(from.x + sx * (i + 0.5), y, from.y + sz * (j + 0.5))
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_add(parent, mi, "%s%d_%d" % [prefix, i, j], root)
@@ -223,7 +226,8 @@ func _omni(parent: Node, root: Node, n: String, pos: Vector3, color: Color, ener
 	l.shadow_enabled = false
 	_add(parent, l, n, root)
 	if optional:
-		l.add_to_group("optional_lights", true)
+		# Extra lamps only exist in the lightmap: no real-time cost at any quality.
+		l.light_bake_mode = Light3D.BAKE_STATIC
 	return l
 
 
@@ -304,6 +308,8 @@ func _batch_mesh(b: Dictionary, parent: Node, root: Node, n: String, file: Strin
 	ResourceSaver.save(mesh, path, ResourceSaver.FLAG_COMPRESS)
 	var mi := MeshInstance3D.new()
 	mi.mesh = load(path)
+	# Not baked (small or many parts): lit by the lightmap probes instead.
+	mi.gi_mode = GeometryInstance3D.GI_MODE_DYNAMIC
 	if not shadow:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_add(parent, mi, n, root)
@@ -326,6 +332,9 @@ const CARS := ["sedan", "suv", "van", "police", "truck", "taxi", "hatchbackSport
 const HOUSE_SCALE := 3.3
 const LAMP_SCALE := 4.4
 const TOWN_EDGE := 23.0
+## Lightmap texel size (m) of the town and warehouse meshes: low-res bounce light
+## is enough and keeps the lightmaps small for phones.
+const BAKE_TEXEL := 0.5
 ## Kit pieces switch to their plain LOD1 meshes (and wall details disappear)
 ## beyond this distance (visibility ranges, see tools/kit_builder.gd).
 const TOWN_LOD_DISTANCE := 24.0
@@ -339,8 +348,8 @@ func _build_town() -> Node3D:
 	print("Town:")
 	var env := Environment.new()
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.16, 0.17, 0.36)
-	sky_mat.sky_horizon_color = Color(0.98, 0.56, 0.36)
+	sky_mat.sky_top_color = Color(0.13, 0.16, 0.3)
+	sky_mat.sky_horizon_color = Color(0.78, 0.55, 0.45)
 	sky_mat.sky_curve = 0.12
 	sky_mat.ground_horizon_color = Color(0.55, 0.36, 0.32)
 	sky_mat.ground_bottom_color = Color(0.1, 0.08, 0.1)
@@ -365,7 +374,8 @@ func _build_town() -> Node3D:
 
 	var root := _new_map("town", "res://assets/music/town_empty_city.ogg", env)
 	# Low evening sun from the west, warm and orange.
-	_sun(root, Vector3(-11.0, -72.0, 0.0), Color(1.0, 0.56, 0.32), 1.25)
+	var sun := _sun(root, Vector3(-11.0, -72.0, 0.0), Color(1.0, 0.64, 0.42), 1.15)
+	sun.light_angular_distance = 1.5  # soft baked shadows
 	var level: Node3D = root.get_node("NavigationRegion3D/Level")
 	var detail: Node3D = root.get_node("Detail")
 	var lights: Node3D = root.get_node("Lights")
@@ -418,7 +428,7 @@ func _build_town() -> Node3D:
 				_blocker(level, root, "House%d" % k, Vector3(box.size.x - 0.2, box.size.y, box.size.z - 0.2), box.get_center())
 				_house_details(kit, model, box, s[1], k)
 				k += 1
-			_batch_mesh(b, detail, root, "Houses%d%d" % [sx + 1, sz + 1], "town_houses_%d%d" % [sx + 1, sz + 1])
+			_lm_batch_mesh(b, detail, root, "Houses%d%d" % [sx + 1, sz + 1], "town_houses_%d%d" % [sx + 1, sz + 1], BAKE_TEXEL)
 
 	# Cars: parked, abandoned across lanes, and piled up at the road ends.
 	var cars := [
@@ -483,7 +493,7 @@ func _build_town() -> Node3D:
 		mi.mesh = load("res://level/generated/skyline_%s.res" % side)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_add(detail, mi, "Skyline" + side, root)
-	kit.build(detail, root, "Kit", {"lod_distance": TOWN_LOD_DISTANCE, "file_prefix": "town_kit"})
+	kit.build(detail, root, "Kit", {"lod_distance": TOWN_LOD_DISTANCE, "file_prefix": "town_kit", "lightmap": true})
 
 	var spawns := [
 		Vector3(18.5, 0, 0), Vector3(-19.0, 0, 0), Vector3(0, 0, -18.5), Vector3(0, 0, 18.5),
@@ -494,6 +504,7 @@ func _build_town() -> Node3D:
 		["SniperPickup", Vector3(12.0, 0, 5.4), 3],
 		["AmmoBox1", Vector3(-5.6, 0, 9.0), -1], ["AmmoBox2", Vector3(8.0, 0, -5.4), -1], ["AmmoBox3", Vector3(-9.0, 0, -2.4), -1],
 	]
+	_add_lightmap(root, sun, Color(0.36, 0.42, 0.58), 0.8)
 	_finish_map(root, Vector3(0, 0, 7.0), 0.0, spawns, pickups)
 	return root
 
@@ -598,7 +609,8 @@ func _build_warehouse() -> Node3D:
 
 	var root := _new_map("warehouse", "res://assets/music/warehouse_insistent.ogg", env)
 	# Moonlight: cold and dim. The roof keeps it out of the warehouse.
-	_sun(root, Vector3(-38.0, 35.0, 0.0), Color(0.55, 0.65, 1.0), 0.35)
+	var sun := _sun(root, Vector3(-38.0, 35.0, 0.0), Color(0.55, 0.65, 1.0), 0.35)
+	sun.light_angular_distance = 1.0
 	var level: Node3D = root.get_node("NavigationRegion3D/Level")
 	var detail: Node3D = root.get_node("Detail")
 	var lights: Node3D = root.get_node("Lights")
@@ -715,7 +727,7 @@ func _build_warehouse() -> Node3D:
 	# A wall lamp over the door outside (its housing is in the kit).
 	_glow_bulb(detail, root, "DoorLampBulb", Vector3(WH_E + 0.5 + 0.45, 5.52, 0))
 	_omni(lights, root, "DoorLamp", Vector3(WH_E + 1.0, 5.3, 0), Color(1.0, 0.7, 0.45), 1.6, 8.0, true)
-	kit.build(detail, root, "Kit", {"lod_distance": WAREHOUSE_LOD_DISTANCE, "file_prefix": "warehouse_kit"})
+	kit.build(detail, root, "Kit", {"lod_distance": WAREHOUSE_LOD_DISTANCE, "file_prefix": "warehouse_kit", "lightmap": true})
 
 	var spawns := [
 		Vector3(20.5, 0, -11.5), Vector3(20.5, 0, 11.5), Vector3(18.5, 0, 3.2),
@@ -727,6 +739,7 @@ func _build_warehouse() -> Node3D:
 		["SniperPickup", Vector3(16.0, 0, 2.0), 3],
 		["AmmoBox1", Vector3(0.5, 0, 8.1), -1], ["AmmoBox2", Vector3(-7.75, 0, -2.0), -1], ["AmmoBox3", Vector3(12.0, 0, -3.5), -1],
 	]
+	_add_lightmap(root, sun, Color(0.12, 0.16, 0.3), 0.6)
 	_finish_map(root, Vector3(5.0, 0, 0.5), PI / 2.0, spawns, pickups)
 	return root
 
@@ -1092,7 +1105,7 @@ func _lm_plane(parent: Node, root: Node, n: String, size: Vector2, center: Vecto
 
 
 ## A merged vertex-coloured mesh with lightmap UVs (no LODs), GI static.
-func _lm_batch_mesh(b: Dictionary, parent: Node, root: Node, n: String, file: String) -> MeshInstance3D:
+func _lm_batch_mesh(b: Dictionary, parent: Node, root: Node, n: String, file: String, texel := 0.2) -> MeshInstance3D:
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = b.v
@@ -1102,7 +1115,7 @@ func _lm_batch_mesh(b: Dictionary, parent: Node, root: Node, n: String, file: St
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	mesh.surface_set_material(0, m_vcolor)
-	mesh.lightmap_unwrap(Transform3D(), 0.2)
+	mesh.lightmap_unwrap(Transform3D(), texel)
 	var path := GEN + file + ".res"
 	ResourceSaver.save(mesh, path, ResourceSaver.FLAG_COMPRESS)
 	var mi := MeshInstance3D.new()
@@ -1144,6 +1157,12 @@ func _target(parent: Node, root: Node, n: String, kind: String, pos: Vector3, si
 func _save_map(map_root: Node3D, id: String) -> void:
 	var scene_path := "res://maps/%s.tscn" % id
 	var nav_path := "res://maps/%s_navmesh.res" % id
+	# Meshes without lightmap UVs can't be baked: the probes light them instead.
+	for mi: MeshInstance3D in map_root.find_children("*", "MeshInstance3D", true, true):
+		if mi.owner == map_root and mi.gi_mode == GeometryInstance3D.GI_MODE_STATIC and mi.mesh \
+				and mi.mesh.get_surface_count() > 0 \
+				and mi.mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV2] == null:
+			mi.gi_mode = GeometryInstance3D.GI_MODE_DYNAMIC
 	var ps := PackedScene.new()
 	ps.pack(map_root)
 	ResourceSaver.save(ps, scene_path)
@@ -1173,3 +1192,24 @@ func _save_map(map_root: Node3D, id: String) -> void:
 	ResourceSaver.save(ps, scene_path)
 	map_root.free()
 	print("  saved ", scene_path)
+
+
+## The baked lighting of the town and warehouse: sky light as a colour (the
+## Compatibility editor bakes an HDRI sky black), 6 bounces, soft shadows,
+## the denoiser. Direct light of real-time lamps stays real-time; only their
+## bounce light is in the lightmap. Extra lamps are BAKE_STATIC (baked fully).
+## tools/rebake.bat bakes it into maps/<id>.lmbake / .exr.
+func _add_lightmap(root: Node3D, sun: Node, color: Color, energy: float) -> void:
+	var lm := LightmapGI.new()
+	lm.quality = LightmapGI.BAKE_QUALITY_HIGH
+	lm.bounces = 6
+	lm.bounce_indirect_energy = 1.25
+	lm.use_denoiser = true
+	lm.denoiser_strength = 0.12
+	lm.texel_scale = 0.4
+	lm.max_texture_size = 2048
+	lm.environment_mode = LightmapGI.ENVIRONMENT_MODE_CUSTOM_COLOR
+	lm.environment_custom_color = color
+	lm.environment_custom_energy = energy
+	_add(root, lm, "LightmapGI", root)
+	root.move_child(lm, sun.get_index() + 1)

@@ -84,24 +84,57 @@ func _test_map(m: Dictionary) -> void:
 	check(sun != null and env != null, "%s has a sun/moon and an environment" % tag)
 	var lamps := main.find_children("*", "Light3D", true, false).filter(
 			func(l: Node) -> bool: return not player.is_ancestor_of(l) and l != sun)
+	var atmo: Node = main.get_node_or_null("Atmosphere")
+	var real_time := lamps.filter(func(l: Light3D) -> bool:
+			return l.light_bake_mode != Light3D.BAKE_STATIC and (atmo == null or not atmo.is_ancestor_of(l)))
+	var baked_only := lamps.filter(func(l: Light3D) -> bool: return l.light_bake_mode == Light3D.BAKE_STATIC)
+	var lightmap: LightmapGI = main.get_node_or_null("LightmapGI")
+	check(lightmap != null and lightmap.light_data != null, "%s has a baked lightmap" % tag)
+	check(lightmap != null and lightmap.bounces >= 6 and lightmap.use_denoiser, "%s: the lightmap has 6+ bounces and the denoiser" % tag)
 	if m.id != "yard":
-		check(lamps.size() >= 4 and lamps.size() <= 8, "%s has %d lamps (few, for phones)" % [tag, lamps.size()])
-		var optional := get_nodes_in_group("optional_lights")
-		check(not optional.is_empty(), "%s has extra lamps that Low quality can turn off" % tag)
+		check(real_time.size() >= 3 and real_time.size() <= 8, "%s has %d real-time lamps (few, for phones)" % [tag, real_time.size()])
+		check(not baked_only.is_empty(), "%s has extra lamps that exist only in the lightmap" % tag)
+
+	# Atmosphere: the colour grade is always on; fog + dust from Medium,
+	# reflection probes + light shafts from High.
+	check(atmo != null, "%s has an atmosphere" % tag)
+	if atmo:
 		var settings: Node = root.get_node("Settings")
 		var q: int = settings.quality
+		var dust: Node3D = atmo.get_node_or_null("Dust")
+		var shafts := atmo.find_children("Shaft*", "MeshInstance3D", false, false)
+		var probes := atmo.find_children("Probe*", "ReflectionProbe", false, false)
+		var moods := atmo.find_children("*", "Light3D", false, false)
+		check(dust != null and probes.size() >= 1, "%s has dust and reflection probes" % tag)
+		if m.id != "yard":
+			check(shafts.size() >= 4 and moods.size() >= 1, "%s has %d light shafts and %d emergency lights" % [tag, shafts.size(), moods.size()])
 		settings.set_value("quality", settings.Quality.LOW)
-		check(optional.all(func(l: Node3D) -> bool: return not l.visible), "%s: Low quality turns the extra lamps off" % tag)
+		check(env.adjustment_enabled and env.adjustment_color_correction != null, "%s: Low keeps the colour grade" % tag)
+		check(not env.fog_enabled and not env.glow_enabled and not dust.visible, "%s: Low has no fog, glow or dust" % tag)
+		check(shafts.all(func(s: Node3D) -> bool: return not s.visible) and probes.all(func(p: Node3D) -> bool: return not p.visible)
+				and moods.all(func(l: Node3D) -> bool: return not l.visible), "%s: Low has no shafts, probes or extra lights" % tag)
+		settings.set_value("quality", settings.Quality.MEDIUM)
+		check(env.fog_enabled and dust.visible and not env.glow_enabled, "%s: Medium adds fog and dust" % tag)
+		check(shafts.all(func(s: Node3D) -> bool: return not s.visible) and probes.all(func(p: Node3D) -> bool: return not p.visible),
+				"%s: Medium has no shafts or probes" % tag)
 		settings.set_value("quality", settings.Quality.HIGH)
-		check(optional.all(func(l: Node3D) -> bool: return l.visible), "%s: High quality turns them on" % tag)
+		check(env.fog_enabled and env.glow_enabled and dust.visible, "%s: High adds glow" % tag)
+		check(shafts.all(func(s: Node3D) -> bool: return s.visible) and probes.all(func(p: Node3D) -> bool: return p.visible)
+				and moods.all(func(l: Node3D) -> bool: return l.visible), "%s: High adds shafts, probes and emergency lights" % tag)
 		settings.set_value("quality", q)
 
 	# Draw calls: count visible mesh surfaces (the yard is the reference).
 	var surfaces := 0
+	# (The atmosphere's few shafts and bulbs are counted on their own.)
 	for mi: MeshInstance3D in main.find_children("*", "MeshInstance3D", true, false):
-		if mi.is_visible_in_tree() and mi.mesh and not player.is_ancestor_of(mi) and not hud.is_ancestor_of(mi):
+		if mi.is_visible_in_tree() and mi.mesh and not player.is_ancestor_of(mi) and not hud.is_ancestor_of(mi) and (atmo == null or not atmo.is_ancestor_of(mi)):
 			surfaces += mi.mesh.get_surface_count()
 	print("     %s: %d mesh surfaces" % [tag, surfaces])
+	if atmo:
+		var fx := 0
+		for mi: MeshInstance3D in atmo.find_children("*", "MeshInstance3D", true, false):
+			fx += 1 if mi.is_visible_in_tree() else 0
+		check(fx <= 12, "%s: the atmosphere adds only %d draw calls" % [tag, fx])
 	if m.id == "yard":
 		_yard_surfaces = surfaces
 	else:

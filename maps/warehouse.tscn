@@ -1,8 +1,9 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dnqnb3pkir7yt"]
 
-[ext_resource type="Script" path="res://main.gd" id="1_ufx6m"]
-[ext_resource type="AudioStream" path="res://assets/music/warehouse_insistent.ogg" id="2_k1h53"]
+[ext_resource type="Script" uid="uid://x07cwedf63qo" path="res://main.gd" id="1_ufx6m"]
+[ext_resource type="AudioStream" uid="uid://gfm5aoddooy6" path="res://assets/music/warehouse_insistent.ogg" id="2_k1h53"]
 [ext_resource type="PackedScene" path="res://props/wood_crate.tscn" id="3_4a658"]
+[ext_resource type="LightmapGIData" uid="uid://b5wc3h6knp7x5" path="res://maps/warehouse.lmbake" id="3_gpox5"]
 [ext_resource type="NavigationMesh" path="res://maps/warehouse_navmesh.res" id="3_k1h53"]
 [ext_resource type="PackedScene" path="res://props/military_crate.tscn" id="4_gpox5"]
 [ext_resource type="PackedScene" path="res://props/barrel_rust.tscn" id="5_70hr0"]
@@ -33,7 +34,7 @@
 [ext_resource type="ArrayMesh" path="res://level/generated/warehouse_kit_1_0_lod0.res" id="30_rcf74"]
 [ext_resource type="ArrayMesh" path="res://level/generated/warehouse_kit_1_0_lod1.res" id="31_n2ioj"]
 [ext_resource type="PackedScene" path="res://player.tscn" id="32_kakmk"]
-[ext_resource type="AudioStream" path="res://assets/sounds/wind_loop.ogg" id="33_it0yb"]
+[ext_resource type="AudioStream" uid="uid://c4s4nb8rfu1f0" path="res://assets/sounds/wind_loop.ogg" id="33_it0yb"]
 [ext_resource type="PackedScene" path="res://hud.tscn" id="34_gab4s"]
 [ext_resource type="PackedScene" path="res://pickup.tscn" id="35_h5wny"]
 
@@ -137,99 +138,147 @@ size = Vector3(6, 2.6, 2.45)
 size = Vector3(0.35, 6, 0.35)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_eostx"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_f54vp"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_xx1vg"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_mgg4a"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_g38yy"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_cwr5e"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_io7cf"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_xd8c3"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_3723e"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_tqslr"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_tna6i"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_20jf7"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_6e6cp"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_fp285"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_w36v1"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_226s1"]
+lightmap_size_hint = Vector2i(32, 34)
 material = ExtResource("10_spth1")
+add_uv2 = true
 size = Vector2(6, 6.5)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_dvwrw"]
+lightmap_size_hint = Vector2i(37, 37)
 material = ExtResource("11_53k27")
+add_uv2 = true
 size = Vector2(7, 7)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_yxo5n"]
+lightmap_size_hint = Vector2i(37, 37)
 material = ExtResource("11_53k27")
+add_uv2 = true
 size = Vector2(7, 7)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_47tox"]
+lightmap_size_hint = Vector2i(37, 37)
 material = ExtResource("11_53k27")
+add_uv2 = true
 size = Vector2(7, 7)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_un8e6"]
+lightmap_size_hint = Vector2i(37, 37)
 material = ExtResource("11_53k27")
+add_uv2 = true
 size = Vector2(7, 7)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_kguht"]
+lightmap_size_hint = Vector2i(37, 37)
 material = ExtResource("11_53k27")
+add_uv2 = true
 size = Vector2(7, 7)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_dqxca"]
+lightmap_size_hint = Vector2i(37, 37)
 material = ExtResource("11_53k27")
+add_uv2 = true
 size = Vector2(7, 7)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_8x2qk"]
+lightmap_size_hint = Vector2i(37, 37)
 material = ExtResource("11_53k27")
+add_uv2 = true
 size = Vector2(7, 7)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_q0tdx"]
+lightmap_size_hint = Vector2i(37, 37)
 material = ExtResource("11_53k27")
+add_uv2 = true
 size = Vector2(7, 7)
 
 [sub_resource type="BoxMesh" id="BoxMesh_ot0oi"]
@@ -266,580 +315,614 @@ rings = 4
 [sub_resource type="BoxShape3D" id="BoxShape3D_6rvyx"]
 size = Vector3(25.5, 0.3, 27.5)
 
-[node name="Main" type="Node3D" unique_id=285257352]
+[node name="Main" type="Node3D" unique_id=499895297]
 script = ExtResource("1_ufx6m")
 map_id = "warehouse"
 music = ExtResource("2_k1h53")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1343855609]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=626109791]
 environment = SubResource("Environment_ffeeu")
 
-[node name="Sun" type="DirectionalLight3D" parent="." unique_id=550990346]
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1412047650]
 transform = Transform3D(0.81915206, -0.35312894, 0.45198444, 0, 0.7880108, 0.6156615, -0.57357645, -0.5043204, 0.64550066, 0, 0, 0)
 light_color = Color(0.55, 0.65, 1, 1)
 light_energy = 0.35
+light_angular_distance = 1.0
 shadow_enabled = true
 shadow_blur = 1.5
 directional_shadow_mode = 0
 directional_shadow_max_distance = 30.0
 
-[node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=1348070892]
+[node name="LightmapGI" type="LightmapGI" parent="." unique_id=1032198094]
+quality = 2
+bounces = 6
+bounce_indirect_energy = 1.25
+denoiser_strength = 0.12
+texel_scale = 0.4
+max_texture_size = 2048
+environment_mode = 3
+environment_custom_color = Color(0.12, 0.16, 0.3, 1)
+environment_custom_energy = 0.6
+light_data = ExtResource("3_gpox5")
+
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=1265586488]
 navigation_mesh = ExtResource("3_k1h53")
 
-[node name="Level" type="Node3D" parent="NavigationRegion3D" unique_id=348538841]
+[node name="Level" type="Node3D" parent="NavigationRegion3D" unique_id=282985467]
 
-[node name="Floor" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=355562462]
+[node name="Floor" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=485868038]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, -0.5, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Floor" unique_id=590959375]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Floor" unique_id=821275123]
 shape = SubResource("BoxShape3D_b3uyy")
 
-[node name="WallW" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=950678228]
+[node name="WallW" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1158255214]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16.25, 3.5, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/WallW" unique_id=1658957724]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/WallW" unique_id=1583256414]
 shape = SubResource("BoxShape3D_td4bj")
 
-[node name="WallN" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1645781066]
+[node name="WallN" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1043739285]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 3.5, -13.25)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/WallN" unique_id=1201616582]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/WallN" unique_id=1336808572]
 shape = SubResource("BoxShape3D_080dk")
 
-[node name="WallS" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1223795451]
+[node name="WallS" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1945091400]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 3.5, 13.25)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/WallS" unique_id=555599834]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/WallS" unique_id=236263964]
 shape = SubResource("BoxShape3D_5jpf4")
 
-[node name="WallE1" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=183618621]
+[node name="WallE1" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=51738324]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.25, 3.5, -8.75)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/WallE1" unique_id=2101409379]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/WallE1" unique_id=1614558848]
 shape = SubResource("BoxShape3D_018ye")
 
-[node name="WallE2" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1768290642]
+[node name="WallE2" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=2140752872]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.25, 3.5, 8.75)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/WallE2" unique_id=1761493386]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/WallE2" unique_id=289527553]
 shape = SubResource("BoxShape3D_c5ihl")
 
-[node name="DoorHeader" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=84270829]
+[node name="DoorHeader" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=562660535]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.25, 6, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/DoorHeader" unique_id=406609230]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/DoorHeader" unique_id=484563961]
 shape = SubResource("BoxShape3D_805ku")
 
-[node name="YardWallN" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1112123534]
+[node name="YardWallN" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=675160002]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.5, 1.4, -13.75)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/YardWallN" unique_id=1980588674]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/YardWallN" unique_id=1614975412]
 shape = SubResource("BoxShape3D_gphwe")
 
-[node name="YardWallS" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=935648648]
+[node name="YardWallS" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1398863361]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.5, 1.4, 13.75)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/YardWallS" unique_id=2144453333]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/YardWallS" unique_id=1234814445]
 shape = SubResource("BoxShape3D_1q7ja")
 
-[node name="YardWallE" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=2012436902]
+[node name="YardWallE" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1733400439]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.75, 1.4, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/YardWallE" unique_id=1649793243]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/YardWallE" unique_id=1136483067]
 shape = SubResource("BoxShape3D_en22q")
 
-[node name="Rack0" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=102532086]
+[node name="Rack0" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=60009369]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.5, 2.15, -10.2)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack0" unique_id=1480412827]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack0" unique_id=164659873]
 shape = SubResource("BoxShape3D_gicf1")
 
-[node name="Rack1" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1882640717]
+[node name="Rack1" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1489889410]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 2.15, -10.2)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack1" unique_id=808483338]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack1" unique_id=608499709]
 shape = SubResource("BoxShape3D_8sf5q")
 
-[node name="Rack2" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=487410331]
+[node name="Rack2" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=766815197]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.5, 2.15, -6)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack2" unique_id=1429536559]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack2" unique_id=835479241]
 shape = SubResource("BoxShape3D_xht8n")
 
-[node name="Rack3" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1798380950]
+[node name="Rack3" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1433123087]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 2.15, -6)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack3" unique_id=1171850643]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack3" unique_id=1381813747]
 shape = SubResource("BoxShape3D_tnwp4")
 
-[node name="Rack4" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=406954585]
+[node name="Rack4" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1080409658]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.5, 2.15, 6)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack4" unique_id=513135610]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack4" unique_id=1710861188]
 shape = SubResource("BoxShape3D_2xmek")
 
-[node name="Rack5" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=924249528]
+[node name="Rack5" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1792659887]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 2.15, 6)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack5" unique_id=727335416]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack5" unique_id=1211509167]
 shape = SubResource("BoxShape3D_copgg")
 
-[node name="Rack6" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=838954666]
+[node name="Rack6" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=2086379952]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.5, 2.15, 10.2)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack6" unique_id=1378845916]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack6" unique_id=1317981649]
 shape = SubResource("BoxShape3D_08mn5")
 
-[node name="Rack7" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1257095957]
+[node name="Rack7" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1101339078]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 2.15, 10.2)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack7" unique_id=991603634]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Rack7" unique_id=364751835]
 shape = SubResource("BoxShape3D_7g3qp")
 
-[node name="Forklift0" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1123618401]
+[node name="Forklift0" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1961036471]
 transform = Transform3D(0.8480481, 0, 0.52991927, 0, 1, 0, -0.52991927, 0, 0.8480481, -3.6589758, 1.1, 2.3455853)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Forklift0" unique_id=1638102251]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Forklift0" unique_id=1118028607]
 shape = SubResource("BoxShape3D_sye74")
 
-[node name="Forklift1" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=870556396]
+[node name="Forklift1" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1365598013]
 transform = Transform3D(-0.1736482, 0, -0.9848077, 0, 1, 0, 0.9848077, 0, -0.1736482, 3.4954424, 1.1, -8.247906)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Forklift1" unique_id=1235281463]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Forklift1" unique_id=490892445]
 shape = SubResource("BoxShape3D_aypm6")
 
-[node name="Forklift2" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1518771703]
+[node name="Forklift2" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=312722503]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -11.900001, 1.1, -1)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Forklift2" unique_id=2051788634]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Forklift2" unique_id=293779979]
 shape = SubResource("BoxShape3D_bsv0a")
 
-[node name="Truck" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=95654845]
+[node name="Truck" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=666091515]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.000009, 1.0400001, 7.5)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Truck" unique_id=1073503399]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Truck" unique_id=1651866149]
 shape = SubResource("BoxShape3D_pq1u6")
 
-[node name="Container" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=795455490]
+[node name="Container" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1706041858]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.5, 1.3, -10.2)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Container" unique_id=197866490]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/Container" unique_id=1623566412]
 shape = SubResource("BoxShape3D_371aj")
 
-[node name="Clutter0" parent="NavigationRegion3D/Level" unique_id=1715668293 instance=ExtResource("3_4a658")]
+[node name="Clutter0" parent="NavigationRegion3D/Level" unique_id=1784542240 instance=ExtResource("3_4a658")]
 transform = Transform3D(0.9848077, 0, 0.17364818, 0, 1, 0, -0.17364818, 0, 0.9848077, -8.8, 0, -2.6)
 
-[node name="Clutter1" parent="NavigationRegion3D/Level" unique_id=1366469611 instance=ExtResource("3_4a658")]
+[node name="Clutter1" parent="NavigationRegion3D/Level" unique_id=868414855 instance=ExtResource("3_4a658")]
 transform = Transform3D(0.9961947, 0, -0.08715574, 0, 1, 0, 0.08715574, 0, 0.9961947, -8, 0, -3.5)
 
-[node name="Clutter2" parent="NavigationRegion3D/Level" unique_id=1302626116 instance=ExtResource("4_gpox5")]
+[node name="Clutter2" parent="NavigationRegion3D/Level" unique_id=1265653890 instance=ExtResource("4_gpox5")]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -5, 0, 3.8)
 
-[node name="Clutter3" parent="NavigationRegion3D/Level" unique_id=1320243231 instance=ExtResource("5_70hr0")]
+[node name="Clutter3" parent="NavigationRegion3D/Level" unique_id=1099622979 instance=ExtResource("5_70hr0")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.6, 0, 4.2)
 
-[node name="Clutter4" parent="NavigationRegion3D/Level" unique_id=141255428 instance=ExtResource("6_3maia")]
+[node name="Clutter4" parent="NavigationRegion3D/Level" unique_id=1163876173 instance=ExtResource("6_3maia")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.3, 0, 4.9)
 
-[node name="Clutter5" parent="NavigationRegion3D/Level" unique_id=990082013 instance=ExtResource("7_4265f")]
+[node name="Clutter5" parent="NavigationRegion3D/Level" unique_id=1017922506 instance=ExtResource("7_4265f")]
 transform = Transform3D(0.9659258, 0, 0.25881904, 0, 1, 0, -0.25881904, 0, 0.9659258, 5.5, 0, -3.5)
 
-[node name="Clutter6" parent="NavigationRegion3D/Level" unique_id=539290822 instance=ExtResource("7_4265f")]
+[node name="Clutter6" parent="NavigationRegion3D/Level" unique_id=951607732 instance=ExtResource("7_4265f")]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -14.8, 0, 3)
 
-[node name="Clutter7" parent="NavigationRegion3D/Level" unique_id=1563147170 instance=ExtResource("4_gpox5")]
+[node name="Clutter7" parent="NavigationRegion3D/Level" unique_id=640684850 instance=ExtResource("4_gpox5")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, -11.6)
 
-[node name="Clutter8" parent="NavigationRegion3D/Level" unique_id=861524372 instance=ExtResource("5_70hr0")]
+[node name="Clutter8" parent="NavigationRegion3D/Level" unique_id=594284124 instance=ExtResource("5_70hr0")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5, 0, -6)
 
-[node name="Clutter9" parent="NavigationRegion3D/Level" unique_id=481502200 instance=ExtResource("5_70hr0")]
+[node name="Clutter9" parent="NavigationRegion3D/Level" unique_id=535878044 instance=ExtResource("5_70hr0")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.2, 0, -5.3)
 
-[node name="Clutter10" parent="NavigationRegion3D/Level" unique_id=164415302 instance=ExtResource("3_4a658")]
+[node name="Clutter10" parent="NavigationRegion3D/Level" unique_id=217028612 instance=ExtResource("3_4a658")]
 transform = Transform3D(0.8660254, 0, 0.5, 0, 1, 0, -0.5, 0, 0.8660254, 19.5, 0, 6)
 
-[node name="Clutter11" parent="NavigationRegion3D/Level" unique_id=637073313 instance=ExtResource("8_i1qgs")]
+[node name="Clutter11" parent="NavigationRegion3D/Level" unique_id=2061898183 instance=ExtResource("8_i1qgs")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 0, 11)
 
-[node name="Clutter12" parent="NavigationRegion3D/Level" unique_id=1481327446 instance=ExtResource("9_867ek")]
+[node name="Clutter12" parent="NavigationRegion3D/Level" unique_id=928488058 instance=ExtResource("9_867ek")]
 transform = Transform3D(0.34202015, 0, 0.9396926, 0, 1, 0, -0.9396926, 0, 0.34202015, 10.4, 0, 3.6)
 
-[node name="Clutter13" parent="NavigationRegion3D/Level" unique_id=1276430256 instance=ExtResource("3_4a658")]
+[node name="Clutter13" parent="NavigationRegion3D/Level" unique_id=1855732322 instance=ExtResource("3_4a658")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.5, 0, 11.6)
 
-[node name="FloodPole" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=1883089291]
+[node name="FloodPole" type="StaticBody3D" parent="NavigationRegion3D/Level" unique_id=945879010]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.6, 3, 0.8)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/FloodPole" unique_id=1444189120]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/Level/FloodPole" unique_id=1257741012]
 shape = SubResource("BoxShape3D_wsyts")
 
-[node name="Detail" type="Node3D" parent="." unique_id=464083580]
+[node name="Detail" type="Node3D" parent="." unique_id=137790000]
 
-[node name="Floor0_0" type="MeshInstance3D" parent="Detail" unique_id=845165007]
+[node name="Floor0_0" type="MeshInstance3D" parent="Detail" unique_id=160167515]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 0, -9.75)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_eostx")
 
-[node name="Floor0_1" type="MeshInstance3D" parent="Detail" unique_id=776528684]
+[node name="Floor0_1" type="MeshInstance3D" parent="Detail" unique_id=1067337808]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 0, -3.25)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_f54vp")
 
-[node name="Floor0_2" type="MeshInstance3D" parent="Detail" unique_id=874141407]
+[node name="Floor0_2" type="MeshInstance3D" parent="Detail" unique_id=259246134]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 0, 3.25)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_xx1vg")
 
-[node name="Floor0_3" type="MeshInstance3D" parent="Detail" unique_id=851481863]
+[node name="Floor0_3" type="MeshInstance3D" parent="Detail" unique_id=207965973]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 0, 9.75)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_mgg4a")
 
-[node name="Floor1_0" type="MeshInstance3D" parent="Detail" unique_id=1636211101]
+[node name="Floor1_0" type="MeshInstance3D" parent="Detail" unique_id=985631212]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 0, -9.75)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_g38yy")
 
-[node name="Floor1_1" type="MeshInstance3D" parent="Detail" unique_id=1423534617]
+[node name="Floor1_1" type="MeshInstance3D" parent="Detail" unique_id=886611801]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 0, -3.25)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_cwr5e")
 
-[node name="Floor1_2" type="MeshInstance3D" parent="Detail" unique_id=838771790]
+[node name="Floor1_2" type="MeshInstance3D" parent="Detail" unique_id=1813451458]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 0, 3.25)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_io7cf")
 
-[node name="Floor1_3" type="MeshInstance3D" parent="Detail" unique_id=713107757]
+[node name="Floor1_3" type="MeshInstance3D" parent="Detail" unique_id=1914960582]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 0, 9.75)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_xd8c3")
 
-[node name="Floor2_0" type="MeshInstance3D" parent="Detail" unique_id=1353586952]
+[node name="Floor2_0" type="MeshInstance3D" parent="Detail" unique_id=1844839085]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, -9.75)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_3723e")
 
-[node name="Floor2_1" type="MeshInstance3D" parent="Detail" unique_id=1826907469]
+[node name="Floor2_1" type="MeshInstance3D" parent="Detail" unique_id=630476398]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, -3.25)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_tqslr")
 
-[node name="Floor2_2" type="MeshInstance3D" parent="Detail" unique_id=590742557]
+[node name="Floor2_2" type="MeshInstance3D" parent="Detail" unique_id=577603559]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 3.25)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_tna6i")
 
-[node name="Floor2_3" type="MeshInstance3D" parent="Detail" unique_id=715541155]
+[node name="Floor2_3" type="MeshInstance3D" parent="Detail" unique_id=1713190745]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 9.75)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_20jf7")
 
-[node name="Floor3_0" type="MeshInstance3D" parent="Detail" unique_id=425756239]
+[node name="Floor3_0" type="MeshInstance3D" parent="Detail" unique_id=2077932021]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -9.75)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_6e6cp")
 
-[node name="Floor3_1" type="MeshInstance3D" parent="Detail" unique_id=1543474600]
+[node name="Floor3_1" type="MeshInstance3D" parent="Detail" unique_id=505534346]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -3.25)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_fp285")
 
-[node name="Floor3_2" type="MeshInstance3D" parent="Detail" unique_id=1828749131]
+[node name="Floor3_2" type="MeshInstance3D" parent="Detail" unique_id=570706614]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 3.25)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_w36v1")
 
-[node name="Floor3_3" type="MeshInstance3D" parent="Detail" unique_id=629158886]
+[node name="Floor3_3" type="MeshInstance3D" parent="Detail" unique_id=1030636336]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 9.75)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_226s1")
 
-[node name="Yard0_0" type="MeshInstance3D" parent="Detail" unique_id=1226008353]
+[node name="Yard0_0" type="MeshInstance3D" parent="Detail" unique_id=1133993529]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 0, -10.5)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_dvwrw")
 
-[node name="Yard0_1" type="MeshInstance3D" parent="Detail" unique_id=645066381]
+[node name="Yard0_1" type="MeshInstance3D" parent="Detail" unique_id=1909724243]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 0, -3.5)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_yxo5n")
 
-[node name="Yard0_2" type="MeshInstance3D" parent="Detail" unique_id=174545581]
+[node name="Yard0_2" type="MeshInstance3D" parent="Detail" unique_id=714623858]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 0, 3.5)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_47tox")
 
-[node name="Yard0_3" type="MeshInstance3D" parent="Detail" unique_id=1504409550]
+[node name="Yard0_3" type="MeshInstance3D" parent="Detail" unique_id=2129161744]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 0, 10.5)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_un8e6")
 
-[node name="Yard1_0" type="MeshInstance3D" parent="Detail" unique_id=825329454]
+[node name="Yard1_0" type="MeshInstance3D" parent="Detail" unique_id=1561990833]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.5, 0, -10.5)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_kguht")
 
-[node name="Yard1_1" type="MeshInstance3D" parent="Detail" unique_id=1552602195]
+[node name="Yard1_1" type="MeshInstance3D" parent="Detail" unique_id=1670610777]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.5, 0, -3.5)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_dqxca")
 
-[node name="Yard1_2" type="MeshInstance3D" parent="Detail" unique_id=1835655772]
+[node name="Yard1_2" type="MeshInstance3D" parent="Detail" unique_id=672095998]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.5, 0, 3.5)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_8x2qk")
 
-[node name="Yard1_3" type="MeshInstance3D" parent="Detail" unique_id=120693805]
+[node name="Yard1_3" type="MeshInstance3D" parent="Detail" unique_id=968390045]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.5, 0, 10.5)
 cast_shadow = 0
 mesh = SubResource("PlaneMesh_q0tdx")
 
-[node name="Racks" type="MeshInstance3D" parent="Detail" unique_id=782326041]
+[node name="Racks" type="MeshInstance3D" parent="Detail" unique_id=1576916742]
+gi_mode = 2
 mesh = ExtResource("12_qj8oh")
 
-[node name="Vehicles" type="MeshInstance3D" parent="Detail" unique_id=1158397011]
+[node name="Vehicles" type="MeshInstance3D" parent="Detail" unique_id=1014030269]
+gi_mode = 2
 mesh = ExtResource("13_6eb5b")
 
-[node name="LampTube0" type="MeshInstance3D" parent="Detail" unique_id=906050415]
+[node name="LampTube0" type="MeshInstance3D" parent="Detail" unique_id=973313928]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 6.07, 0)
 cast_shadow = 0
+gi_mode = 2
 mesh = SubResource("BoxMesh_ot0oi")
 
-[node name="LampTube1" type="MeshInstance3D" parent="Detail" unique_id=643413141]
+[node name="LampTube1" type="MeshInstance3D" parent="Detail" unique_id=298871606]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 6.07, 0)
 cast_shadow = 0
+gi_mode = 2
 mesh = SubResource("BoxMesh_iag5e")
 
-[node name="LampTube2" type="MeshInstance3D" parent="Detail" unique_id=427511997]
+[node name="LampTube2" type="MeshInstance3D" parent="Detail" unique_id=73915867]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 6.07, 0)
 cast_shadow = 0
+gi_mode = 2
 mesh = SubResource("BoxMesh_6qxgf")
 
-[node name="LampTube3" type="MeshInstance3D" parent="Detail" unique_id=902618927]
+[node name="LampTube3" type="MeshInstance3D" parent="Detail" unique_id=1851132773]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.75, 6.07, -8.1)
 cast_shadow = 0
+gi_mode = 2
 mesh = SubResource("BoxMesh_2hghp")
 
-[node name="LampTube4" type="MeshInstance3D" parent="Detail" unique_id=924771626]
+[node name="LampTube4" type="MeshInstance3D" parent="Detail" unique_id=1318385510]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.75, 6.07, 8.1)
 cast_shadow = 0
+gi_mode = 2
 mesh = SubResource("BoxMesh_3ae7c")
 
-[node name="LampFixtures" type="MeshInstance3D" parent="Detail" unique_id=143735357]
+[node name="LampFixtures" type="MeshInstance3D" parent="Detail" unique_id=1209320188]
+gi_mode = 2
 mesh = ExtResource("15_fmt1q")
 
-[node name="FloodGlow" type="MeshInstance3D" parent="Detail" unique_id=1613734213]
+[node name="FloodGlow" type="MeshInstance3D" parent="Detail" unique_id=1337282001]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19.98, 6, 0.8)
+gi_mode = 2
 mesh = SubResource("BoxMesh_7hhm8")
 
-[node name="DoorLampBulb" type="MeshInstance3D" parent="Detail" unique_id=870710897]
+[node name="DoorLampBulb" type="MeshInstance3D" parent="Detail" unique_id=1688775065]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.95, 5.52, 0)
 cast_shadow = 0
+gi_mode = 2
 mesh = SubResource("SphereMesh_yxjno")
 
-[node name="Kit" type="Node3D" parent="Detail" unique_id=1059740010]
+[node name="Kit" type="Node3D" parent="Detail" unique_id=1776511156]
 
-[node name="Chunk_-1_-1_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=521409493]
+[node name="Chunk_-1_-1_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=783087807]
 visibility_range_end = 22.0
 visibility_range_end_margin = 2.0
 mesh = ExtResource("16_7ffy5")
 
-[node name="Chunk_-1_-1_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=635725412]
+[node name="Chunk_-1_-1_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=1781605437]
+gi_mode = 2
 visibility_range_begin = 22.0
 visibility_range_begin_margin = 2.0
 mesh = ExtResource("17_qtybt")
 
-[node name="Chunk_-1_0_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=1600512237]
+[node name="Chunk_-1_0_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=1811450737]
 visibility_range_end = 22.0
 visibility_range_end_margin = 2.0
 mesh = ExtResource("18_71mx6")
 
-[node name="Chunk_-1_0_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=688763520]
+[node name="Chunk_-1_0_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=1412299279]
+gi_mode = 2
 visibility_range_begin = 22.0
 visibility_range_begin_margin = 2.0
 mesh = ExtResource("19_c3j20")
 
-[node name="Chunk_-2_-1_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=694401992]
+[node name="Chunk_-2_-1_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=435216045]
 visibility_range_end = 22.0
 visibility_range_end_margin = 2.0
 mesh = ExtResource("20_ff4ge")
 
-[node name="Chunk_-2_-1_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=1441603182]
+[node name="Chunk_-2_-1_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=447252119]
+gi_mode = 2
 visibility_range_begin = 22.0
 visibility_range_begin_margin = 2.0
 mesh = ExtResource("21_ny7wt")
 
-[node name="Chunk_-2_0_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=1269332537]
+[node name="Chunk_-2_0_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=1737020484]
 visibility_range_end = 22.0
 visibility_range_end_margin = 2.0
 mesh = ExtResource("22_lx7ar")
 
-[node name="Chunk_-2_0_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=613723804]
+[node name="Chunk_-2_0_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=2033526474]
+gi_mode = 2
 visibility_range_begin = 22.0
 visibility_range_begin_margin = 2.0
 mesh = ExtResource("23_affys")
 
-[node name="Chunk_0_-1_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=1025121733]
+[node name="Chunk_0_-1_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=2022467174]
 visibility_range_end = 22.0
 visibility_range_end_margin = 2.0
 mesh = ExtResource("24_5gfxl")
 
-[node name="Chunk_0_-1_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=710872223]
+[node name="Chunk_0_-1_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=124490010]
+gi_mode = 2
 visibility_range_begin = 22.0
 visibility_range_begin_margin = 2.0
 mesh = ExtResource("25_n3fvd")
 
-[node name="Chunk_0_0_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=1518004206]
+[node name="Chunk_0_0_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=1652789836]
 visibility_range_end = 22.0
 visibility_range_end_margin = 2.0
 mesh = ExtResource("26_17sn8")
 
-[node name="Chunk_0_0_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=827959043]
+[node name="Chunk_0_0_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=532891116]
+gi_mode = 2
 visibility_range_begin = 22.0
 visibility_range_begin_margin = 2.0
 mesh = ExtResource("27_8a67i")
 
-[node name="Chunk_1_-1_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=1648312808]
+[node name="Chunk_1_-1_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=941333061]
 visibility_range_end = 22.0
 visibility_range_end_margin = 2.0
 mesh = ExtResource("28_e2nfo")
 
-[node name="Chunk_1_-1_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=1503756570]
+[node name="Chunk_1_-1_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=590034641]
+gi_mode = 2
 visibility_range_begin = 22.0
 visibility_range_begin_margin = 2.0
 mesh = ExtResource("29_epibs")
 
-[node name="Chunk_1_0_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=759187530]
+[node name="Chunk_1_0_LOD0" type="MeshInstance3D" parent="Detail/Kit" unique_id=1774198931]
 visibility_range_end = 22.0
 visibility_range_end_margin = 2.0
 mesh = ExtResource("30_rcf74")
 
-[node name="Chunk_1_0_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=1671756512]
+[node name="Chunk_1_0_LOD1" type="MeshInstance3D" parent="Detail/Kit" unique_id=1318614069]
+gi_mode = 2
 visibility_range_begin = 22.0
 visibility_range_begin_margin = 2.0
 mesh = ExtResource("31_n2ioj")
 
-[node name="Lights" type="Node3D" parent="." unique_id=939932006]
+[node name="Lights" type="Node3D" parent="." unique_id=161097407]
 
-[node name="Lamp0" type="OmniLight3D" parent="Lights" unique_id=2037483166]
+[node name="Lamp0" type="OmniLight3D" parent="Lights" unique_id=325382004]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 5.8, 0)
 light_color = Color(1, 0.86, 0.62, 1)
 light_energy = 2.4
 omni_range = 11.0
 omni_attenuation = 1.2
 
-[node name="Lamp1" type="OmniLight3D" parent="Lights" unique_id=538740808]
+[node name="Lamp1" type="OmniLight3D" parent="Lights" unique_id=257433839]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 5.8, 0)
 light_color = Color(1, 0.86, 0.62, 1)
 light_energy = 2.4
 omni_range = 11.0
 omni_attenuation = 1.2
 
-[node name="Lamp2" type="OmniLight3D" parent="Lights" unique_id=414679752]
+[node name="Lamp2" type="OmniLight3D" parent="Lights" unique_id=1657004717]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 5.8, 0)
 light_color = Color(1, 0.86, 0.62, 1)
 light_energy = 2.4
 omni_range = 11.0
 omni_attenuation = 1.2
 
-[node name="Lamp3" type="OmniLight3D" parent="Lights" unique_id=149763312 groups=["optional_lights"]]
+[node name="Lamp3" type="OmniLight3D" parent="Lights" unique_id=77791136]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.75, 5.8, -8.1)
 light_color = Color(1, 0.86, 0.62, 1)
 light_energy = 2.4
+light_bake_mode = 1
 omni_range = 11.0
 omni_attenuation = 1.2
 
-[node name="Lamp4" type="OmniLight3D" parent="Lights" unique_id=517424431 groups=["optional_lights"]]
+[node name="Lamp4" type="OmniLight3D" parent="Lights" unique_id=806816181]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.75, 5.8, 8.1)
 light_color = Color(1, 0.86, 0.62, 1)
 light_energy = 2.4
+light_bake_mode = 1
 omni_range = 11.0
 omni_attenuation = 1.2
 
-[node name="Floodlight" type="SpotLight3D" parent="Lights" unique_id=897788168]
+[node name="Floodlight" type="SpotLight3D" parent="Lights" unique_id=402780437]
 transform = Transform3D(0.07253569, -0.47045568, 0.8794373, 0, 0.88176, 0.47169822, -0.9973658, -0.03421496, 0.06395908, 20, 5.9, 0.8)
 light_color = Color(0.85, 0.9, 1, 1)
 light_energy = 4.0
 spot_range = 24.0
 spot_angle = 38.0
 
-[node name="DoorLamp" type="OmniLight3D" parent="Lights" unique_id=1419466586 groups=["optional_lights"]]
+[node name="DoorLamp" type="OmniLight3D" parent="Lights" unique_id=779034495]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 5.3, 0)
 light_color = Color(1, 0.7, 0.45, 1)
 light_energy = 1.6
+light_bake_mode = 1
 omni_range = 8.0
 omni_attenuation = 1.2
 
-[node name="Roof" type="StaticBody3D" parent="." unique_id=1226235722]
+[node name="Roof" type="StaticBody3D" parent="." unique_id=39908859]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 7.15, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Roof" unique_id=90310345]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Roof" unique_id=1176203267]
 shape = SubResource("BoxShape3D_6rvyx")
 
-[node name="Player" parent="." unique_id=464894770 instance=ExtResource("32_kakmk")]
+[node name="Player" parent="." unique_id=1139387019 instance=ExtResource("32_kakmk")]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 5, 0, 0.5)
 
-[node name="Enemies" type="Node3D" parent="." unique_id=1773866988]
+[node name="Enemies" type="Node3D" parent="." unique_id=1380201210]
 
-[node name="SpawnPoints" type="Node3D" parent="." unique_id=1074787802]
+[node name="SpawnPoints" type="Node3D" parent="." unique_id=169759332]
 
-[node name="Spawn1" type="Marker3D" parent="SpawnPoints" unique_id=1805986525]
+[node name="Spawn1" type="Marker3D" parent="SpawnPoints" unique_id=672229814]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.5, 0.1, -11.5)
 
-[node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=1095156468]
+[node name="Spawn2" type="Marker3D" parent="SpawnPoints" unique_id=1167344409]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.5, 0.1, 11.5)
 
-[node name="Spawn3" type="Marker3D" parent="SpawnPoints" unique_id=291253082]
+[node name="Spawn3" type="Marker3D" parent="SpawnPoints" unique_id=2002176315]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.5, 0.1, 3.2)
 
-[node name="Spawn4" type="Marker3D" parent="SpawnPoints" unique_id=1412225753]
+[node name="Spawn4" type="Marker3D" parent="SpawnPoints" unique_id=1631081499]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.1, 0)
 
-[node name="Spawn5" type="Marker3D" parent="SpawnPoints" unique_id=1100554187]
+[node name="Spawn5" type="Marker3D" parent="SpawnPoints" unique_id=1519462577]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.1, -11.8)
 
-[node name="Spawn6" type="Marker3D" parent="SpawnPoints" unique_id=602030804]
+[node name="Spawn6" type="Marker3D" parent="SpawnPoints" unique_id=2009486349]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.1, 11.8)
 
-[node name="Spawn7" type="Marker3D" parent="SpawnPoints" unique_id=38686582]
+[node name="Spawn7" type="Marker3D" parent="SpawnPoints" unique_id=1648109419]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.2, 0.1, -8.1)
 
-[node name="Spawn8" type="Marker3D" parent="SpawnPoints" unique_id=1091570127]
+[node name="Spawn8" type="Marker3D" parent="SpawnPoints" unique_id=1274170259]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.2, 0.1, 8.1)
 
-[node name="SpawnTimer" type="Timer" parent="." unique_id=132579351]
+[node name="SpawnTimer" type="Timer" parent="." unique_id=450620136]
 wait_time = 3.0
 autostart = true
 
-[node name="Wind" type="AudioStreamPlayer" parent="." unique_id=498091047]
+[node name="Wind" type="AudioStreamPlayer" parent="." unique_id=2056213075]
 stream = ExtResource("33_it0yb")
 volume_db = -14.0
 
-[node name="HUD" parent="." unique_id=530412779 instance=ExtResource("34_gab4s")]
+[node name="HUD" parent="." unique_id=1037252788 instance=ExtResource("34_gab4s")]
 
-[node name="Pickups" type="Node3D" parent="." unique_id=184385492]
+[node name="Pickups" type="Node3D" parent="." unique_id=99238290]
 
-[node name="RiflePickup" parent="Pickups" unique_id=94580499 instance=ExtResource("35_h5wny")]
+[node name="RiflePickup" parent="Pickups" unique_id=621478410 instance=ExtResource("35_h5wny")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -3)
 kind = 0
 
-[node name="ShotgunPickup" parent="Pickups" unique_id=1573458243 instance=ExtResource("35_h5wny")]
+[node name="ShotgunPickup" parent="Pickups" unique_id=2041082829 instance=ExtResource("35_h5wny")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, -8.1)
 kind = 0
 weapon_index = 2
 
-[node name="SniperPickup" parent="Pickups" unique_id=1704264810 instance=ExtResource("35_h5wny")]
+[node name="SniperPickup" parent="Pickups" unique_id=1002882915 instance=ExtResource("35_h5wny")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 2)
 kind = 0
 weapon_index = 3
 
-[node name="AmmoBox1" parent="Pickups" unique_id=99576498 instance=ExtResource("35_h5wny")]
+[node name="AmmoBox1" parent="Pickups" unique_id=1905964139 instance=ExtResource("35_h5wny")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 8.1)
 
-[node name="AmmoBox2" parent="Pickups" unique_id=544370436 instance=ExtResource("35_h5wny")]
+[node name="AmmoBox2" parent="Pickups" unique_id=548993995 instance=ExtResource("35_h5wny")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.75, 0, -2)
 
-[node name="AmmoBox3" parent="Pickups" unique_id=722487651 instance=ExtResource("35_h5wny")]
+[node name="AmmoBox3" parent="Pickups" unique_id=1468165117 instance=ExtResource("35_h5wny")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, -3.5)

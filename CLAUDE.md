@@ -28,6 +28,7 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 | **Persistent progression** | config `progression_config.gd`, state `progress.gd` (autoload `Progress`) |
 | Armory / Achievements screens | `ui/armory_menu.gd`, `ui/achievements_menu.gd` (overlays on the main menu) |
 | Weapon skins (material tint / camo) | `weapon_skins.gd` |
+| **Lighting mood** (3 maps, not Training) | config `atmosphere_config.gd`, builder `atmosphere.gd` (created by `main.gd`), shader `effects/light_shaft.gdshader` |
 | Maps list | `maps.gd` (`LIST` for map select, `TRAINING` for the arena) |
 | **Training Arena** (main menu > Training) | scene `maps/training.tscn` (built by `build_maps.gd`), `training/training.gd` (extends `main.gd`), `training/target.gd`, `training/weapon_rack.gd`, `training/training_ui.gd`, config `training_config.gd` |
 | Settings + best scores | `settings.gd` (autoload `Settings`), `ui/settings_menu.*` |
@@ -228,3 +229,24 @@ FBX 6.1 that Blender can't; bones lose the `mixamorig_` prefix) ->
   `builds/windows/DeadPerimeter.exe` (git-ignored). No commit.
 - `publish.bat`: web export to `docs/`, commit everything, push (GitHub Pages).
 - `tools/rebake.bat`: lightmaps + navmeshes after level geometry changes.
+
+## Lighting and atmosphere (yard, town, warehouse)
+
+- **Baked**: every map has a LightmapGI (HIGH quality, 6 bounces, denoiser,
+  soft sun via `light_angular_distance`). Direct light stays real-time, the
+  lightmap holds bounce light only; extra lamps are `BAKE_STATIC` (no runtime
+  cost). Town/warehouse: houses, floor tiles and kit LOD0 chunks are baked
+  (`BAKE_TEXEL`, `texel_scale 0.4`); cars, racks, props and kit LOD1 are lit by
+  the probes. Lightmaps: yard 2.9 MB, town 1.0, warehouse 0.75 (EXR, stored
+  uncompressed by `rebake.bat`). After level changes: `build_maps.gd -- --only
+  town` (or warehouse), then `rebake.bat town` (or warehouse / yard).
+- **Mood** (`atmosphere_config.gd` -> `atmosphere.gd`, applied at runtime so a
+  map rebuild never loses it): per-map tonemap + adjustments + 1D colour curve
+  + glow, fog, CPU dust around the camera, additive light shaft cylinders
+  (`light_shaft.gdshader`: cones under lamps, beams along the sun/moon),
+  ReflectionProbes (update once), flickering lamps, emergency lights (police
+  car, warehouse red beacons).
+- **Quality** (`Atmosphere.apply_quality`, called from `main._apply_quality`):
+  Low = baked light + grade; Medium = + fog, dust, flickering lamps; High = +
+  probes, shafts, glow, emergency lights. Auto uses the same switch.
+- `map_shots.gd -- --shots <dir>` saves High and Low pictures per view.

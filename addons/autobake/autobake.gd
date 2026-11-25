@@ -12,6 +12,8 @@ extends EditorPlugin
 
 const BAKES := [
 	{"id": "yard", "scene": "res://main.tscn", "file": "res://main.lmbake"},
+	{"id": "town", "scene": "res://maps/town.tscn", "file": "res://maps/town.lmbake"},
+	{"id": "warehouse", "scene": "res://maps/warehouse.tscn", "file": "res://maps/warehouse.lmbake"},
 	{"id": "training", "scene": "res://maps/training.tscn", "file": "res://maps/training.lmbake"},
 ]
 

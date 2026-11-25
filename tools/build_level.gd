@@ -70,9 +70,11 @@ func _process(_delta: float) -> bool:
 
 
 	var lm := LightmapGI.new()
-	lm.quality = LightmapGI.BAKE_QUALITY_MEDIUM
-	lm.bounces = 3
+	lm.quality = LightmapGI.BAKE_QUALITY_HIGH
+	lm.bounces = 6
+	lm.bounce_indirect_energy = 1.25
 	lm.use_denoiser = true
+	lm.denoiser_strength = 0.12
 	lm.max_texture_size = 2048
 	lm.generate_probes_subdiv = LightmapGI.GENERATE_PROBES_SUBDIV_8
 	# The Compatibility editor bakes the HDRI sky as black, so the sky light

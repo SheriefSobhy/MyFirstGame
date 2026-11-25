@@ -55,15 +55,16 @@ func _run() -> void:
 	for m: Dictionary in Maps.LIST:
 		var cam := await _open(m)
 		if shots_dir != "":
-			S.quality = Q_HIGH
-			S.changed.emit()
-			for v: Array in VIEWS[m.id]:
-				_aim(cam, v)
-				for f in 30:
-					await process_frame
-				var path := shots_dir.path_join("%s_%s.png" % [m.id, v[0]])
-				root.get_texture().get_image().save_png(path)
-				print("saved ", path)
+			for q: int in [Q_HIGH, Q_LOW]:
+				S.quality = q
+				S.changed.emit()
+				for v: Array in VIEWS[m.id]:
+					_aim(cam, v)
+					for f in 30:
+						await process_frame
+					var path := shots_dir.path_join("%s_%s_%s.png" % [m.id, v[0], "high" if q == Q_HIGH else "low"])
+					root.get_texture().get_image().save_png(path)
+					print("saved ", path)
 		if bench:
 			for q: int in [Q_LOW, Q_MEDIUM, Q_HIGH]:
 				S.quality = q

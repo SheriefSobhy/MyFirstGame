@@ -59,7 +59,9 @@ func add(piece: String, xf: Transform3D, tint := Color.WHITE, group := "") -> vo
 ## Creates the merged meshes under a new node `node_name` in `parent`.
 ## opts:
 ##   lod_distance  float, 0 = no LOD1 (only LOD0 meshes, always drawn)
-##   lightmap      bool, GI static with lightmap UV2 (the yard)
+##   lightmap      bool, GI static with lightmap UV2 (the yard, town, warehouse)
+##   lightmap_lod1 bool, LOD1 chunks get lightmap UVs too (default: no, they are
+##                 lit by the lightmap probes: they only show far away)
 ##   shadows       bool (default true)
 ##   file_prefix   String: meshes are saved to res://level/generated/<prefix>_<chunk>.res
 func build(parent: Node, owner_node: Node, node_name: String, opts: Dictionary) -> Node3D:
@@ -77,14 +79,17 @@ func build(parent: Node, owner_node: Node, node_name: String, opts: Dictionary) 
 			var b: Dictionary = c["lod%d" % lod]
 			if b.i.is_empty():
 				continue
-			var mesh := _commit(b, opts.get("lightmap", false))
+			var baked: bool = opts.get("lightmap", false) and (lod == 0 or opts.get("lightmap_lod1", false))
+			var mesh := _commit(b, baked)
 			var path := "res://level/generated/%s%s_lod%d.res" % [opts.get("file_prefix", "kit"), key, lod]
 			ResourceSaver.save(mesh, path, ResourceSaver.FLAG_COMPRESS)
 			var mi := MeshInstance3D.new()
 			mi.name = "Chunk%s_LOD%d" % [key, lod]
 			mi.mesh = load(path)
-			if opts.get("lightmap", false):
+			if baked:
 				mi.gi_mode = GeometryInstance3D.GI_MODE_STATIC
+			elif opts.get("lightmap", false):
+				mi.gi_mode = GeometryInstance3D.GI_MODE_DYNAMIC
 			if not opts.get("shadows", true):
 				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			if lod_d > 0.0:

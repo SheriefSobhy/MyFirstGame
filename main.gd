@@ -46,6 +46,7 @@ const Explosion := preload("res://effects/explosion.gd")
 const Grenade := preload("res://effects/grenade.gd")
 const Tutorial := preload("res://tutorial.gd")
 const AutoQuality := preload("res://auto_quality.gd")
+const Atmosphere := preload("res://atmosphere.gd")
 
 enum Phase { FIGHT, BREAK, OVER }
 
@@ -66,6 +67,9 @@ var economy: MatchEconomy
 var tutorial: Tutorial
 ## Graphics Auto measuring the frame rate (auto_quality.gd), null when not.
 var auto_quality: AutoQuality
+## Colour grade, dust, light shafts, probes, flickering lamps (atmosphere.gd);
+## null on maps without one (the Training Arena).
+var atmosphere: Node3D
 ## Revives left this match (economy.gd REVIVES_PER_MATCH).
 var revives_left := Economy.REVIVES_PER_MATCH
 
@@ -124,6 +128,7 @@ func _ready() -> void:
 
 	if DisplayServer.is_touchscreen_available():
 		max_enemies = PHONE_MAX_ENEMIES
+	atmosphere = Atmosphere.attach(self, map_id, environment, sun)
 	_apply_quality()
 	Settings.changed.connect(_apply_quality)
 	_prewarm_effects()
@@ -526,6 +531,8 @@ func _wave_cleared() -> void:
 # the screen; the HUD always stays sharp). Medium matches the old phone setup.
 func _apply_quality() -> void:
 	var vp := get_viewport()
+	if atmosphere:
+		atmosphere.apply_quality(Settings.effective_quality())
 	var flash_light: Light3D = player.get_node("%FlashLight")
 	# Maps can mark some of their lamps as extras that Low quality turns off.
 	for lamp: Node in get_tree().get_nodes_in_group("optional_lights"):
