@@ -165,6 +165,7 @@ var _glint: MeshInstance3D
 var _tracer: MeshInstance3D
 var _sfx: AudioStreamPlayer3D
 var _push := Vector3.ZERO         # knockback velocity, fades out
+var _stun_time := 0.0              # a revive shove holds it in HIT at least this long
 var _last_hit_dir := Vector3.ZERO # direction the last hit pushed it (flat)
 var _last_hit_force := 0.0
 var _last_headshot := false
@@ -266,7 +267,8 @@ func _physics_process(delta: float) -> void:
 			_attack(delta)
 		State.HIT:
 			_stop()  # only the knockback moves it
-			if _state_time > stats.hit_stun:
+			if _state_time > maxf(stats.hit_stun, _stun_time):
+				_stun_time = 0.0
 				_set_state(State.CHASE)
 		State.AIM:
 			_aim(delta)
@@ -598,6 +600,23 @@ func take_damage(amount: int, hit_position := Vector3.ZERO, hit_normal := Vector
 		_flinch(amount, headshot)
 		if stats.hit_stun > 0.0 and state != State.ARMED:
 			_set_state(State.HIT)
+
+
+## The player came back to life (main.gd revive): pushed away from `from` at
+## `speed` m/s (slowing down by KNOCK_DECAY) and staggered for `stun` seconds.
+## Exploders already counting down keep counting.
+func shove_from(from: Vector3, speed: float, stun: float) -> void:
+	if state == State.DEAD:
+		return
+	var dir := global_position - from
+	dir.y = 0.0
+	if dir.length_squared() < 0.0025:
+		dir = -global_basis.z
+		dir.y = 0.0
+	_push = dir.normalized() * speed
+	if state != State.ARMED:
+		_stun_time = stun
+		_set_state(State.HIT)
 
 
 # Pushed away from the hit; small enemies fly further than big ones.

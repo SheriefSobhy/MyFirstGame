@@ -53,7 +53,9 @@ func _run() -> void:
 	check(select.name == "MapSelect", "Play opens the map selection screen")
 	check(select.play_buttons.size() == 3, "three maps to choose from")
 	select.play_buttons["yard"].pressed.emit()
-	await frames(15)
+	check(await _wait_for_scene("LoadingScreen"), "Play shows the loading screen")
+	check(await _wait_for_scene("Main"), "the loading screen opens the map")
+	await frames(5)
 	var main := current_scene
 	check(main.name == "Main" and main.map_id == "yard", "picking Industrial Yard loads the yard")
 	await create_timer(1.6).timeout  # let the music fade over
@@ -191,7 +193,15 @@ func _test_game_over(main: Node, settings: Node) -> void:
 	var score: int = main.score
 	main.player.take_damage(1000)
 	await frames(2)
-	check(paused and hud.game_over_panel.visible, "dying shows Game Over and pauses")
+	check(paused and hud.revive_screen.visible and not hud.game_over_panel.visible,
+			"dying first offers a revive (game paused)")
+	check(hud.revive_screen.watch_button.text == "Watch ad to revive", "the revive button says Watch ad")
+	_press_esc()
+	await frames(2)
+	check(paused and hud.revive_screen.visible, "Esc doesn't resume past the revive offer")
+	hud.revive_screen.no_button.pressed.emit()
+	await frames(2)
+	check(paused and hud.game_over_panel.visible and not hud.revive_screen.visible, "No thanks shows Game Over and pauses")
 	check(hud.waves_label.text == "Waves survived: 1", "Game Over shows waves survived (got '%s')" % hud.waves_label.text)
 	check(hud.kills_label.text == "Kills: 5", "Game Over shows kills (got '%s')" % hud.kills_label.text)
 	check(hud.final_score_label.text == "Score: %d" % score, "Game Over shows the score")
@@ -207,6 +217,8 @@ func _test_game_over(main: Node, settings: Node) -> void:
 	main = current_scene
 	hud = main.hud
 	check(not paused and main.wave == 1 and main.score == 0 and not main.player.is_dead, "Retry starts a fresh game")
+	check(main.revives_left == 1, "Retry gives the revive back")
+	main.revives_left = 0
 	main.player.take_damage(1000)
 	await frames(2)
 	check(hud.best_label.text == "Best: %d" % score, "lower score shows the saved best (got '%s')" % hud.best_label.text)
@@ -215,6 +227,16 @@ func _test_game_over(main: Node, settings: Node) -> void:
 	await frames(10)
 	check(current_scene.name == "MainMenu" and not paused, "Main Menu button goes back to the menu")
 	check(current_scene.best_label.text.begins_with("Best: %d" % score), "menu shows the best score")
+
+
+## Waits (up to 30 s) until the current scene is `scene_name`.
+func _wait_for_scene(scene_name: String) -> bool:
+	var until := Time.get_ticks_msec() + 30000
+	while Time.get_ticks_msec() < until:
+		if current_scene != null and current_scene.name == scene_name:
+			return true
+		await process_frame
+	return false
 
 
 func _press_esc() -> void:

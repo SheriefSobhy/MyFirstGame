@@ -411,6 +411,7 @@ func _test_match() -> void:
 	var coins_before: int = progress.coins
 	var start_xp: int = progress.current.xp
 	main.waves_survived = 4
+	main.revives_left = 0
 	player.take_damage(1000)
 	await frames(3)
 	var summary: Dictionary = progress.end_match(4, main.kills, 0)

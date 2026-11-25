@@ -98,6 +98,7 @@ const FOOTSTEP_SOUNDS := [
 
 var health := MAX_HEALTH
 var is_dead := false
+var _invulnerable := 0.0     # seconds left of no damage (after a revive)
 var weapon_index := 0       # slot in Weapons.LIST
 var grenades := START_GRENADES
 ## Absorbs part of each hit (economy.gd ARMOR_ABSORB) until it runs out.
@@ -280,6 +281,7 @@ func _process(delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	if is_dead:
 		return
+	_invulnerable = maxf(_invulnerable - delta, 0.0)
 
 	# Gravity and jumping.
 	if not is_on_floor():
@@ -874,6 +876,8 @@ func show_all_view_models(on: bool) -> void:
 func take_damage(amount: int) -> void:
 	if is_dead:
 		return
+	if _invulnerable > 0.0:
+		return
 	_shake = maxf(_shake, SHAKE_ON_HIT)
 	Haptics.damage()
 	if GOD_MODE:
@@ -895,6 +899,23 @@ func take_damage(amount: int) -> void:
 		_set_aiming(false)
 		cancel_grenade()
 		died.emit()
+
+
+## Back to life with full health (the revive after watching an ad), and
+## no damage for `invulnerable` seconds.
+func revive(invulnerable := 0.0) -> void:
+	is_dead = false
+	health = MAX_HEALTH
+	_invulnerable = invulnerable
+	_aim_wanted = false
+	touch_move = Vector2.ZERO
+	touch_shoot = false
+	health_changed.emit(health)
+	emit_status()
+
+
+func is_invulnerable() -> bool:
+	return _invulnerable > 0.0
 
 
 ## Adds armor, up to economy.gd MAX_ARMOR. Returns false if it was already full.

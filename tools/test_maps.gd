@@ -205,6 +205,7 @@ func _test_best_scores() -> void:
 	await frames(15)
 	var main := current_scene
 	main.get_node("SpawnTimer").stop()
+	main.revives_left = 0
 	main.player.take_damage(1000)
 	await frames(3)
 	check(main.hud.best_label.text == "Best: 300", "Game Over in the town shows the town best (got '%s')" % main.hud.best_label.text)
@@ -242,17 +243,31 @@ func _test_select_screen() -> void:
 	current_scene.play_button.pressed.emit()
 	await frames(5)
 	current_scene.play_buttons["warehouse"].pressed.emit()
-	await frames(15)
+	check(await _wait_for_scene("LoadingScreen"), "Play shows the loading screen")
+	check(current_scene.progress_bar != null and current_scene.tip_label.text.begins_with("Tip: "), "the loading screen has a tip and a progress bar")
+	await _wait_for_scene("Main")
+	await frames(5)
 	check(current_scene.name == "Main" and current_scene.map_id == "warehouse", "picking Warehouse Night loads it")
 	# Retry stays on the same map.
 	var main := current_scene
 	main.get_node("SpawnTimer").stop()
+	main.revives_left = 0
 	main.player.take_damage(1000)
 	await frames(3)
 	main.hud.retry_button.pressed.emit()
 	await frames(15)
 	check(current_scene.map_id == "warehouse", "Retry replays the same map")
 	paused = false
+
+
+## Waits (up to 30 s) until the current scene is `scene_name`.
+func _wait_for_scene(scene_name: String) -> bool:
+	var until := Time.get_ticks_msec() + 30000
+	while Time.get_ticks_msec() < until:
+		if current_scene != null and current_scene.name == scene_name:
+			return true
+		await process_frame
+	return false
 
 
 func _screenshot(file_name: String) -> void:

@@ -13,8 +13,16 @@ const SETTINGS_PATH := "user://settings.cfg"
 const SAVE_PATH := "user://save.cfg"
 const MUSIC_BUS := "Music"
 
-enum Quality { LOW, MEDIUM, HIGH }
-const QUALITY_NAMES := ["Low", "Medium", "High"]
+## AUTO measures the frame rate in the first seconds of a match and picks
+## Low, Medium or High (auto_quality.gd); `auto_quality` remembers the pick.
+enum Quality { LOW, MEDIUM, HIGH, AUTO }
+const QUALITY_NAMES := ["Low", "Medium", "High", "Auto"]
+## Frame rate cap choices (battery saving). Not applied in headless tests.
+const FPS_CAPS := [30, 60]
+## Touch button size and opacity limits (Customize Controls).
+const MIN_BUTTON_SCALE := 0.6
+const MAX_BUTTON_SCALE := 1.6
+const MIN_TOUCH_OPACITY := 0.2
 
 const MIN_SENSITIVITY := 0.2
 const MAX_SENSITIVITY := 3.0
@@ -22,11 +30,22 @@ const MAX_SENSITIVITY := 3.0
 var master_volume := 1.0     # 0..1
 var music_volume := 0.6      # 0..1
 var look_sensitivity := 1.0  # multiplier on mouse and touch look speed
-var quality: int = Quality.HIGH
+var quality: int = Quality.AUTO
+## What Auto picked last (-1 = not measured yet: the next match measures).
+var auto_quality := -1
+var fps_cap := 60
 var damage_numbers := true   # floating damage numbers on hits
 var haptics := true          # phone vibration on shots, kills, explosions and damage
 var aim_assist := true       # touch only: slower look over enemies, pull when aiming
 var debug_unlock_all := false # testing: every weapon from the start, every level unlock (weapons, maps)
+var left_handed := false     # touch controls mirrored: joystick right, buttons left
+var touch_opacity := 1.0     # touch buttons and joystick
+## Moved / resized touch buttons: name -> {"pos": Vector2, "scale": float}.
+## pos.x >= 0 is measured from the left edge, < 0 from the right edge;
+## pos.y (< 0) from the bottom edge. Buttons not in here use their default
+## spot and size (touch_controls.gd BUTTONS). Saved unmirrored.
+var touch_layout := {}
+var tutorial_done := false   # the first-match tutorial was finished or skipped
 
 ## Best score and wave per map id (see maps.gd): {id: {"score": int, "wave": int}}.
 var bests := {}
@@ -42,19 +61,58 @@ func _ready() -> void:
 		var bus := AudioServer.bus_count - 1
 		AudioServer.set_bus_name(bus, MUSIC_BUS)
 		AudioServer.set_bus_send(bus, &"Master")
-	# The Android app and phones start on Medium (the old phone settings),
-	# computers on High. Desktop builds ("pc") always count as computers, even
-	# on touchscreen laptops.
-	var phone := not OS.has_feature("pc") and (OS.has_feature("android")
-			or DisplayServer.is_touchscreen_available())
-	quality = Quality.MEDIUM if phone else Quality.HIGH
+	# Tests (tool scripts) skip the tutorial unless they ask for it.
+	if _under_test():
+		tutorial_done = true
 	_load()
 	_apply_audio()
+	_apply_fps_cap()
+
+
+func _under_test() -> bool:
+	return get_tree().get_script() != null
+
+
+## True on phones and tablets (and the Android app). Desktop builds ("pc")
+## always count as computers, even on touchscreen laptops.
+static func is_phone() -> bool:
+	return not OS.has_feature("pc") and (OS.has_feature("android")
+			or DisplayServer.is_touchscreen_available())
+
+
+## The quality actually used: the chosen one, or what Auto picked. Before Auto
+## has measured anything: Medium on phones, High on computers.
+func effective_quality() -> int:
+	if quality != Quality.AUTO:
+		return quality
+	if auto_quality >= 0:
+		return auto_quality
+	return Quality.MEDIUM if is_phone() else Quality.HIGH
 
 
 func set_value(key: String, value: Variant) -> void:
+	if key == "quality" and value == Quality.AUTO and quality != Quality.AUTO:
+		auto_quality = -1  # choosing Auto again measures again
 	set(key, value)
 	_apply_audio()
+	_apply_fps_cap()
+	changed.emit()
+
+
+## A touch button's saved layout ({} = its default spot and size).
+func button_layout(button_name: String) -> Dictionary:
+	return touch_layout.get(button_name, {})
+
+
+func set_button_layout(button_name: String, pos: Vector2, scale: float) -> void:
+	touch_layout[button_name] = {"pos": pos, "scale": clampf(scale, MIN_BUTTON_SCALE, MAX_BUTTON_SCALE)}
+	changed.emit()
+
+
+## Customize Controls' "Reset to default": default spots, sizes and opacity.
+func reset_touch_layout() -> void:
+	touch_layout.clear()
+	touch_opacity = 1.0
 	changed.emit()
 
 
@@ -63,10 +121,16 @@ func save_settings() -> void:
 	cfg.set_value("audio", "master_volume", master_volume)
 	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("controls", "look_sensitivity", look_sensitivity)
+	cfg.set_value("controls", "left_handed", left_handed)
+	cfg.set_value("controls", "touch_opacity", touch_opacity)
+	cfg.set_value("controls", "touch_layout", touch_layout)
 	cfg.set_value("graphics", "quality", quality)
+	cfg.set_value("graphics", "auto_quality", auto_quality)
+	cfg.set_value("graphics", "fps_cap", fps_cap)
 	cfg.set_value("gameplay", "damage_numbers", damage_numbers)
 	cfg.set_value("gameplay", "haptics", haptics)
 	cfg.set_value("gameplay", "aim_assist", aim_assist)
+	cfg.set_value("gameplay", "tutorial_done", tutorial_done)
 	cfg.set_value("debug", "unlock_all", debug_unlock_all)
 	cfg.save(SETTINGS_PATH)
 
@@ -121,10 +185,20 @@ func _load() -> void:
 		music_volume = clampf(cfg.get_value("audio", "music_volume", music_volume), 0.0, 1.0)
 		look_sensitivity = clampf(cfg.get_value("controls", "look_sensitivity", look_sensitivity),
 				MIN_SENSITIVITY, MAX_SENSITIVITY)
-		quality = clampi(cfg.get_value("graphics", "quality", quality), Quality.LOW, Quality.HIGH)
+		if not _under_test():  # tests expect the default touch layout
+			left_handed = bool(cfg.get_value("controls", "left_handed", left_handed))
+			touch_opacity = clampf(cfg.get_value("controls", "touch_opacity", touch_opacity), MIN_TOUCH_OPACITY, 1.0)
+			touch_layout = _clean_layout(cfg.get_value("controls", "touch_layout", {}))
+		quality = clampi(cfg.get_value("graphics", "quality", quality), Quality.LOW, Quality.AUTO)
+		auto_quality = clampi(cfg.get_value("graphics", "auto_quality", auto_quality), -1, Quality.HIGH)
+		fps_cap = int(cfg.get_value("graphics", "fps_cap", fps_cap))
+		if not fps_cap in FPS_CAPS:
+			fps_cap = 60
 		damage_numbers = bool(cfg.get_value("gameplay", "damage_numbers", damage_numbers))
 		haptics = bool(cfg.get_value("gameplay", "haptics", haptics))
 		aim_assist = bool(cfg.get_value("gameplay", "aim_assist", aim_assist))
+		if not _under_test():
+			tutorial_done = bool(cfg.get_value("gameplay", "tutorial_done", tutorial_done))
 		debug_unlock_all = bool(cfg.get_value("debug", "unlock_all", debug_unlock_all))
 	var save := ConfigFile.new()
 	if save.load(SAVE_PATH) == OK:
@@ -138,6 +212,25 @@ func _load() -> void:
 		if save.has_section("best") and not bests.has("yard"):
 			bests["yard"] = {"score": int(save.get_value("best", "score", 0)), "wave": int(save.get_value("best", "wave", 0))}
 	_update_overall()
+
+
+# Only well-formed entries from a saved touch layout.
+func _clean_layout(layout: Variant) -> Dictionary:
+	var out := {}
+	if not layout is Dictionary:
+		return out
+	for key: Variant in layout:
+		var b: Variant = layout[key]
+		if b is Dictionary and b.get("pos") is Vector2:
+			out[str(key)] = {"pos": b.pos,
+					"scale": clampf(float(b.get("scale", 1.0)), MIN_BUTTON_SCALE, MAX_BUTTON_SCALE)}
+	return out
+
+
+## Battery saving: 30 or 60 frames per second. Headless runs (tests) stay
+## uncapped so they don't slow down.
+func _apply_fps_cap() -> void:
+	Engine.max_fps = 0 if DisplayServer.get_name() == "headless" else fps_cap
 
 
 func _apply_audio() -> void:

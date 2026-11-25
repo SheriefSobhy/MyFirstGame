@@ -13,11 +13,15 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 
 | What | Where |
 |---|---|
-| Main menu → map select → match | `ui/main_menu.*`, `ui/map_select.*`, a map scene (`main.tscn`, `maps/*.tscn`) |
+| Main menu → map select → match | `ui/main_menu.*`, `ui/map_select.*`, `ui/loading_screen.*` (tip + progress bar, threaded load), a map scene (`main.tscn`, `maps/*.tscn`) |
 | Match flow (waves, score, spawns, Game Over) | `main.gd` (every map scene runs it; `map_id` picks the save key) |
 | Player, weapons, upgrades, skins on the view models | `player.gd`, `weapon_stats.gd`, `weapon_model.gd`, `fp_arms.gd` |
 | Enemies | `enemy.gd`, `enemy_types.gd` |
 | HUD, pause, Game Over, level-up popup, toasts | `hud.gd` / `hud.tscn`, `combat_feedback.gd`, `touch_controls.gd` |
+| First-match tutorial | `tutorial.gd` (added to the HUD by `main.gd`) |
+| Revive ("Watch ad to revive", placeholder ad) | `ui/revive_screen.gd`, `main.gd` `_on_player_died` |
+| Customize Controls (touch layout editor) | `ui/controls_editor.gd` (opened from Settings) |
+| Graphics Auto (FPS-measured quality) | `auto_quality.gd` |
 | In-match economy (cash, shop, power-ups, barrels) | config `economy.gd`, state `match_economy.gd`, UI `ui/shop_menu.gd` |
 | **Persistent progression** | config `progression_config.gd`, state `progress.gd` (autoload `Progress`) |
 | Armory / Achievements screens | `ui/armory_menu.gd`, `ui/achievements_menu.gd` (overlays on the main menu) |
@@ -29,7 +33,7 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 
 ## Balance numbers
 
-- In-match (cash, shop prices, 3-level match upgrades, power-ups): `economy.gd`.
+- In-match (cash, shop prices, 3-level match upgrades, power-ups, revive): `economy.gd`.
 - Persistent (XP curve, level unlocks, coins, Armory prices and bonuses,
   skins, daily mission pool, login rewards, map star waves, achievements):
   `progression_config.gd`. Change numbers there only.
@@ -67,6 +71,26 @@ Best scores stay in `user://save.cfg` (Settings).
 - "Debug: reset progress" (Settings, hidden mid-match, press twice) calls
   `Progress.reset_all()`, which also clears the best scores.
 
+## Mobile / first impression
+
+- **Tutorial**: plays while `Settings.tutorial_done` is false (new players;
+  Settings > Replay Tutorial). Wave 1 waits until the basics (move, look,
+  shoot, aim, switch, grenade) are done or skipped; the shop tip shows at the
+  first break. Touch tips point at the button (`touch_controls.highlight`).
+- **Touch layout**: `Settings.touch_layout` {name: {pos, scale}} overrides
+  `touch_controls.gd` BUTTONS. `pos.x >= 0` is from the left edge, `< 0` from
+  the right; `pos.y` from the bottom. Saved unmirrored; `left_handed` mirrors
+  at draw/hit time (joystick too). `touch_opacity` fades buttons + stick.
+  Always go through `_button_center()` / `_button_radius()`.
+- **Quality**: `Settings.quality` may be `AUTO`; everything reads
+  `Settings.effective_quality()`. Auto measures once (first 10 s of a match,
+  FPS cap lifted meanwhile), saves `auto_quality`; re-picking Auto measures again.
+- **FPS cap**: `Settings.fps_cap` 30/60 → `Engine.max_fps` (never in headless).
+- **Revive**: once per match (`economy.gd` REVIVE_*). The ad is a placeholder in
+  `ui/revive_screen.gd` `_play_ad()`: hook the real rewarded-ad SDK there.
+- **Loading screen**: map select calls `LoadingScreen.go(tree, map)`.
+  The single-threaded web build loads in one go (the bar jumps).
+
 ## Testing
 
 Each test is a SceneTree script that prints PASS/FAIL and exits 1 on failure:
@@ -76,12 +100,18 @@ Each test is a SceneTree script that prints PASS/FAIL and exits 1 on failure:
 ```
 
 Tests: `test_progression`, `test_economy`, `test_game_loop`, `test_maps`,
-`test_weapons`, `test_combat_feel`, `test_enemies`, `test_navigation`
+`test_weapons`, `test_combat_feel`, `test_enemies`, `test_mobile`, `test_navigation`
 (run that one with `--fixed-fps 60`). Most accept `-- --shots <folder>`
 (without `--headless`) to save screenshots for a visual check.
 
 - Under a tool script, `Progress` starts empty and saves to
-  `user://progress_test.cfg`, so tests never touch real progress. Tests that
+  `user://progress_test.cfg`, so tests never touch real progress.
+  `Settings` also skips the tutorial, Auto measuring and the saved touch
+  layout / left-handed / opacity under a tool script (a test can turn the
+  tutorial on with `Settings.tutorial_done = false`). Dying offers a revive
+  first: set `main.revives_left = 0` to go straight to Game Over. Entering a
+  map from map select goes through the loading screen (wait for the scene
+  by name, not a fixed number of frames). Tests that
   need weapons/maps unlocked set `Progress.xp` (e.g. `xp_for_level(15)`).
 - Tests that write best scores back up and restore `user://save.cfg`.
 - In test helpers, wait for `process_frame` as well as `physics_frame` after

@@ -29,35 +29,41 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -450.0
-offset_top = -320.0
-offset_right = 450.0
-offset_bottom = 320.0
+offset_left = -470.0
+offset_top = -348.0
+offset_right = 470.0
+offset_bottom = 348.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Box" type="VBoxContainer" parent="Panel"]
+[node name="Scroll" type="ScrollContainer" parent="Panel"]
 layout_mode = 2
-theme_override_constants/separation = 18
+horizontal_scroll_mode = 0
+
+[node name="Box" type="VBoxContainer" parent="Panel/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
 alignment = 1
 
-[node name="Title" type="Label" parent="Panel/Box"]
+[node name="Title" type="Label" parent="Panel/Scroll/Box"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 44
+theme_override_font_sizes/font_size = 38
 text = "Settings"
 horizontal_alignment = 1
 
-[node name="Grid" type="GridContainer" parent="Panel/Box"]
+[node name="Grid" type="GridContainer" parent="Panel/Scroll/Box"]
 layout_mode = 2
 theme_override_constants/h_separation = 20
-theme_override_constants/v_separation = 22
+theme_override_constants/v_separation = 8
 columns = 3
 
-[node name="MasterLabel" type="Label" parent="Panel/Box/Grid"]
+[node name="MasterLabel" type="Label" parent="Panel/Scroll/Box/Grid"]
 layout_mode = 2
 text = "Master Volume"
 
-[node name="MasterSlider" type="HSlider" parent="Panel/Box/Grid"]
+[node name="MasterSlider" type="HSlider" parent="Panel/Scroll/Box/Grid"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
@@ -65,18 +71,18 @@ size_flags_horizontal = 3
 size_flags_vertical = 4
 step = 1.0
 
-[node name="MasterValue" type="Label" parent="Panel/Box/Grid"]
+[node name="MasterValue" type="Label" parent="Panel/Scroll/Box/Grid"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
 text = "100%"
 horizontal_alignment = 2
 
-[node name="MusicLabel" type="Label" parent="Panel/Box/Grid"]
+[node name="MusicLabel" type="Label" parent="Panel/Scroll/Box/Grid"]
 layout_mode = 2
 text = "Music Volume"
 
-[node name="MusicSlider" type="HSlider" parent="Panel/Box/Grid"]
+[node name="MusicSlider" type="HSlider" parent="Panel/Scroll/Box/Grid"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
@@ -84,18 +90,18 @@ size_flags_horizontal = 3
 size_flags_vertical = 4
 step = 1.0
 
-[node name="MusicValue" type="Label" parent="Panel/Box/Grid"]
+[node name="MusicValue" type="Label" parent="Panel/Scroll/Box/Grid"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
 text = "60%"
 horizontal_alignment = 2
 
-[node name="SensitivityLabel" type="Label" parent="Panel/Box/Grid"]
+[node name="SensitivityLabel" type="Label" parent="Panel/Scroll/Box/Grid"]
 layout_mode = 2
 text = "Look Sensitivity"
 
-[node name="SensitivitySlider" type="HSlider" parent="Panel/Box/Grid"]
+[node name="SensitivitySlider" type="HSlider" parent="Panel/Scroll/Box/Grid"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
@@ -106,44 +112,51 @@ max_value = 3.0
 step = 0.05
 value = 1.0
 
-[node name="SensitivityValue" type="Label" parent="Panel/Box/Grid"]
+[node name="SensitivityValue" type="Label" parent="Panel/Scroll/Box/Grid"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
 text = "1.00x"
 horizontal_alignment = 2
 
-[node name="QualityRow" type="HBoxContainer" parent="Panel/Box"]
+[node name="QualityRow" type="HBoxContainer" parent="Panel/Scroll/Box"]
 layout_mode = 2
 theme_override_constants/separation = 14
 
-[node name="QualityLabel" type="Label" parent="Panel/Box/QualityRow"]
+[node name="QualityLabel" type="Label" parent="Panel/Scroll/Box/QualityRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Graphics"
 
-[node name="Low" type="Button" parent="Panel/Box/QualityRow"]
+[node name="Low" type="Button" parent="Panel/Scroll/Box/QualityRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(130, 60)
 layout_mode = 2
 toggle_mode = true
 text = "Low"
 
-[node name="Medium" type="Button" parent="Panel/Box/QualityRow"]
+[node name="Medium" type="Button" parent="Panel/Scroll/Box/QualityRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(130, 60)
 layout_mode = 2
 toggle_mode = true
 text = "Medium"
 
-[node name="High" type="Button" parent="Panel/Box/QualityRow"]
+[node name="High" type="Button" parent="Panel/Scroll/Box/QualityRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(130, 60)
 layout_mode = 2
 toggle_mode = true
 text = "High"
 
-[node name="QualityHint" type="Label" parent="Panel/Box"]
+[node name="Auto" type="Button" parent="Panel/Scroll/Box/QualityRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(130, 60)
+layout_mode = 2
+toggle_mode = true
+text = "Auto"
+
+[node name="QualityHint" type="Label" parent="Panel/Scroll/Box"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 0.6)
@@ -151,38 +164,38 @@ theme_override_font_sizes/font_size = 20
 text = "Shadows, fog and render resolution"
 horizontal_alignment = 1
 
-[node name="ToggleRow" type="HBoxContainer" parent="Panel/Box"]
+[node name="ToggleRow" type="HBoxContainer" parent="Panel/Scroll/Box"]
 layout_mode = 2
 theme_override_constants/separation = 24
 alignment = 1
 
-[node name="DamageNumbers" type="CheckButton" parent="Panel/Box/ToggleRow"]
+[node name="DamageNumbers" type="CheckButton" parent="Panel/Scroll/Box/ToggleRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "Damage Numbers"
 
-[node name="Vibration" type="CheckButton" parent="Panel/Box/ToggleRow"]
+[node name="Vibration" type="CheckButton" parent="Panel/Scroll/Box/ToggleRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "Vibration"
 
-[node name="AimAssist" type="CheckButton" parent="Panel/Box/ToggleRow"]
+[node name="AimAssist" type="CheckButton" parent="Panel/Scroll/Box/ToggleRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "Aim Assist"
 
-[node name="BottomRow" type="HBoxContainer" parent="Panel/Box"]
+[node name="BottomRow" type="HBoxContainer" parent="Panel/Scroll/Box"]
 layout_mode = 2
 theme_override_constants/separation = 18
 alignment = 1
 
-[node name="DebugUnlock" type="CheckButton" parent="Panel/Box/BottomRow"]
+[node name="DebugUnlock" type="CheckButton" parent="Panel/Scroll/Box/BottomRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
@@ -190,7 +203,7 @@ theme_override_colors/font_color = Color(1, 1, 1, 0.6)
 theme_override_font_sizes/font_size = 20
 text = "Debug: all weapons"
 
-[node name="DebugReset" type="Button" parent="Panel/Box/BottomRow"]
+[node name="DebugReset" type="Button" parent="Panel/Scroll/Box/BottomRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
@@ -198,7 +211,7 @@ theme_override_colors/font_color = Color(1, 1, 1, 0.6)
 theme_override_font_sizes/font_size = 20
 text = "Debug: reset progress"
 
-[node name="BackButton" type="Button" parent="Panel/Box/BottomRow"]
+[node name="BackButton" type="Button" parent="Panel/Scroll/Box/BottomRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(200, 64)
 layout_mode = 2

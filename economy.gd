@@ -35,6 +35,18 @@ const GRENADE_PRICE := 150          # one grenade (up to the player's MAX_GRENAD
 const ARMOR_PRICE := 400            # armor to full
 const HEALTH_PRICE := 300           # health to full
 
+# --- Revive ------------------------------------------------------------------------
+
+## Dying offers this many revives per match ("Watch ad to revive"): back with
+## full health, enemies near you pushed away.
+const REVIVES_PER_MATCH := 1
+const REVIVE_OFFER_TIME := 10.0     # seconds to decide before it counts as "No thanks"
+const REVIVE_AD_TIME := 3.0         # the placeholder ad screen
+const REVIVE_PUSH_RADIUS := 9.0     # m: enemies this close are pushed away...
+const REVIVE_PUSH_SPEED := 9.0      # ...at this speed (m/s, about 5 m) ...
+const REVIVE_STUN := 1.2            # ...and staggered this long (s)
+const REVIVE_INVULNERABLE := 2.0    # s of no damage after coming back
+
 # --- Armor -------------------------------------------------------------------------
 
 const MAX_ARMOR := 100

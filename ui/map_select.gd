@@ -2,12 +2,13 @@ extends Control
 ## Map selection, shown after Play on the main menu: one card per map in
 ## maps.gd with its picture, description, best score and stars (3 per map).
 ## Maps your level hasn't unlocked show the level they need. Picking a card
-## loads that map; Back returns to the main menu.
+## opens the loading screen (ui/loading_screen.gd), which loads that map; Back returns to the main menu.
 
 const Maps := preload("res://maps.gd")
 const Progression := preload("res://progression_config.gd")
 const StarRow := preload("res://ui/star_row.gd")
 const MENU_SCENE := "res://ui/main_menu.tscn"
+const LoadingScreen := preload("res://ui/loading_screen.gd")
 
 @onready var cards: HBoxContainer = %Cards
 @onready var back_button: Button = %BackButton
@@ -115,12 +116,8 @@ func _on_play(m: Dictionary) -> void:
 	for b: Button in play_buttons.values():
 		b.disabled = true
 	back_button.disabled = true
-	loading_label.text = "Loading %s..." % m.name
-	loading_label.visible = true
-	# Let "Loading..." draw before the map loads (that takes a moment).
-	await get_tree().process_frame
-	await get_tree().process_frame
-	get_tree().change_scene_to_file(m.scene)
+	# The loading screen (tip + progress bar) loads the map.
+	LoadingScreen.go(get_tree(), m)
 
 
 func _on_back() -> void:

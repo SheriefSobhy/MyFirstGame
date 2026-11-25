@@ -9,6 +9,12 @@ extends Control
 ##    open the weapon wheel and let go over a weapon to pick it.
 ## Each finger is tracked by its touch index, so you can move, look and
 ## shoot at the same time. Only shown on touch screen devices.
+##
+## Layout: buttons can be moved and resized (Settings > Customize Controls,
+## ui/controls_editor.gd, saved in Settings.touch_layout), the whole set can
+## be mirrored for left-handed players (Settings.left_handed: joystick on the
+## right, buttons on the left) and faded (Settings.touch_opacity).
+## `edit_mode` draws every button for the editor and ignores the game.
 
 const JOY_RADIUS := 90.0            # how far the knob can move from the center
 const KNOB_RADIUS := 40.0
@@ -19,6 +25,7 @@ const FONT_SIZE := 22
 const COLOR_FILL := Color(1, 1, 1, 0.15)
 const COLOR_PRESSED := Color(1, 1, 1, 0.4)
 const COLOR_LINE := Color(1, 1, 1, 0.6)
+const COLOR_HIGHLIGHT := Color(1, 0.8, 0.3)    # tutorial pointer, editor selection
 
 # Buttons: position is an offset from the bottom-right corner of the screen.
 const BUTTONS := {
@@ -49,6 +56,14 @@ const Weapons := preload("res://weapon_stats.gd")
 var player: Node
 ## Controls (like the pause button) whose touches are left to the GUI.
 var blockers: Array[Control] = []
+## The tutorial points at a button (or "joy") with a pulsing ring; "" = none.
+var highlight := "":
+	set(value):
+		highlight = value
+		queue_redraw()
+## Customize Controls: draw every button, no player, selected one outlined.
+var edit_mode := false
+var edit_selected := ""
 
 ## A finger that jumps further than this (in pixels) between two events is
 ## treated as a different finger.
@@ -72,9 +87,12 @@ var _switch_time := 0.0        # seconds the Switch button has been held
 func _ready() -> void:
 	visible = force_show or DisplayServer.is_touchscreen_available()
 	resized.connect(queue_redraw)
+	Settings.changed.connect(queue_redraw)
 
 
 func _process(delta: float) -> void:
+	if highlight != "":
+		queue_redraw()  # the pulsing ring
 	# Holding Switch for a moment opens the weapon wheel.
 	if _fingers.has("switch") and not _wheel_open:
 		_switch_time += delta
@@ -83,7 +101,7 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not visible or player == null:
+	if not visible or player == null or edit_mode:
 		return
 	if event is InputEventScreenTouch:
 		if event.pressed:
@@ -97,7 +115,7 @@ func _input(event: InputEvent) -> void:
 
 func _touch_down(index: int, pos: Vector2) -> void:
 	for blocker in blockers:
-		if blocker.is_visible_in_tree() and blocker.get_global_rect().has_point(pos):
+		if is_instance_valid(blocker) and blocker.is_visible_in_tree() and blocker.get_global_rect().has_point(pos):
 			return
 	match _button_at(pos):
 		"shoot":
@@ -283,31 +301,67 @@ func _draw_wheel(font: Font) -> void:
 				WHEEL_FONT_SIZE - 4, Color(1, 1, 1, 0.6) if owned else COLOR_DISABLED)
 
 
-## The joystick's fixed spot near the bottom-left corner.
+## The joystick's fixed spot near the bottom-left corner (bottom-right when
+## left-handed).
 func _joy_home() -> Vector2:
-	return Vector2(JOY_MARGIN, size.y - JOY_MARGIN)
+	return _mirror(Vector2(JOY_MARGIN, size.y - JOY_MARGIN))
 
 
 func _movement_enabled() -> bool:
-	return player != null and player.MOVEMENT_ENABLED
+	return edit_mode or (player != null and player.MOVEMENT_ENABLED)
 
 
 # Returns the name of the button under pos, or "" if none.
 func _button_at(pos: Vector2) -> String:
-	for button_name in BUTTONS:
+	for button_name: String in BUTTONS:
 		if _button_shown(button_name) \
-				and pos.distance_to(_button_center(button_name)) <= BUTTONS[button_name].radius:
+				and pos.distance_to(_button_center(button_name)) <= _button_radius(button_name):
 			return button_name
 	return ""
 
 
 # The Aim button shows for every weapon that can aim (all of them).
 func _button_shown(button_name: String) -> bool:
-	return button_name != "aim" or (player != null and player.can_aim())
+	return edit_mode or button_name != "aim" or (player != null and player.can_aim())
 
 
+## Where a button is on screen: its saved spot (Customize Controls) or the
+## default, mirrored for left-handed players.
 func _button_center(button_name: String) -> Vector2:
-	return size + BUTTONS[button_name].offset
+	var layout: Dictionary = Settings.button_layout(button_name)
+	var p: Vector2 = size + BUTTONS[button_name].offset
+	if layout.has("pos"):
+		var o: Vector2 = layout.pos
+		p = Vector2(o.x if o.x >= 0.0 else size.x + o.x, size.y + o.y)
+	return _mirror(p)
+
+
+func _button_radius(button_name: String) -> float:
+	return BUTTONS[button_name].radius * float(Settings.button_layout(button_name).get("scale", 1.0))
+
+
+func _button_scale(button_name: String) -> float:
+	return float(Settings.button_layout(button_name).get("scale", 1.0))
+
+
+## Customize Controls: puts a button at screen point `pos` (kept on screen)
+## with size `scale`, and saves it in Settings. The spot is remembered from
+## the nearer side edge, so it stays put on wider or narrower screens.
+func place_button(button_name: String, pos: Vector2, scale: float) -> void:
+	var r: float = BUTTONS[button_name].radius * clampf(scale, Settings.MIN_BUTTON_SCALE, Settings.MAX_BUTTON_SCALE)
+	pos = pos.clamp(Vector2(r, r), size - Vector2(r, r))
+	var p := _mirror(pos)  # saved as right-handed
+	var x := p.x if p.x < size.x * 0.5 else p.x - size.x
+	Settings.set_button_layout(button_name, Vector2(x, p.y - size.y), scale)
+
+
+func _mirror(p: Vector2) -> Vector2:
+	return Vector2(size.x - p.x, p.y) if Settings.left_handed else p
+
+
+# Button and joystick colours, faded by the opacity setting.
+func _fade(c: Color) -> Color:
+	return Color(c, c.a * Settings.touch_opacity)
 
 
 func _draw() -> void:
@@ -317,30 +371,52 @@ func _draw() -> void:
 	if _movement_enabled():
 		var center := _joy_home()
 		var knob := _joy_knob if _fingers.has("joy") else center
-		draw_circle(center, JOY_RADIUS, COLOR_FILL)
-		draw_arc(center, JOY_RADIUS, 0.0, TAU, 48, COLOR_LINE, 2.0)
-		draw_circle(knob, KNOB_RADIUS, COLOR_PRESSED)
+		draw_circle(center, JOY_RADIUS, _fade(COLOR_FILL))
+		draw_arc(center, JOY_RADIUS, 0.0, TAU, 48, _fade(COLOR_LINE), 2.0)
+		draw_circle(knob, KNOB_RADIUS, _fade(COLOR_PRESSED))
+		if edit_mode:
+			draw_string(font, center + Vector2(-JOY_RADIUS, JOY_RADIUS + 26), "MOVE",
+					HORIZONTAL_ALIGNMENT_CENTER, JOY_RADIUS * 2.0, FONT_SIZE - 4, _fade(Color.WHITE))
 
 	# Buttons.
-	for button_name in BUTTONS:
+	for button_name: String in BUTTONS:
 		if not _button_shown(button_name):
 			continue
 		var b: Dictionary = BUTTONS[button_name]
 		var c := _button_center(button_name)
-		var held: bool = (button_name in ["shoot", "grenade", "switch"] and _fingers.has(button_name)) \
-				or (button_name == "aim" and player.is_aiming())
-		draw_circle(c, b.radius, COLOR_PRESSED if held else COLOR_FILL)
-		draw_arc(c, b.radius, 0.0, TAU, 48, COLOR_LINE, 2.0)
-		if button_name == "grenade":
+		var r := _button_radius(button_name)
+		var font_size := int(FONT_SIZE * clampf(_button_scale(button_name), 0.8, 1.3))
+		var held: bool = player != null and ((button_name in ["shoot", "grenade", "switch"] and _fingers.has(button_name)) \
+				or (button_name == "aim" and player.is_aiming()))
+		draw_circle(c, r, _fade(COLOR_PRESSED if held else COLOR_FILL))
+		draw_arc(c, r, 0.0, TAU, 48, _fade(COLOR_LINE), 2.0)
+		if edit_mode and button_name == edit_selected:
+			draw_arc(c, r + 6.0, 0.0, TAU, 48, COLOR_HIGHLIGHT, 4.0)
+		if button_name == "grenade" and player != null:
 			# Label and how many are left; dimmed when there are none.
 			var text_color := Color.WHITE if player.grenades > 0 else COLOR_DISABLED
-			draw_string(font, Vector2(c.x - b.radius, c.y + 2), b.label,
-					HORIZONTAL_ALIGNMENT_CENTER, b.radius * 2.0, FONT_SIZE - 5, text_color)
-			draw_string(font, Vector2(c.x - b.radius, c.y + 28), "x%d" % player.grenades,
-					HORIZONTAL_ALIGNMENT_CENTER, b.radius * 2.0, FONT_SIZE, text_color)
+			draw_string(font, Vector2(c.x - r, c.y + 2), b.label,
+					HORIZONTAL_ALIGNMENT_CENTER, r * 2.0, font_size - 5, _fade(text_color))
+			draw_string(font, Vector2(c.x - r, c.y + 28), "x%d" % player.grenades,
+					HORIZONTAL_ALIGNMENT_CENTER, r * 2.0, font_size, _fade(text_color))
 		else:
-			draw_string(font, Vector2(c.x - b.radius, c.y + FONT_SIZE * 0.35), b.label,
-					HORIZONTAL_ALIGNMENT_CENTER, b.radius * 2.0, FONT_SIZE)
+			draw_string(font, Vector2(c.x - r, c.y + font_size * 0.35), b.label,
+					HORIZONTAL_ALIGNMENT_CENTER, r * 2.0, font_size - (5 if button_name == "grenade" else 0),
+					_fade(Color.WHITE))
+
+	# The tutorial's pointer: a pulsing ring around one button (or the stick).
+	if highlight != "":
+		var hc := Vector2.ZERO
+		var hr := 0.0
+		if highlight == "joy":
+			hc = _joy_home()
+			hr = JOY_RADIUS
+		elif BUTTONS.has(highlight) and _button_shown(highlight):
+			hc = _button_center(highlight)
+			hr = _button_radius(highlight)
+		if hr > 0.0:
+			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 160.0)
+			draw_arc(hc, hr + 8.0 + pulse * 10.0, 0.0, TAU, 48, Color(COLOR_HIGHLIGHT, 0.5 + 0.5 * pulse), 5.0)
 
 	if _wheel_open:
 		_draw_wheel(font)

@@ -44,6 +44,8 @@ const BOSS_HP_PER_WAVE := 40    # extra boss health for each later boss wave
 const BOSS_WAVE_SHARE := 0.6    # boss waves have fewer other enemies
 const Explosion := preload("res://effects/explosion.gd")
 const Grenade := preload("res://effects/grenade.gd")
+const Tutorial := preload("res://tutorial.gd")
+const AutoQuality := preload("res://auto_quality.gd")
 
 enum Phase { FIGHT, BREAK, OVER }
 
@@ -60,6 +62,12 @@ var phase := Phase.FIGHT
 var max_enemies := MAX_ENEMIES
 ## Cash, the shop, power-ups (match_economy.gd).
 var economy: MatchEconomy
+## The first-match tutorial (tutorial.gd), null when not running.
+var tutorial: Tutorial
+## Graphics Auto measuring the frame rate (auto_quality.gd), null when not.
+var auto_quality: AutoQuality
+## Revives left this match (economy.gd REVIVES_PER_MATCH).
+var revives_left := Economy.REVIVES_PER_MATCH
 
 var _to_spawn := 0     # enemies of this wave not spawned yet
 var _spawn_queue: Array[String] = []   # their kinds, in spawn order
@@ -115,6 +123,8 @@ func _ready() -> void:
 	player.touch_active = hud.touch_controls.visible
 	hud.retry_requested.connect(_on_retry)
 	hud.main_menu_requested.connect(_on_main_menu)
+	hud.revive_screen.revived.connect(_on_revived)
+	hud.revive_screen.declined.connect(_game_over)
 	hud.touch_controls.player = player
 	# The touch Aim button lights up while aiming.
 	player.weapon_changed.connect(func(_name: String) -> void: hud.touch_controls.queue_redraw())
@@ -135,8 +145,13 @@ func _ready() -> void:
 	_apply_quality()
 	Settings.changed.connect(_apply_quality)
 	_prewarm_effects()
+	_start_auto_quality()
 
-	start_wave(1)
+	# The first match teaches the controls before wave 1 (tutorial.gd).
+	if Settings.tutorial_done:
+		start_wave(1)
+	else:
+		start_tutorial()
 
 
 func _process(delta: float) -> void:
@@ -150,6 +165,38 @@ func _process(delta: float) -> void:
 		hud.set_break(wave + 1, seconds)
 	if _break_left <= 0.0:
 		start_wave(wave + 1)
+
+
+## Shows the tutorial tips (tutorial.gd); wave 1 waits until the basics are
+## done or skipped.
+func start_tutorial() -> void:
+	tutorial = Tutorial.new()
+	tutorial.name = "Tutorial"
+	tutorial.player = player
+	tutorial.hud = hud
+	hud.add_child(tutorial)
+	hud.move_child(tutorial, hud.shop_button.get_index())  # under the shop and menus
+	tutorial.basics_done.connect(func() -> void:
+		if wave == 0:
+			start_wave(1))
+	tutorial.tree_exited.connect(func() -> void: tutorial = null)
+	hud.wave_label.text = "Tutorial"
+
+
+# Graphics Auto: measure the frame rate this match (auto_quality.gd), unless
+# it already picked. Not in tests (they set the quality themselves).
+func _start_auto_quality() -> void:
+	if Settings.quality != Settings.Quality.AUTO or Settings.auto_quality >= 0 \
+			or Settings._under_test():
+		return
+	auto_quality = AutoQuality.new()
+	auto_quality.name = "AutoQuality"
+	auto_quality.measured_at = Settings.effective_quality()
+	add_child(auto_quality)
+	auto_quality.picked.connect(func(q: int) -> void:
+		auto_quality = null
+		_apply_quality()
+		hud.show_toast("Graphics: Auto picked %s" % Settings.QUALITY_NAMES[q]))
 
 
 # Cash, the shop, armor and power-ups. Weapons are bought in the shop now,
@@ -469,7 +516,8 @@ func _wave_cleared() -> void:
 	hud.show_banner("Wave %d cleared" % wave, "+$%d  ·  Shop open" % Economy.wave_cash(wave), BREAK_TIME - 0.6)
 
 
-# Graphics quality from the settings screen (Low / Medium / High): shadows,
+# Graphics quality from the settings screen (Low / Medium / High, or what
+# Auto picked, see auto_quality.gd): shadows,
 # fog, glow and the resolution the 3D scene is drawn at (it is scaled up to
 # the screen; the HUD always stays sharp). Medium matches the old phone setup.
 func _apply_quality() -> void:
@@ -477,8 +525,8 @@ func _apply_quality() -> void:
 	var flash_light: Light3D = player.get_node("%FlashLight")
 	# Maps can mark some of their lamps as extras that Low quality turns off.
 	for lamp: Node in get_tree().get_nodes_in_group("optional_lights"):
-		lamp.visible = Settings.quality != Settings.Quality.LOW
-	match Settings.quality:
+		lamp.visible = Settings.effective_quality() != Settings.Quality.LOW
+	match Settings.effective_quality():
 		Settings.Quality.LOW:
 			vp.scaling_3d_scale = 0.5
 			vp.mesh_lod_threshold = 4.0
@@ -576,7 +624,42 @@ func _prewarm_effects() -> void:
 		node.queue_free()
 
 
+# Dying: a revive is offered first while there is one left this match
+# (ui/revive_screen.gd: "Watch ad to revive"), then Game Over.
 func _on_player_died() -> void:
+	if revives_left > 0:
+		revives_left -= 1
+		spawn_timer.paused = true
+		get_tree().paused = true
+		hud.offer_revive()
+		return
+	_game_over()
+
+
+## Back with full health after the (placeholder) ad: enemies near the
+## player are pushed away and staggered, and a moment of no damage.
+func _on_revived() -> void:
+	player.revive(Economy.REVIVE_INVULNERABLE)
+	push_back_enemies(player.global_position)
+	spawn_timer.paused = false
+	hud.end_revive()
+	get_tree().paused = false
+	hud.show_message("Back in the fight!")
+
+
+## Pushes every living enemy within REVIVE_PUSH_RADIUS away from `from`.
+func push_back_enemies(from: Vector3) -> void:
+	for e: Node in enemies.get_children():
+		if e.state == e.State.DEAD or not e.has_method("shove_from"):
+			continue
+		if e.global_position.distance_to(from) <= Economy.REVIVE_PUSH_RADIUS:
+			e.shove_from(from, Economy.REVIVE_PUSH_SPEED, Economy.REVIVE_STUN)
+
+
+func _game_over() -> void:
+	if phase == Phase.OVER:
+		return
+	spawn_timer.paused = false
 	phase = Phase.OVER
 	spawn_timer.stop()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

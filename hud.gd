@@ -17,6 +17,7 @@ signal shop_ready
 
 const CombatFeedback := preload("res://combat_feedback.gd")
 const ShopMenu := preload("res://ui/shop_menu.gd")
+const ReviveScreen := preload("res://ui/revive_screen.gd")
 const Economy := preload("res://economy.gd")
 const Progression := preload("res://progression_config.gd")
 const COLOR_CASH := Color(0.45, 1.0, 0.45)
@@ -60,6 +61,9 @@ var is_game_over := false
 var feedback: CombatFeedback
 ## The between-waves shop (ui/shop_menu.gd); main.gd sets its economy and player.
 var shop: ShopMenu
+## "Watch ad to revive" when the player dies (ui/revive_screen.gd).
+var revive_screen: ReviveScreen
+var _touch_was_visible := false
 ## Shown during the break between waves; opens the shop.
 var shop_button: Button
 var cash_label: Label
@@ -98,6 +102,10 @@ func _ready() -> void:
 	move_child(feedback, scope_overlay.get_index() + 1)
 	_build_economy_hud()
 	_build_progress_hud()
+	revive_screen = ReviveScreen.new()
+	revive_screen.name = "ReviveScreen"
+	add_child(revive_screen)
+	move_child(revive_screen, level_up_panel.get_index())
 	game_over_panel.visible = false
 	pause_menu.visible = false
 	settings_menu.visible = false
@@ -128,7 +136,7 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if is_game_over:
+	if is_game_over or revive_screen.visible:
 		return
 	# B opens the shop during the break (keyboard).
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_B:
@@ -157,7 +165,7 @@ func _notification(what: int) -> void:
 
 
 func pause() -> void:
-	if is_game_over or get_tree().paused or shop.visible:
+	if is_game_over or get_tree().paused or shop.visible or revive_screen.visible:
 		return
 	get_tree().paused = true
 	touch_controls.reset()
@@ -181,6 +189,30 @@ func resume() -> void:
 
 func is_paused() -> bool:
 	return pause_menu.visible
+
+
+# --- Revive --------------------------------------------------------------------
+
+## The player died with a revive left: "Watch ad to revive" / "No thanks"
+## (main.gd pauses the game meanwhile).
+func offer_revive() -> void:
+	touch_controls.reset()
+	_touch_was_visible = touch_controls.visible
+	touch_controls.visible = false
+	pause_button.visible = false
+	shop_button.visible = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_was_captured = false
+	revive_screen.offer()
+
+
+## Revived: the game controls come back.
+func end_revive() -> void:
+	touch_controls.visible = _touch_was_visible
+	pause_button.visible = true
+	shop_button.visible = _shop_available
+	if not DisplayServer.is_touchscreen_available():
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 # --- Economy: cash, armor, power-ups and the shop ----------------------------

@@ -436,6 +436,7 @@ func _test_barrels() -> void:
 
 func _test_game_over() -> void:
 	player.armor = 0
+	main.revives_left = 0  # straight to Game Over (the revive has its own test)
 	player.take_damage(1000)
 	await frames(3)
 	check(hud.game_over_panel.visible, "Game Over")
