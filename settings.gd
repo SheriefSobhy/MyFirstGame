@@ -52,6 +52,9 @@ var bests := {}
 ## The best score over all maps (shown on the main menu).
 var best_score := 0
 var best_wave := 0
+## Training Arena challenge bests (training_config.gd CHALLENGES): id -> value
+## (seconds for Target Practice, headshots, accuracy %). Saved with the bests.
+var training_bests := {}
 
 
 func _ready() -> void:
@@ -147,12 +150,31 @@ func submit_score(score: int, waves: int, map_id := "yard") -> bool:
 	return new_best
 
 
+## Records a Training Arena challenge result. lower_is_better for times.
+## Returns true if it is a new best.
+func submit_training(challenge: String, value: float, lower_is_better := false) -> bool:
+	var has_old := training_bests.has(challenge)
+	var old: float = training_bests.get(challenge, 0.0)
+	var better := not has_old or (value < old if lower_is_better else value > old)
+	if better:
+		training_bests[challenge] = value
+		save_bests()
+	return better
+
+
+## The best result of a Training Arena challenge, or -1 if never done.
+func training_best(challenge: String) -> float:
+	return training_bests.get(challenge, -1.0)
+
+
 ## Writes the best scores to user://save.cfg.
 func save_bests() -> void:
 	var cfg := ConfigFile.new()
 	for id: String in bests:
 		cfg.set_value("best_" + id, "score", bests[id].score)
 		cfg.set_value("best_" + id, "wave", bests[id].wave)
+	for id: String in training_bests:
+		cfg.set_value("training", id, training_bests[id])
 	cfg.save(SAVE_PATH)
 
 
@@ -167,6 +189,7 @@ func best_wave_for(map_id: String) -> int:
 ## Forgets every best score (tests use this; nothing is saved until the next run).
 func clear_bests() -> void:
 	bests.clear()
+	training_bests.clear()
 	_update_overall()
 
 
@@ -208,6 +231,9 @@ func _load() -> void:
 					"score": int(save.get_value(section, "score", 0)),
 					"wave": int(save.get_value(section, "wave", 0)),
 				}
+		if save.has_section("training"):
+			for id in save.get_section_keys("training"):
+				training_bests[id] = float(save.get_value("training", id, 0.0))
 		# Saves from before there were several maps: that score was the yard's.
 		if save.has_section("best") and not bests.has("yard"):
 			bests["yard"] = {"score": int(save.get_value("best", "score", 0)), "wave": int(save.get_value("best", "wave", 0))}

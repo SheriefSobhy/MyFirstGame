@@ -8,7 +8,7 @@ extends SceneTree
 ##   godot --headless --path . --script res://tools/bake_navmesh.gd
 
 const Types := preload("res://enemy_types.gd")
-const MAPS := ["res://main.tscn", "res://maps/town.tscn", "res://maps/warehouse.tscn"]
+const MAPS := ["res://main.tscn", "res://maps/town.tscn", "res://maps/warehouse.tscn", "res://maps/training.tscn"]
 
 ## Must match navigation/3d/default_cell_size and default_cell_height in
 ## project.godot. Fine cells so each agent radius is kept closely (Recast

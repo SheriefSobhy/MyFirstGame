@@ -10,6 +10,8 @@ extends Control
 const MAP_SELECT_SCENE := "res://ui/map_select.tscn"
 const Config := preload("res://progression_config.gd")
 const ArmoryMenu := preload("res://ui/armory_menu.gd")
+const LoadingScreen := preload("res://ui/loading_screen.gd")
+const Maps := preload("res://maps.gd")
 const AchievementsMenu := preload("res://ui/achievements_menu.gd")
 const COLOR_GOLD := Color(1.0, 0.8, 0.35)
 const COLOR_DONE := Color(0.45, 1.0, 0.45)
@@ -17,6 +19,7 @@ const COLOR_DONE := Color(0.45, 1.0, 0.45)
 @onready var title_label: Label = %Title
 @onready var best_label: Label = %Best
 @onready var play_button: Button = %PlayButton
+@onready var training_button: Button = %TrainingButton
 @onready var armory_button: Button = %ArmoryButton
 @onready var achievements_button: Button = %AchievementsButton
 @onready var settings_button: Button = %SettingsButton
@@ -56,7 +59,9 @@ func _ready() -> void:
 	move_child(settings_menu, -1)
 	_build_login_popup()
 
+	_compact_buttons()
 	play_button.pressed.connect(_on_play)
+	training_button.pressed.connect(_on_training)
 	armory_button.pressed.connect(armory.open)
 	achievements_button.pressed.connect(achievements.open)
 	settings_button.pressed.connect(settings_menu.open)
@@ -252,6 +257,30 @@ func _claim_login() -> void:
 
 
 func _on_play() -> void:
-	for button: Button in [play_button, armory_button, achievements_button, settings_button, quit_button]:
-		button.disabled = true
+	_disable_buttons()
 	get_tree().change_scene_to_file(MAP_SELECT_SCENE)
+
+
+## The Training Arena (always unlocked, earns nothing), through the loading screen.
+func _on_training() -> void:
+	_disable_buttons()
+	LoadingScreen.go(get_tree(), Maps.TRAINING)
+
+
+# The buttons under Play: a little smaller, so all six fit on a 720 px screen.
+func _compact_buttons() -> void:
+	for b: Button in [training_button, armory_button, achievements_button, settings_button, quit_button]:
+		b.add_theme_font_size_override("font_size", 27)
+		for state in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
+			var sb := b.get_theme_stylebox(state)
+			if sb == null:
+				continue
+			sb = sb.duplicate()
+			sb.content_margin_top = 6.0
+			sb.content_margin_bottom = 6.0
+			b.add_theme_stylebox_override(state, sb)
+
+
+func _disable_buttons() -> void:
+	for button: Button in [play_button, training_button, armory_button, achievements_button, settings_button, quit_button]:
+		button.disabled = true

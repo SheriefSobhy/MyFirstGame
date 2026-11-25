@@ -43,6 +43,21 @@ static func powerup() -> AudioStreamWAV:
 		return (sin(TAU * freq * t) * 0.6 + sin(TAU * freq * 2.0 * t) * 0.25) * env, 0.6)
 
 
+## A steel plate ringing when hit (Training Arena metal targets).
+static func ding() -> AudioStreamWAV:
+	return _build("ding", func(t: float) -> float:
+		var ring := sin(TAU * 1180.0 * t) * 0.5 + sin(TAU * 2730.0 * t) * 0.3 + sin(TAU * 4410.0 * t) * 0.15
+		var knock := sin(TAU * 420.0 * t) * exp(-t * 60.0)
+		return (ring * exp(-t * 7.0) * 0.8 + knock * 0.4) * minf(t / 0.002, 1.0), 0.7)
+
+
+## A soft rising blip: a pop-up target appears (Training Arena challenges).
+static func blip() -> AudioStreamWAV:
+	return _build("blip", func(t: float) -> float:
+		var f := lerpf(700.0, 1100.0, minf(t / 0.06, 1.0))
+		return sin(TAU * f * t) * minf(t / 0.004, 1.0) * exp(-t * 30.0) * 0.5, 0.12)
+
+
 ## "Lub-dub": two soft low thumps.
 static func heartbeat() -> AudioStreamWAV:
 	return _build("heart", func(t: float) -> float:

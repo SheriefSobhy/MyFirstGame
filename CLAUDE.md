@@ -26,7 +26,8 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 | **Persistent progression** | config `progression_config.gd`, state `progress.gd` (autoload `Progress`) |
 | Armory / Achievements screens | `ui/armory_menu.gd`, `ui/achievements_menu.gd` (overlays on the main menu) |
 | Weapon skins (material tint / camo) | `weapon_skins.gd` |
-| Maps list | `maps.gd` |
+| Maps list | `maps.gd` (`LIST` for map select, `TRAINING` for the arena) |
+| **Training Arena** (main menu > Training) | scene `maps/training.tscn` (built by `build_maps.gd`), `training/training.gd` (extends `main.gd`), `training/target.gd`, `training/weapon_rack.gd`, `training/training_ui.gd`, config `training_config.gd` |
 | Settings + best scores | `settings.gd` (autoload `Settings`), `ui/settings_menu.*` |
 | Music | `music.gd` (autoload `Music`) |
 | Level kit (Blender-made walls, frames, roofs, pipes, signs...) | `tools/blender/build_kit.py` → `assets/models/kit/kit.glb` + `assets/textures/kit/`, placed by `tools/kit_builder.gd`, material `materials/kit.tres` (`kit_surface.gdshader`) |
@@ -39,6 +40,36 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
   skins, daily mission pool, login rewards, map star waves, achievements):
   `progression_config.gd`. Change numbers there only.
 - Weapon stats: `weapon_stats.gd`. Enemy stats: `enemy_types.gd`.
+- Training Arena (target/dummy/challenge layout and numbers): `training_config.gd`.
+
+## Training Arena (`training/`)
+
+Always unlocked, opened from the main menu's Training button through the
+loading screen (`Maps.TRAINING`, not in `Maps.LIST`). Nothing is earned:
+`training.gd` never calls `Progress.start_match`/`on_kill`/..., so no XP,
+coins, missions, achievements or best scores (a test checks this).
+
+- `training.gd` extends `main.gd` (graphics quality, navmeshes, prewarm) and
+  replaces `_ready`/`_process`; no waves. Player: `invincible`,
+  `own_all_weapons()`, `set_infinite_ammo()` (reserve -1, reloads stay),
+  `infinite_grenades`. Armory upgrades/skins apply as in a match.
+- Range: firing line z = 0, downrange -z to 100 m. Lanes: one per distance on
+  the left (paper + 2 steel plates, `LANES`, so near targets never hide far
+  ones), pop-ups and 2 moving targets in the middle, dummies on the right.
+  Weapon rack on the hall's back wall (E / TAKE).
+- Targets (`target.gd`) look like enemies to the gun (`take_damage`,
+  `is_head_hit`, `hp`), so hit markers/damage numbers work; the silhouette's
+  head is a headshot. Steel plates fall and reset after `METAL_RESET`.
+- Dummies are `enemy.gd` with `dummy = true`: never chase/attack/aim, the
+  exploder doesn't blow up; `set_dummy_walk()` patrols slowly along the lane.
+  They come back `DUMMY_RESPAWN` s after dying; head zones show `head_sphere()`.
+- Stats from `player.fired` + `enemy_hit` (one shot = one hit however many
+  pellets). DPS is in damage-number units (x10).
+- Challenges (`CHALLENGES`): Target Practice (time), Headshot Challenge
+  (count), Reflex (accuracy %); bests in `Settings.training_bests`
+  (`user://save.cfg` [training]), cleared with the best scores.
+- Lit by the sun + a baked lightmap (`maps/training.lmbake/.exr`, ~0.9 MB);
+  the hall lamps are `BAKE_STATIC` (no runtime cost).
 
 ## Persistent progression (`progress.gd`)
 
@@ -101,8 +132,8 @@ Each test is a SceneTree script that prints PASS/FAIL and exits 1 on failure:
 ```
 
 Tests: `test_progression`, `test_economy`, `test_game_loop`, `test_maps`,
-`test_weapons`, `test_combat_feel`, `test_enemies`, `test_mobile`, `test_navigation`
-(run that one with `--fixed-fps 60`). Most accept `-- --shots <folder>`
+`test_weapons`, `test_combat_feel`, `test_enemies`, `test_mobile`,
+`test_training`, `test_navigation` (run that one with `--fixed-fps 60`). Most accept `-- --shots <folder>`
 (without `--headless`) to save screenshots for a visual check.
 
 - Under a tool script, `Progress` starts empty and saves to
@@ -150,6 +181,11 @@ used headless only (`blender -b --factory-startup --python ...`).
   keep full-height colliders, so broken tops are kept under ~0.9 m deep).
 - After changing the kit: `build_kit.bat`, then `build_level.gd` and
   `build_maps.gd`, then `tools/rebake.bat`.
+- `build_maps.gd -- --only training` (or town / warehouse) rebuilds one map;
+  `rebake.bat training` (or yard) bakes one lightmap (the autobake plugin
+  bakes `main.tscn` and `maps/training.tscn`). The editor run re-serializes
+  `project.godot` and `ui/theme.tres`: revert those (`git checkout`).
+- `make_thumbnails.gd -- --only <id>` (with a window) renders one picture.
 - `rebake.bat` imports headless first: the editor crashed (signal 11) when it
   had to VRAM-compress new textures itself (GPU compressor on this Intel GPU).
 - Size: the kit added ~5 MB to the APK (atlas textures ~2.8 MB, merged meshes
@@ -162,4 +198,4 @@ used headless only (`blender -b --factory-startup --python ...`).
 - `build_all.bat`: Android APK → `builds/LastStand.apk`, Windows →
   `builds/windows/LastStand.exe` (git-ignored). No commit.
 - `publish.bat`: web export to `docs/`, commit everything, push (GitHub Pages).
-- `tools/rebake.bat`: lightmap + navmeshes after level geometry changes.
+- `tools/rebake.bat`: lightmaps + navmeshes after level geometry changes.

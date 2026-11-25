@@ -108,29 +108,11 @@ func _ready() -> void:
 	wind.play()
 	Music.play_game(music)
 
-	# Player -> HUD
-	player.health_changed.connect(hud.set_health)
-	player.ammo_changed.connect(hud.set_ammo)
-	player.weapon_changed.connect(hud.set_weapon)
-	player.grenades_changed.connect(hud.set_grenades)
-	player.scope_changed.connect(hud.set_scoped)
-	player.aim_changed.connect(hud.set_aiming)
-	player.message.connect(hud.show_message)
-	player.died.connect(_on_player_died)
-	player.hit_taken.connect(hud.flash_damage)
-	player.enemy_hit.connect(hud.feedback.on_enemy_hit)
-	# Aim assist only helps the touch controls.
-	player.touch_active = hud.touch_controls.visible
+	_connect_player_hud()
 	hud.retry_requested.connect(_on_retry)
 	hud.main_menu_requested.connect(_on_main_menu)
 	hud.revive_screen.revived.connect(_on_revived)
 	hud.revive_screen.declined.connect(_game_over)
-	hud.touch_controls.player = player
-	# The touch Aim button lights up while aiming.
-	player.weapon_changed.connect(func(_name: String) -> void: hud.touch_controls.queue_redraw())
-	player.scope_changed.connect(func(_on: bool) -> void: hud.touch_controls.queue_redraw())
-	player.aim_changed.connect(func(_on: bool, _sight: String) -> void: hud.touch_controls.queue_redraw())
-	player.grenades_changed.connect(func(_n: int) -> void: hud.touch_controls.queue_redraw())
 	spawn_timer.wait_time = SPAWN_INTERVAL
 	spawn_timer.timeout.connect(_on_spawn_tick)
 
@@ -152,6 +134,28 @@ func _ready() -> void:
 		start_wave(1)
 	else:
 		start_tutorial()
+
+
+# Player -> HUD and the touch controls (the Training Arena uses this too).
+func _connect_player_hud() -> void:
+	player.health_changed.connect(hud.set_health)
+	player.ammo_changed.connect(hud.set_ammo)
+	player.weapon_changed.connect(hud.set_weapon)
+	player.grenades_changed.connect(hud.set_grenades)
+	player.scope_changed.connect(hud.set_scoped)
+	player.aim_changed.connect(hud.set_aiming)
+	player.message.connect(hud.show_message)
+	player.died.connect(_on_player_died)
+	player.hit_taken.connect(hud.flash_damage)
+	player.enemy_hit.connect(hud.feedback.on_enemy_hit)
+	# Aim assist only helps the touch controls.
+	player.touch_active = hud.touch_controls.visible
+	hud.touch_controls.player = player
+	# The touch Aim button lights up while aiming.
+	player.weapon_changed.connect(func(_name: String) -> void: hud.touch_controls.queue_redraw())
+	player.scope_changed.connect(func(_on: bool) -> void: hud.touch_controls.queue_redraw())
+	player.aim_changed.connect(func(_on: bool, _sight: String) -> void: hud.touch_controls.queue_redraw())
+	player.grenades_changed.connect(func(_n: int) -> void: hud.touch_controls.queue_redraw())
 
 
 func _process(delta: float) -> void:

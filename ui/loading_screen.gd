@@ -28,6 +28,7 @@ const TIPS := [
 	"Aiming down the sights makes every gun more accurate.",
 	"Settings > Customize Controls lets you move and resize the touch buttons.",
 	"Battery low? Cap the frame rate at 30 FPS in Settings.",
+	"Try your Armory upgrades and skins in the Training Arena first.",
 ]
 
 ## The map being loaded (set by go()).

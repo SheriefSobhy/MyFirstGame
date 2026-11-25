@@ -1,0 +1,32 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://materials/level_surface.gdshader" id="1_xb2vj"]
+[ext_resource type="Texture2D" path="res://assets/textures/concrete_floor_worn_001/concrete_floor_worn_001_diff_1k.jpg" id="2_2ivpk"]
+[ext_resource type="Texture2D" path="res://assets/textures/generated/noise_rgb.png" id="3_i2uxk"]
+[ext_resource type="Texture2D" path="res://assets/textures/concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_1k.jpg" id="4_i3sew"]
+[ext_resource type="Texture2D" path="res://assets/textures/concrete_floor_worn_001/concrete_floor_worn_001_rough_1k.jpg" id="5_a6314"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_xb2vj")
+shader_parameter/albedo_tex = ExtResource("2_2ivpk")
+shader_parameter/normal_tex = ExtResource("4_i3sew")
+shader_parameter/roughness_tex = ExtResource("5_a6314")
+shader_parameter/noise_tex = ExtResource("3_i2uxk")
+shader_parameter/tint = Color(0.62, 0.6, 0.55, 1)
+shader_parameter/uv_scale = 0.2
+shader_parameter/normal_strength = null
+shader_parameter/roughness_add = null
+shader_parameter/macro_scale = 0.04
+shader_parameter/macro_strength = 0.35
+shader_parameter/macro_tint = Color(0.8, 0.74, 0.66, 1)
+shader_parameter/patch_amount = null
+shader_parameter/patch_scale = null
+shader_parameter/patch_tint = null
+shader_parameter/streak_strength = null
+shader_parameter/dirt_color = null
+shader_parameter/dirt_height = null
+shader_parameter/dirt_strength = 0.6
+shader_parameter/ground_y = null
+shader_parameter/edge_dirt_start = 0.0
+shader_parameter/edge_dirt_end = null

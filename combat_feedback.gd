@@ -45,6 +45,8 @@ var marker_kind := ""
 var streak := 0
 ## The text of the last streak popup ("" before any).
 var last_streak_text := ""
+## Damage numbers even with the setting off (the Training Arena).
+var force_numbers := false
 
 var _marker_time := 0.0
 var _marker_length := MARKER_TIME
@@ -133,7 +135,7 @@ func on_enemy_hit(_enemy: Node3D, damage: int, point: Vector3, headshot: bool, k
 		_tick_sound.play()
 	if headshot:
 		_show_headshot()
-	if Settings.damage_numbers:
+	if Settings.damage_numbers or force_numbers:
 		_show_number(damage * DAMAGE_DISPLAY_SCALE, point, headshot)
 
 

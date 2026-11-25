@@ -21,6 +21,9 @@ signal armor_changed(armor: int)
 ## A shot hit an enemy (all pellets on it added up). For the hit marker and
 ## damage numbers. killed = this shot killed it.
 signal enemy_hit(enemy: Node3D, damage: int, point: Vector3, headshot: bool, killed: bool)
+## A shot left the gun (before its bullets hit anything): the Training
+## Arena's accuracy stats.
+signal fired
 
 const Weapons := preload("res://weapon_stats.gd")
 const Haptics := preload("res://effects/haptics.gd")
@@ -105,6 +108,11 @@ var grenades := START_GRENADES
 var armor := 0
 ## Insta-Kill power-up: every bullet kills (except the Boss). Set by match_economy.gd.
 var insta_kill := false
+## Training Arena (training/training.gd): no damage at all, spare ammo never
+## runs out (reloads still happen) and grenades are never used up.
+var invincible := false
+var infinite_ammo := false
+var infinite_grenades := false
 
 # Set by the on-screen touch controls (see touch_controls.gd).
 var touch_move := Vector2.ZERO   # joystick direction, length 0..1
@@ -407,6 +415,7 @@ func shoot() -> void:
 	_mag[weapon_index] -= 1
 	_fire_cooldown = w.fire_delay
 	_emit_ammo()
+	fired.emit()
 
 	# Flash, sound, kick and shake.
 	muzzle_flash.visible = true
@@ -744,6 +753,25 @@ func give_weapon(index: int) -> bool:
 	return true
 
 
+## Training Arena: every weapon, magazines full.
+func own_all_weapons() -> void:
+	for i in _owned.size():
+		if not _owned[i]:
+			_owned[i] = true
+			_mag[i] = mag_size(i)
+			_reserve[i] = Weapons.LIST[i].reserve
+	_emit_ammo()
+
+
+## Training Arena: unlimited spare ammo on (every reserve -1 = unlimited) or
+## off (every reserve back to full).
+func set_infinite_ammo(on: bool) -> void:
+	infinite_ammo = on
+	for i in _owned.size():
+		_reserve[i] = -1 if on else Weapons.LIST[i].max_reserve
+	_emit_ammo()
+
+
 ## Called by ammo boxes: spare ammo for every weapon the player owns, and
 ## one grenade. Returns false (and the box stays) if everything is already full.
 func give_ammo() -> bool:
@@ -878,6 +906,10 @@ func take_damage(amount: int) -> void:
 		return
 	if _invulnerable > 0.0:
 		return
+	if invincible:
+		_shake = maxf(_shake, SHAKE_ON_HIT * 0.5)
+		hit_taken.emit()  # red flash only
+		return
 	_shake = maxf(_shake, SHAKE_ON_HIT)
 	Haptics.damage()
 	if GOD_MODE:
@@ -960,7 +992,7 @@ func add_shake(amount: float) -> void:
 
 ## G pressed / GRENADE button touched: pull the pin and show the throw arc.
 func start_grenade() -> void:
-	if is_dead or _grenade_held or grenades <= 0 or _throw_cooldown > 0.0:
+	if is_dead or _grenade_held or (grenades <= 0 and not infinite_grenades) or _throw_cooldown > 0.0:
 		return
 	_grenade_held = true
 	_play_reload_sound(PIN_SOUND)
@@ -974,9 +1006,10 @@ func throw_grenade() -> void:
 		return
 	_grenade_held = false
 	_hide_throw_preview()
-	if is_dead or grenades <= 0:
+	if is_dead or (grenades <= 0 and not infinite_grenades):
 		return
-	grenades -= 1
+	if not infinite_grenades:
+		grenades -= 1
 	_throw_cooldown = THROW_COOLDOWN
 	grenades_changed.emit(grenades)
 	var g: RigidBody3D = Grenade.new()

@@ -43,6 +43,19 @@ const LIST := [
 ]
 
 
+## The Training Arena (main menu > Training): not on the map selection screen,
+## always unlocked, earns nothing (training/training.gd).
+const TRAINING := {
+	"id": "training",
+	"short": "Training",
+	"name": "Training Arena",
+	"description": "A shooting range: targets, dummies of every enemy type and challenges.",
+	"scene": "res://maps/training.tscn",
+	"thumbnail": "res://ui/thumbnails/training.jpg",
+	"color": Color(0.55, 0.9, 0.55),
+}
+
+
 static func find(id: String) -> Dictionary:
 	for m: Dictionary in LIST:
 		if m.id == id:

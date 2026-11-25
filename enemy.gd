@@ -129,6 +129,13 @@ var no_reward := false
 ## how many times each happened (for tests).
 var stuck_level := 0
 var stuck_counts := [0, 0, 0, 0]
+## Training Arena dummy (training/training.gd): never chases or attacks the
+## player, an exploder doesn't blow up. It stands still, or with dummy_walk
+## on walks slowly back and forth between the `patrol` points (navmesh).
+var dummy := false
+var dummy_walk := false
+var patrol: Array[Vector3] = []
+var _patrol_index := 0
 
 var _state_time := 0.0
 var _attack_landed := false
@@ -218,7 +225,13 @@ func _ready() -> void:
 	for a: String in [stats.anims.walk, stats.anims.get("idle", "")]:
 		if a != "" and anim.has_animation(a):
 			anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
-	anim.play(stats.anims.walk, -1, _walk_anim_speed())
+	var idle := _idle_anim()
+	if idle != "":
+		anim.get_animation(idle).loop_mode = Animation.LOOP_LINEAR
+	if dummy:
+		_play_dummy_anim(-1.0)
+	else:
+		anim.play(stats.anims.walk, -1, _walk_anim_speed())
 	anim.seek(randf() * 1.0)  # so a group of enemies doesn't walk in sync
 	_growl_timer = randf_range(1.0, 6.0)
 	_sfx = AudioStreamPlayer3D.new()
@@ -232,7 +245,7 @@ func _ready() -> void:
 		_add_gun()
 		_shot_cooldown = randf_range(0.8, 1.6)
 		_strafe_dir = 1.0 if randf() < 0.5 else -1.0
-	if kind == "boss" and not silent:
+	if kind == "boss" and not silent and not dummy:
 		_sfx.stream = BOSS_ROAR
 		_sfx.unit_size = 20.0
 		_sfx.play()
@@ -259,7 +272,9 @@ func _physics_process(delta: float) -> void:
 	_wants_move = false
 	match state:
 		State.CHASE:
-			if kind == "soldier":
+			if dummy:
+				_dummy_move(delta)
+			elif kind == "soldier":
 				_soldier_move(delta)
 			else:
 				_chase(delta)
@@ -553,6 +568,40 @@ func is_trying_to_move() -> bool:
 	return _wants_move
 
 
+## Training dummy: walking (slowly, between the patrol points) on or off.
+func set_dummy_walk(on: bool) -> void:
+	dummy_walk = on
+	if state == State.CHASE:
+		_play_dummy_anim(0.2)
+
+
+func _dummy_move(delta: float) -> void:
+	if not dummy_walk or patrol.is_empty():
+		_stop()
+		return
+	var target := patrol[_patrol_index % patrol.size()]
+	if _flat_distance(global_position, target) < 0.5:
+		_patrol_index = (_patrol_index + 1) % patrol.size()
+		target = patrol[_patrol_index]
+	_walk_to(target, delta)
+
+
+func _play_dummy_anim(blend: float) -> void:
+	var idle := _idle_anim()
+	if dummy_walk or idle == "":
+		anim.play(stats.anims.walk, blend, _walk_anim_speed())
+	else:
+		anim.play(idle, blend)
+
+
+# A standing animation: the type's own, or the shared rig's neutral idle.
+func _idle_anim() -> String:
+	for a: String in [stats.anims.get("idle", ""), "CharacterArmature|Idle_Neutral"]:
+		if a != "" and anim.has_animation(a):
+			return a
+	return ""
+
+
 func _chase(delta: float) -> void:
 	if not _player_alive():
 		_stop()
@@ -718,7 +767,7 @@ func _die() -> void:
 	_hide_laser()
 	_growl(0.7)  # a groan
 	died.emit()
-	if kind == "exploder" and not _exploded:
+	if kind == "exploder" and not _exploded and not dummy:
 		# Shot dead: it still goes off a moment later.
 		get_tree().create_timer(DEATH_BLAST_DELAY, false).timeout.connect(_explode)
 
@@ -728,7 +777,10 @@ func _set_state(new_state: State) -> void:
 	_state_time = 0.0
 	match new_state:
 		State.CHASE:
-			anim.play(stats.anims.walk, 0.2, _walk_anim_speed())
+			if dummy:
+				_play_dummy_anim(0.2)
+			else:
+				anim.play(stats.anims.walk, 0.2, _walk_anim_speed())
 		State.ATTACK:
 			_attack_landed = false
 			_play_from_start(stats.anims.attack, 0.1)

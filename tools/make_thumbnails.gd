@@ -1,13 +1,14 @@
 extends SceneTree
-## Renders the pictures on the map selection cards (ui/thumbnails/<id>.jpg):
+## Renders the pictures on the map selection cards and the Training Arena
+## (ui/thumbnails/<id>.jpg, also shown by the loading screen):
 ## each map seen from where the player starts, without the HUD or the gun.
 ## Needs a window (not --headless):
-##   godot --path . --script res://tools/make_thumbnails.gd
+##   godot --path . --script res://tools/make_thumbnails.gd [-- --only <id>]
 
 const Maps := preload("res://maps.gd")
 const SIZE := Vector2i(480, 270)
 ## Extra look per map: [yaw offset (deg), pitch (deg)] from the start view.
-const VIEWS := {"yard": [10.0, -4.0], "town": [0.0, 2.0], "warehouse": [0.0, 0.0]}
+const VIEWS := {"yard": [10.0, -4.0], "town": [0.0, 2.0], "warehouse": [0.0, 0.0], "training": [8.0, -2.0]}
 
 
 func _initialize() -> void:
@@ -17,7 +18,11 @@ func _initialize() -> void:
 func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://ui/thumbnails"))
 	root.size = Vector2i(1280, 720)
-	for m: Dictionary in Maps.LIST:
+	var args := OS.get_cmdline_user_args()
+	var only: String = args[args.find("--only") + 1] if args.find("--only") >= 0 and args.find("--only") + 1 < args.size() else ""
+	for m: Dictionary in Maps.LIST + [Maps.TRAINING]:
+		if only != "" and m.id != only:
+			continue
 		change_scene_to_file(m.scene)
 		for i in 10:
 			await process_frame

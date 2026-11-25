@@ -1,7 +1,9 @@
 extends SceneTree
-## Builds the two extra maps, maps/town.tscn and maps/warehouse.tscn, from
-## code, and does a first bake of their navmeshes (maps/<id>_navmesh.res);
-## run tools/bake_navmesh.gd afterwards for the final ones.
+## Builds the extra maps, maps/town.tscn, maps/warehouse.tscn and the
+## Training Arena maps/training.tscn, from code, and does a first bake of
+## their navmeshes (maps/<id>_navmesh.res); run tools/bake_navmesh.gd
+## afterwards for the final ones (tools/rebake.bat also bakes the training
+## lightmap). `-- --only <id>` builds just one of them.
 ## Each map is a full game scene running main.gd, with the same nodes as
 ## main.tscn (Player, HUD, Enemies, SpawnPoints, SpawnTimer, Pickups, Sun...).
 ## Run: godot --headless --path . --script res://tools/build_maps.gd
@@ -36,8 +38,15 @@ func _process(_delta: float) -> bool:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://maps"))
 	seed(7)
 	_make_shared_materials()
-	_save_map(_build_town(), "town")
-	_save_map(_build_warehouse(), "warehouse")
+	# `-- --only training` rebuilds just that map (the others stay untouched).
+	var args := OS.get_cmdline_user_args()
+	var only := args[args.find("--only") + 1] if args.find("--only") >= 0 and args.find("--only") + 1 < args.size() else ""
+	if only in ["", "town"]:
+		_save_map(_build_town(), "town")
+	if only in ["", "warehouse"]:
+		_save_map(_build_warehouse(), "warehouse")
+	if only in ["", "training"]:
+		_save_map(_build_training(), "training")
 	print("BUILD_MAPS: done. Now run tools/bake_navmesh.gd for the final navmeshes")
 	print("  (Brute/Boss navmeshes, unreachable islands removed).")
 	quit()
@@ -81,10 +90,10 @@ func _add(parent: Node, child: Node, n: String, owner_node: Node) -> Node:
 
 
 ## The game nodes every map needs, around an empty level.
-func _new_map(map_id: String, music_path: String, env: Environment) -> Node3D:
+func _new_map(map_id: String, music_path: String, env: Environment, script := "res://main.gd") -> Node3D:
 	var root := Node3D.new()
 	root.name = "Main"
-	root.set_script(load("res://main.gd"))
+	root.set_script(load(script))
 	root.set("map_id", map_id)
 	root.set("music", load(music_path))
 	var we := WorldEnvironment.new()
@@ -853,6 +862,279 @@ func _build_forklift(b: Dictionary, xf: Transform3D) -> void:
 	var wheel := Basis(Vector3.BACK, PI / 2.0)
 	for w in [Vector3(-0.6, 0.28, -0.55), Vector3(0.6, 0.28, -0.55), Vector3(-0.6, 0.24, 0.85), Vector3(0.6, 0.24, 0.85)]:
 		_batch_cyl(b, 0.28 if w.z < 0 else 0.24, 0.25, xf * Transform3D(wheel, w), dark, 10)
+
+
+# --- Training Arena -----------------------------------------------------------------
+# A shooting range: a roofed shooting hall (the weapon rack on its back wall)
+# and an open range downrange (-Z) to a sand berm past the 100 m targets.
+# Lanes across the range: static targets on the left, pop-ups and moving
+# targets in the middle, the dummies on the right. The firing line is z = 0.
+# Lit by the sun plus a baked lightmap (maps/training.lmbake, rebake.bat):
+# the hall lamps are bake-only lights, so nothing but the sun is real-time.
+# Target, dummy and rack positions are in training_config.gd.
+
+const TR := preload("res://training_config.gd")
+const TR_HALF_W := 16.0     # inner faces of the side walls at x = +-16
+const TR_BACK := 13.0       # inner face of the hall's back wall
+const TR_END := -106.0      # inner face of the far wall
+const TR_ROOF_FRONT := -1.0 # the hall's roof reaches out to here
+const TR_ROOF_Y := 4.2
+const TR_LANE_B := -2.75    # lane dividers: static | middle | dummies
+const TR_LANE_C := 5.5
+
+
+func _build_training() -> Node3D:
+	print("Training:")
+	# The yard's afternoon sky and grading, with much less haze (100 m lanes).
+	var yard: Node = load("res://main.tscn").instantiate()
+	var env: Environment = (yard.get_node("WorldEnvironment") as WorldEnvironment).environment.duplicate()
+	var lm_ref: LightmapGI = yard.get_node("LightmapGI")
+	var lm_color := lm_ref.environment_custom_color
+	var lm_energy := lm_ref.environment_custom_energy
+	yard.free()
+	env.fog_density = 0.0022
+	env.fog_sky_affect = 0.1
+
+	var root := _new_map("training", "res://assets/music/town_empty_city.ogg", env, "res://training/training.gd")
+	# Afternoon sun from behind the firing line, a little from the left.
+	var sun := _sun(root, Vector3(-48.0, 25.0, 0.0), Color(1.0, 0.86, 0.68), 1.5)
+	sun.light_cull_mask = 1048573  # as in the yard
+	var level: Node3D = root.get_node("NavigationRegion3D/Level")
+	var detail: Node3D = root.get_node("Detail")
+	var lights: Node3D = root.get_node("Lights")
+	var kit := Kit.new()
+	var len_z := TR_BACK - TR_END
+	var mid_z := (TR_BACK + TR_END) * 0.5
+
+	# Floors: polished concrete in the hall, darker worn concrete downrange.
+	var m_hall := _surface("res://materials/concrete_floor.tres", "training_hall_floor", {
+		"tint": Color(0.92, 0.9, 0.86), "edge_dirt_start": 0.0, "macro_strength": 0.2})
+	var m_range := _surface("res://materials/concrete_floor.tres", "training_range_floor", {
+		"tint": Color(0.62, 0.6, 0.55), "edge_dirt_start": 0.0, "uv_scale": 0.2, "macro_strength": 0.35})
+	_blocker(level, root, "Floor", Vector3(2 * TR_HALF_W + 2, 1, len_z + 2), Vector3(0, -0.5, mid_z))
+	_lm_plane(detail, root, "HallFloor", Vector2(2 * TR_HALF_W, TR_BACK - TR_ROOF_FRONT),
+			Vector3(0, 0, (TR_BACK + TR_ROOF_FRONT) * 0.5), m_hall)
+	var seg := (TR_ROOF_FRONT - TR_END) / 3.0
+	for i in 3:
+		_lm_plane(detail, root, "RangeFloor%d" % i, Vector2(2 * TR_HALF_W, seg),
+				Vector3(0, 0, TR_ROOF_FRONT - seg * (i + 0.5)), m_range)
+
+	# Walls: brick all round (4 m), box colliders.
+	var w := TR_HALF_W + 0.5
+	for b in [["WallW", Vector3(1, 4, len_z + 2), Vector3(-w, 2, mid_z)],
+			["WallE", Vector3(1, 4, len_z + 2), Vector3(w, 2, mid_z)],
+			["WallBack", Vector3(2 * w + 1, 4, 1), Vector3(0, 2, TR_BACK + 0.5)],
+			["WallEnd", Vector3(2 * w + 1, 4, 1), Vector3(0, 2, TR_END - 0.5)]]:
+		_blocker(level, root, b[0], b[1], b[2])
+	var zb := TR_BACK + 0.5
+	var ze := TR_END - 0.5
+	kit.wall_run(Vector3(-w, 0, zb), Vector3(-w, 0, ze), "wall_yard", "pillar_yard", [9, 21])
+	kit.wall_run(Vector3(w, 0, ze), Vector3(w, 0, zb), "wall_yard", "pillar_yard", [14], Color.WHITE, false)
+	kit.wall_run(Vector3(w, 0, zb), Vector3(-w, 0, zb), "wall_yard", "pillar_yard", [], Color.WHITE, false)
+	kit.wall_run(Vector3(-w, 0, ze), Vector3(w, 0, ze), "wall_yard", "pillar_yard", [], Color.WHITE, false)
+
+	# The hall's roof: corrugated sheets on a steel frame, posts on the lane
+	# dividers. Its collider is outside the navmesh region.
+	var roof_d := TR_BACK + 1.0 - TR_ROOF_FRONT
+	var nx := 8
+	var nz := 4
+	for i in nx:
+		for j in nz:
+			var sx := (2 * w + 1) / nx
+			var sz := roof_d / nz
+			kit.add("roof_sheet", Transform3D(Basis.from_scale(Vector3(sx / 4.0, 1, sz / 4.0)),
+					Vector3(-w - 0.5 + sx * (i + 0.5), TR_ROOF_Y, TR_ROOF_FRONT + sz * (j + 0.5))), Color(1.9, 1.9, 1.95))
+	_blocker(root, root, "Roof", Vector3(2 * w + 1, 0.3, roof_d), Vector3(0, TR_ROOF_Y + 0.15, TR_ROOF_FRONT + roof_d * 0.5))
+	var frame := _batch()
+	var steel := Color(0.32, 0.33, 0.36)
+	_batch_box(frame, Vector3(2 * w, 0.3, 0.3), _place(Vector3(0, TR_ROOF_Y - 0.15, TR_ROOF_FRONT + 0.2), 0.0), steel)
+	_batch_box(frame, Vector3(2 * w, 0.25, 0.25), _place(Vector3(0, TR_ROOF_Y - 0.15, 6.0), 0.0), steel)
+	for x in [TR_LANE_B, TR_LANE_C]:
+		_batch_box(frame, Vector3(0.25, TR_ROOF_Y, 0.25), _place(Vector3(x, TR_ROOF_Y * 0.5, TR_ROOF_FRONT + 0.2), 0.0), steel)
+		_blocker(level, root, "RoofPost%d" % int(x), Vector3(0.3, TR_ROOF_Y, 0.3), Vector3(x, TR_ROOF_Y * 0.5, TR_ROOF_FRONT + 0.2))
+	for x in [-8.0, 0.0, 8.0]:
+		_batch_box(frame, Vector3(0.18, 0.35, roof_d), _place(Vector3(x, TR_ROOF_Y - 0.2, TR_ROOF_FRONT + roof_d * 0.5), 0.0), steel)
+
+	# Shooting benches on the firing line (static and middle lanes), with gaps
+	# to walk downrange.
+	var wood := Color(0.5, 0.36, 0.22)
+	for bench in [[Vector2(-15.4, -3.4), "BenchA"], [Vector2(-1.9, 4.9), "BenchB"]]:
+		var a: Vector2 = bench[0]
+		var c := Vector3((a.x + a.y) * 0.5, 0, -0.75)
+		var bl := a.y - a.x
+		_batch_box(frame, Vector3(bl, 0.08, 0.7), _place(c + Vector3(0, 1.0, 0), 0.0), wood)
+		_batch_box(frame, Vector3(bl, 0.9, 0.08), _place(c + Vector3(0, 0.5, -0.3), 0.0), wood.darkened(0.25))
+		for x in [a.x + 0.2, a.y - 0.2]:
+			_batch_box(frame, Vector3(0.08, 1.0, 0.6), _place(Vector3(x, 0.5, c.z), 0.0), steel)
+		_blocker(level, root, bench[1], Vector3(bl, 1.05, 0.7), c + Vector3(0, 0.52, 0))
+
+	# Lane lines on the floor, the firing line, and a stripe at each distance.
+	var paint := Color(0.86, 0.84, 0.78)
+	var yellow := Color(0.95, 0.75, 0.15)
+	_batch_box(frame, Vector3(2 * TR_HALF_W, 0.01, 0.15), _place(Vector3(0, 0.006, -0.1), 0.0), yellow)
+	for x in [TR_LANE_B, TR_LANE_C]:
+		_batch_box(frame, Vector3(0.12, 0.01, -TR_END - 4.0), _place(Vector3(x, 0.006, (TR_END + 2.0) * 0.5 - 1.0), 0.0), paint)
+	# Each distance's lane: thin lines between the lanes, a stripe across it
+	# at the distance, and a sign high up behind its targets.
+	var edges := [-TR_HALF_W, -13.5, -11.0, -8.0, TR_LANE_B]  # the 10 / 25 / 50 / 100 m lanes
+	for i in range(1, edges.size() - 1):
+		_batch_box(frame, Vector3(0.06, 0.01, -TR_END - 4.0), _place(Vector3(edges[i], 0.006, (TR_END + 2.0) * 0.5 - 1.0), 0.0), paint.darkened(0.3))
+	for li in TR.DISTANCES.size():
+		var d: int = TR.DISTANCES[li]
+		var s: float = TR.TARGET_SCALE[d]
+		var c: float = TR.LANES[d]
+		_batch_box(frame, Vector3(edges[li + 1] - edges[li], 0.01, 0.12),
+				_place(Vector3((edges[li] + edges[li + 1]) * 0.5, 0.006, -d), 0.0), paint)
+		var at := Vector3(c + 0.2 * s, 0, -d - 1.2)
+		var top := 0.6 + 0.95 * s + 0.5 * s
+		var k := 1.0 + d / 30.0
+		_batch_box(frame, Vector3(0.08, top, 0.08), _place(at + Vector3(0, top * 0.5, -0.05), 0.0), steel)
+		_batch_box(frame, Vector3(1.1 * k, 0.55 * k, 0.05), _place(at + Vector3(0, top + 0.27 * k, 0), 0.0), Color(0.12, 0.25, 0.14))
+		_sign_label(detail, root, "Dist%d" % d, "%d m" % d, at + Vector3(0, top + 0.27 * k, 0.03), 0.0045 * k)
+	for m: Array in TR.MOVERS:
+		var z := -float(m[0])
+		_batch_box(frame, Vector3(m[1] * 2.0 + 1.0, 0.06, 0.2), _place(Vector3(TR.MOVER_X, 0.03, z), 0.0), steel)
+		_sign_label(detail, root, "Mover%d" % int(m[0]), "%d m" % int(m[0]), Vector3(TR.MOVER_X, 2.3, z - 0.8), 0.0045)
+	# The berm behind the far targets.
+	_batch_box(frame, Vector3(2 * TR_HALF_W, 2.4, 2.5), _place(Vector3(0, 1.2, TR_END + 1.25), 0.0), Color(0.55, 0.45, 0.32))
+	_blocker(level, root, "Berm", Vector3(2 * TR_HALF_W, 2.4, 2.5), Vector3(0, 1.2, TR_END + 1.25))
+	# Lamp housings under the roof.
+	var lamp_spots := [Vector3(-10.5, 0, 5.0), Vector3(0.0, 0, 5.0), Vector3(10.5, 0, 5.0), Vector3(-5.0, 0, 10.5), Vector3(5.0, 0, 10.5)]
+	for p: Vector3 in lamp_spots:
+		_batch_box(frame, Vector3(1.4, 0.12, 0.45), _place(p + Vector3(0, TR_ROOF_Y - 0.45, 0), 0.0), Color(0.25, 0.25, 0.27))
+	_lm_batch_mesh(frame, detail, root, "RangeProps", "training_props")
+	for i in lamp_spots.size():
+		var p: Vector3 = lamp_spots[i]
+		var tube := MeshInstance3D.new()
+		var tm := BoxMesh.new()
+		tm.size = Vector3(1.25, 0.05, 0.3)
+		tm.material = m_glow
+		tube.mesh = tm
+		tube.position = p + Vector3(0, TR_ROOF_Y - 0.53, 0)
+		tube.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_add(detail, tube, "LampTube%d" % i, root)
+		var l := _omni(lights, root, "Lamp%d" % i, p + Vector3(0, TR_ROOF_Y - 0.8, 0), Color(1.0, 0.9, 0.75), 2.6, 10.0)
+		l.light_bake_mode = Light3D.BAKE_STATIC  # in the lightmap only: free at run time
+
+	# Cover: concrete walls between the lanes in front of the firing line, and
+	# jersey barriers in front of the dummies.
+	for x in [TR_LANE_B, TR_LANE_C]:
+		var a := Vector3(x, 0, -2.5)
+		kit.wall_run(a, a + Vector3(0, 0, -4.3), "wall_low_broken" if x > 0 else "wall_low", "pillar_low", [], Color.WHITE, true, 4.3)
+		_blocker(level, root, "Cover%d" % int(x), Vector3(0.5, 2.8, 4.3), a + Vector3(0, 1.4, -2.15))
+	for x in [7.8, 12.6]:
+		var at := Vector3(x, 0, -6.5)
+		kit.add("barrier", Transform3D(Basis(), at))
+		_blocker(level, root, "Barrier%d" % int(x), Vector3(3.0, 1.0, 0.6), at + Vector3(0, 0.5, 0))
+	# The back wall: lamps, a pipe and a sign over the range end.
+	for x in [-9.0, 9.0]:
+		kit.mount("lamp_wall", Vector3(x, 3.0, TR_BACK), Vector3.FORWARD)
+	kit.mount("pipe_h", Vector3(0, 3.6, TR_BACK), Vector3.FORWARD, Color.WHITE, Vector3(30.0, 1, 1))
+	kit.mount("sign_danger", Vector3(0, 3.0, TR_END), Vector3.BACK)
+	kit.build(detail, root, "Kit", {"lightmap": true, "file_prefix": "training_kit"})
+
+	# The weapon rack on the back wall, facing downrange.
+	var rack := Node3D.new()
+	rack.set_script(load("res://training/weapon_rack.gd"))
+	_add(root, rack, "WeaponRack", root)
+	rack.transform = Transform3D(Basis(Vector3.UP, PI), Vector3(0, 0, TR_BACK - 0.5))
+	_blocker(level, root, "Rack", Vector3(12.4, 2.2, 0.5), Vector3(0, 1.1, TR_BACK - 0.3))
+
+	# Targets.
+	var holder := _add(root, Node3D.new(), "Targets", root)
+	for d: int in TR.DISTANCES:
+		var s: float = TR.TARGET_SCALE[d]
+		_target(holder, root, "Paper%d" % d, "paper", Vector3(TR.paper_x(d), 0, -d), s)
+		var mx: Array[float] = TR.metal_x(d)
+		for i in mx.size():
+			_target(holder, root, "Metal%d_%d" % [d, i], "metal", Vector3(mx[i], 0, -d), s)
+	for m: Array in TR.MOVERS:
+		_target(holder, root, "Mover%d" % int(m[0]), "paper", Vector3(TR.MOVER_X, 0, -float(m[0])), 1.0, m[1], m[2])
+	for i in TR.POPUPS.size():
+		var p: Vector2 = TR.POPUPS[i]
+		_target(holder, root, "Popup%d" % i, "popup", Vector3(p.x, 0, p.y), 1.0)
+
+	# Lightmap: small (the yard's custom sky colour; the Compatibility editor
+	# bakes the HDRI sky black).
+	var lm := LightmapGI.new()
+	lm.texel_scale = 0.4
+	lm.environment_mode = LightmapGI.ENVIRONMENT_MODE_CUSTOM_COLOR
+	lm.environment_custom_color = lm_color
+	lm.environment_custom_energy = lm_energy
+	lm.quality = LightmapGI.BAKE_QUALITY_LOW
+	_add(root, lm, "LightmapGI", root)
+	root.move_child(lm, sun.get_index() + 1)
+	var old := load("res://maps/training.tscn") if ResourceLoader.exists("res://maps/training.tscn") else null
+	if old:
+		# Keep the baked lightmap when the map is rebuilt (rebake.bat re-bakes it).
+		var prev: Node = (old as PackedScene).instantiate()
+		var prev_lm := prev.get_node_or_null("LightmapGI") as LightmapGI
+		if prev_lm and prev_lm.light_data:
+			lm.light_data = prev_lm.light_data
+		prev.free()
+
+	_finish_map(root, Vector3(0, 0, 5.0), 0.0, [Vector3(10.0, 0, -20.0)], [])
+	return root
+
+
+## A floor rectangle with lightmap UVs (visual only).
+func _lm_plane(parent: Node, root: Node, n: String, size: Vector2, center: Vector3, mat: Material) -> void:
+	var pm := PlaneMesh.new()
+	pm.size = size
+	pm.material = mat
+	pm.add_uv2 = true
+	var mi := MeshInstance3D.new()
+	mi.mesh = pm
+	mi.position = center
+	mi.gi_mode = GeometryInstance3D.GI_MODE_STATIC
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_add(parent, mi, n, root)
+
+
+## A merged vertex-coloured mesh with lightmap UVs (no LODs), GI static.
+func _lm_batch_mesh(b: Dictionary, parent: Node, root: Node, n: String, file: String) -> MeshInstance3D:
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = b.v
+	arrays[Mesh.ARRAY_NORMAL] = b.n
+	arrays[Mesh.ARRAY_COLOR] = b.c
+	arrays[Mesh.ARRAY_INDEX] = b.i
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	mesh.surface_set_material(0, m_vcolor)
+	mesh.lightmap_unwrap(Transform3D(), 0.2)
+	var path := GEN + file + ".res"
+	ResourceSaver.save(mesh, path, ResourceSaver.FLAG_COMPRESS)
+	var mi := MeshInstance3D.new()
+	mi.mesh = load(path)
+	mi.gi_mode = GeometryInstance3D.GI_MODE_STATIC
+	_add(parent, mi, n, root)
+	print("  %s: %d tris" % [file, b.i.size() / 3])
+	return mi
+
+
+func _sign_label(parent: Node, root: Node, n: String, text: String, pos: Vector3, pixel: float) -> void:
+	var l := Label3D.new()
+	l.text = text
+	l.font_size = 96
+	l.outline_size = 12
+	l.pixel_size = pixel
+	l.modulate = Color(1, 1, 1)
+	l.position = pos
+	_add(parent, l, n, root)
+
+
+func _target(parent: Node, root: Node, n: String, kind: String, pos: Vector3, size: float,
+		move_half := 0.0, move_speed := 0.0) -> void:
+	var t := StaticBody3D.new()
+	t.set_script(load("res://training/target.gd"))
+	t.set("kind", kind)
+	t.set("size", size)
+	t.set("move_half", move_half)
+	t.set("move_speed", move_speed)
+	t.position = pos
+	t.add_to_group("training_targets", true)
+	_add(parent, t, n, root)
 
 
 # --- Saving ----------------------------------------------------------------------

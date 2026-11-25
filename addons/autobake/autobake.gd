@@ -1,19 +1,26 @@
 @tool
 extends EditorPlugin
-## Bakes the lightmap for main.tscn without clicking anything.
+## Bakes the lightmaps (the yard, main.tscn, and the Training Arena,
+## maps/training.tscn) without clicking anything.
 ## It does NOTHING unless the editor is started with the --autobake user arg:
 ##   Godot_v4.7.2-stable_win64_console.exe --editor --path . -- --autobake
 ## (tools/rebake.bat runs exactly that, then bakes the navmeshes with
-## tools/bake_navmesh.gd.) It opens main.tscn, presses the editor's own
-## "Bake Lightmaps" button (LightmapGI can't be baked from script in 4.7),
-## answers the save dialog with res://main.lmbake, saves the scene and quits.
+## tools/bake_navmesh.gd.) `--autobake=training` (or `=yard`) bakes just one.
+## For each scene it opens it, presses the editor's own "Bake Lightmaps"
+## button (LightmapGI can't be baked from script in 4.7), answers the save
+## dialog with the scene's .lmbake path, saves the scene; then it quits.
 
-const LIGHTMAP_FILE := "res://main.lmbake"
+const BAKES := [
+	{"id": "yard", "scene": "res://main.tscn", "file": "res://main.lmbake"},
+	{"id": "training", "scene": "res://maps/training.tscn", "file": "res://maps/training.lmbake"},
+]
 
 
 func _enter_tree() -> void:
-	if "--autobake" in OS.get_cmdline_user_args():
-		_run.call_deferred()
+	for arg in OS.get_cmdline_user_args():
+		if arg == "--autobake" or arg.begins_with("--autobake="):
+			_run.call_deferred(arg.trim_prefix("--autobake").trim_prefix("="))
+			return
 
 
 func _frames(n: int) -> void:
@@ -21,9 +28,17 @@ func _frames(n: int) -> void:
 		await get_tree().process_frame
 
 
-func _run() -> void:
+func _run(only: String) -> void:
 	await _frames(30)
-	EditorInterface.open_scene_from_path("res://main.tscn")
+	for b: Dictionary in BAKES:
+		if only == "" or only == b.id:
+			await _bake(b.scene, b.file)
+	print("AUTOBAKE: done")
+	get_tree().quit()
+
+
+func _bake(scene_path: String, lightmap_file: String) -> void:
+	EditorInterface.open_scene_from_path(scene_path)
 	await _frames(30)
 	var scene := EditorInterface.get_edited_scene_root()
 
@@ -42,13 +57,11 @@ func _run() -> void:
 		btn.pressed.emit()
 		await _frames(30)
 		# First bake of a scene asks where to save the lightmap file.
-		_answer_file_dialog(EditorInterface.get_base_control())
+		_answer_file_dialog(EditorInterface.get_base_control(), lightmap_file)
 		await _frames(120)
-		print("AUTOBAKE: light_data ", lm.light_data.resource_path if lm.light_data else "NOT BAKED")
+		print("AUTOBAKE: %s light_data %s" % [scene_path, lm.light_data.resource_path if lm.light_data else "NOT BAKED"])
 	EditorInterface.save_scene()
 	await _frames(30)
-	print("AUTOBAKE: done")
-	get_tree().quit()
 
 
 func _find_button(n: Node, text: String) -> Button:
@@ -61,10 +74,10 @@ func _find_button(n: Node, text: String) -> Button:
 	return null
 
 
-func _answer_file_dialog(n: Node) -> void:
+func _answer_file_dialog(n: Node, path: String) -> void:
 	if n is FileDialog and n.visible:
 		n.hide()
-		n.file_selected.emit(LIGHTMAP_FILE)
+		n.file_selected.emit(path)
 		return
 	for c in n.get_children():
-		_answer_file_dialog(c)
+		_answer_file_dialog(c, path)
