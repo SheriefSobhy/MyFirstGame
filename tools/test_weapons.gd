@@ -65,6 +65,7 @@ func _run() -> void:
 	await _test_grenades()
 	await _test_ammo_box()
 	await _test_touch_layout()
+	await _test_view_models()
 
 	settings.debug_unlock_all = debug_unlock
 	print("\n%s: %d failure(s)" % ["OK" if failures == 0 else "FAILED", failures])
@@ -696,6 +697,63 @@ func _test_ammo_box() -> void:
 		player.head.rotation.x = deg_to_rad(-25)
 		await seconds(0.3)
 		await _screenshot("rifle_pickup")
+
+
+# First-person models (weapon_view.gd, fp_arms.gd): every gun has its own
+# model with both hands on it, casings fly, parts move on shots and reloads.
+func _test_view_models() -> void:
+	player.own_all_weapons()
+	for i in Weapons.LIST.size():
+		var view: Node3D = player._views[i]
+		check(view.model != null and view.right_target != null and view.left_target != null,
+				"%s: first-person model with hand targets" % Weapons.LIST[i].name)
+	player.switch_to(1)
+	await seconds(0.6)
+	var arms: Node3D = player.arms
+	var skel: Skeleton3D = arms.skel
+	var hand := skel.global_transform * skel.get_bone_global_pose(skel.find_bone("RightHand")).origin
+	var grip: Vector3 = player._view().right_target.global_position
+	check(hand.distance_to(grip) < 0.06, "right hand is on the grip (%.3f m)" % hand.distance_to(grip))
+	var left := skel.global_transform * skel.get_bone_global_pose(skel.find_bone("LeftHand")).origin
+	var guard: Vector3 = player._view().left_target.global_position
+	check(left.distance_to(guard) < 0.06, "left hand is on the handguard (%.3f m)" % left.distance_to(guard))
+	# Casings.
+	var casings: Node = player.get_node("Casings")
+	var before: int = casings.count("rifle")
+	player.touch_shoot = true
+	await seconds(0.35)
+	player.touch_shoot = false
+	check(casings.count("rifle") > before, "firing throws casings (%d)" % casings.count("rifle"))
+	# Pistol slide kicks back.
+	player.switch_to(0)
+	await seconds(0.6)
+	var slide: Node3D = player._view().part("slide")
+	var rest := slide.position
+	player.touch_shoot = true
+	await frames(2)
+	player.touch_shoot = false
+	check(slide.position.x < rest.x - 0.005, "pistol slide kicks back")
+	await seconds(0.4)
+	check(slide.position.is_equal_approx(rest), "pistol slide returns")
+	# Reload: the magazine leaves the gun with the left hand, then comes back.
+	player.start_reload()
+	var mag: Node3D = player._view().part("mag")
+	var mag_rest := mag.position
+	await seconds(0.45)
+	check(mag.position.y < mag_rest.y - 0.05, "reload: magazine pulled out (%.2f m)" % (mag_rest.y - mag.position.y))
+	await seconds(1.2)
+	check(mag.position.is_equal_approx(mag_rest) and not player.is_reloading(), "reload: magazine back in")
+	# The revolver's cylinder turns on each shot.
+	player.switch_to(7)
+	await seconds(0.6)
+	var cyl: Node3D = player._view().part("cylinder")
+	player.touch_shoot = true
+	await frames(2)
+	player.touch_shoot = false
+	await seconds(0.3)
+	check(absf(wrapf(cyl.rotation.x, -PI, PI)) > 0.5, "revolver cylinder turns after a shot")
+	player.switch_to(0)
+	await seconds(0.5)
 
 
 func _test_touch_layout() -> void:

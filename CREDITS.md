@@ -1,9 +1,11 @@
 # Credits
 
-Every third-party asset in this project is released under
-[CC0 1.0 Universal (public domain)](https://creativecommons.org/publicdomain/zero/1.0/),
-except the enemy characters, which come from Adobe Mixamo (see "Enemies" below).
-Credit isn't required, but it's listed here with thanks.
+Most third-party assets in this project are released under
+[CC0 1.0 Universal (public domain)](https://creativecommons.org/publicdomain/zero/1.0/).
+The exceptions: the first-person guns are **CC BY 4.0** (credit required, see
+"Guns" below), and the enemy characters and first-person arms come from Adobe
+Mixamo (see "Enemies" below). For CC0 assets credit isn't required, but it's
+listed here with thanks.
 
 ## Textures and sky: Poly Haven (https://polyhaven.com)
 
@@ -42,35 +44,37 @@ https://github.com/trebeljahr/quaternius-showcase, whose LICENSES.md lists each 
 
 | Asset | Pack | Source |
 | --- | --- | --- |
-| `Swat.glb`: first-person arms. Only the arms are kept and posed onto the current gun in `fp_arms.gd` | Ultimate Modular Men Pack | https://quaternius.com/packs/ultimatemodularcharacters.html |
 | `buildings/Building2_Small`, `Building3_Big`, `Building3_Small`, `Building4`: skyline | Buildings Pack | https://quaternius.com/packs/buildings.html |
 | `buildings/3Story_Slim_Mat`, `4Story_Mat`, `6Story_Stack_Mat`: skyline | Ultimate Buildings Pack | https://quaternius.com/packs/ultimatetexturedbuildings.html |
 | `props/Rock1-3`, `Rock5`: concrete rubble, re-textured with Concrete Wall 008 | Modular Dungeon Pack | https://quaternius.com/packs/medievaldungeon.html |
 
-### Guns: Quaternius' Ultimate Gun Pack (CC0)
+### Guns: Sketchfab models (CC BY 4.0)
 
-All eight guns come from Quaternius' **Ultimate Gun Pack** (July 2019, 40 low-poly guns, CC0).
-It was downloaded from OpenGameArt: https://opengameart.org/content/low-poly-guns-pack
-(also on https://quaternius.itch.io/50-lowpoly-guns).
+The eight guns (first person, pickups, the Training rack, the Armory, and the
+enemy soldier's rifle) are Sketchfab models licensed under
+[Creative Commons Attribution 4.0](http://creativecommons.org/licenses/by/4.0/).
+The downloads (with their license files) are kept in `art_source/sketchfab/`
+(git-ignored). The in-game names are generic.
 
-The pack ships as FBX/OBJ/Blend. The chosen models were converted to GLB in Godot: each model was scaled to metres with the barrel along +X and the grip at the origin.
-Plain parts were made non-metallic, and parts named "Metal" were given a slight metallic sheen.
-The in-game names are generic.
+| In game | Work | Author | Source |
+| --- | --- | --- | --- |
+| Pistol | "Pistol" | DJMaesen (https://sketchfab.com/bumstrum) | https://sketchfab.com/3d-models/pistol-5f6ec54257de449cacc8c872660b40d3 |
+| Assault Rifle | "Low poly M4 rifle" | Jithran (https://sketchfab.com/theassman) | https://sketchfab.com/3d-models/low-poly-m4-rifle-9836b8d7a1984d5a83f0be2827af1d60 |
+| AK Rifle | "Low-Poly AKM" | TastyTony (https://sketchfab.com/TastyTony) | https://sketchfab.com/3d-models/low-poly-akm-849b7cdf8622487485febc40db89e734 |
+| SMG | "Low-Poly HK416" | TastyTony (https://sketchfab.com/TastyTony) | https://sketchfab.com/3d-models/low-poly-hk416-059e968f6f764357880807c62c117ab7 |
+| Shotgun | "low poly shotgun" | leoxx300 (https://sketchfab.com/leoxx300) | https://sketchfab.com/3d-models/low-poly-shotgun-f4c473876f924e1f94769757424407aa |
+| Sniper | "Sniper" | DJMaesen (https://sketchfab.com/bumstrum) | https://sketchfab.com/3d-models/sniper-ac84ffacbbb34504a528446e241465f6 |
+| LMG | "LMG" | DJMaesen (https://sketchfab.com/bumstrum) | https://sketchfab.com/3d-models/lmg-8c24d7374ea64bdab1c30f49c69d5ed8 |
+| Revolver | "Revolver" | DTry101 (https://sketchfab.com/DTry) | https://sketchfab.com/3d-models/revolver-547cbf7f50b042c987c9f88a8b8eb65e |
 
-| File (`assets/models/quaternius/ultimate_guns/`) | In game | Pack model |
-| --- | --- | --- |
-| `pistol.glb` | Pistol | `Pistol_1` |
-| `carbine.glb` | Assault Rifle | `AssaultRifle2_1` |
-| `shotgun.glb` | Shotgun | `Shotgun_2` |
-| `sniper.glb` | Sniper | `SniperRifle_1` |
-| `smg.glb` | SMG | `SubmachineGun_2` |
-| `ak_rifle.glb` | AK Rifle | `AssaultRifle_2` |
-| `lmg.glb` | LMG | `AssaultRifle_5` with its magazine replaced by a drum (made in Godot from cylinders) and the pack's `Bipod` accessory added |
-| `revolver.glb` | Revolver | `Revolver_2` |
-
-These replace the earlier Survival Pack pistol and shotgun and the Sci-Fi Modular Gun Pack rifle and sniper.
-
-The skyline buildings are merged into four meshes by `tools/build_level.gd`, with their material colours stored as vertex colours.
+Changes (made by `tools/blender/build_guns.py`): scaled to real size and turned
+barrel-forward, moving parts split out for animation (magazine, slide, bolt,
+charging handle, pump, feed cover, cylinder), reduced to three detail levels,
+and textures resized and re-encoded as WebP. The rifle's optic was removed (the
+game adds its own reflex sight), and the revolver's flashlight, red dot and
+loose rounds were removed. The sniper's spec/gloss maps were converted to
+metal/rough. The rifle, AK and SMG models have no textures (flat material
+colours).
 
 ### Enemies: Adobe Mixamo (https://www.mixamo.com)
 
@@ -86,7 +90,7 @@ only the converted, reduced models are in the game.
 | `zombie.fbx` | Zombie | - |
 | `runner.fbx` | Runner | Smaller; plays the running clip, faster |
 | `brute.fbx` | Brute and Brute Boss | Larger, slower and heavier animations. The Boss is bigger still, darker, with a faint red glow |
-| `soldier.fbx` | Soldier | Holds the game's AK model (`ultimate_guns/ak_rifle.glb`) |
+| `soldier.fbx` | Soldier, and the player's first-person arms | Holds the game's AK model (`guns/ak_low.glb`). The arms and gloves are cut from this character by `tools/blender/build_arms.py` (texture re-baked for the arms only) |
 | `exploder.fbx` | Exploder | Pulsing orange glow |
 
 Animations: Zombie Idle, Zombie Walk, Zombie Running, Zombie Attack and

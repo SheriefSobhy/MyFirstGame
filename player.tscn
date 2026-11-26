@@ -3,7 +3,6 @@
 [ext_resource type="Script" path="res://player.gd" id="1_player"]
 [ext_resource type="AudioStream" path="res://assets/sounds/gunshot_pistol.wav" id="3_shot"]
 [ext_resource type="Script" path="res://fp_arms.gd" id="4_arms"]
-[ext_resource type="PackedScene" path="res://assets/models/quaternius/Swat.glb" id="5_swat"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.4
@@ -49,34 +48,34 @@ current = true
 fov = 75.0
 near = 0.03
 
-[node name="WeaponSway" type="Node3D" parent="Head/Camera3D"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, -0.16, -0.27)
+[node name="ViewModel" type="Node3D" parent="Head/Camera3D"]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 
-[node name="WeaponReload" type="Node3D" parent="Head/Camera3D/WeaponSway"]
+[node name="WeaponSway" type="Node3D" parent="Head/Camera3D/ViewModel"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, -0.19, -0.32)
 
-[node name="WeaponRecoil" type="Node3D" parent="Head/Camera3D/WeaponSway/WeaponReload"]
+[node name="WeaponReload" type="Node3D" parent="Head/Camera3D/ViewModel/WeaponSway"]
 
-[node name="Gun" type="Node3D" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil"]
+[node name="WeaponRecoil" type="Node3D" parent="Head/Camera3D/ViewModel/WeaponSway/WeaponReload"]
+
+[node name="Gun" type="Node3D" parent="Head/Camera3D/ViewModel/WeaponSway/WeaponReload/WeaponRecoil"]
 unique_name_in_owner = true
 
-[node name="Arms" type="Node3D" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil"]
+[node name="Arms" type="Node3D" parent="Head/Camera3D/ViewModel"]
 script = ExtResource("4_arms")
 
-[node name="Swat" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil/Arms" instance=ExtResource("5_swat")]
-transform = Transform3D(-0.85, 0, 0, 0, 0.85, 0, 0, 0, -0.85, -0.15, -1.277, 0.381)
-
-[node name="Muzzle" type="Node3D" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil"]
+[node name="Muzzle" type="Node3D" parent="Head/Camera3D/ViewModel/WeaponSway/WeaponReload/WeaponRecoil"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.045, -0.135)
 
-[node name="MuzzleFlash" type="Node3D" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil/Muzzle"]
+[node name="MuzzleFlash" type="Node3D" parent="Head/Camera3D/ViewModel/WeaponSway/WeaponReload/WeaponRecoil/Muzzle"]
 unique_name_in_owner = true
 visible = false
 
-[node name="FlashMesh" type="MeshInstance3D" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil/Muzzle/MuzzleFlash"]
+[node name="FlashMesh" type="MeshInstance3D" parent="Head/Camera3D/ViewModel/WeaponSway/WeaponReload/WeaponRecoil/Muzzle/MuzzleFlash"]
 cast_shadow = 0
 mesh = SubResource("QuadMesh_flash")
 
-[node name="FlashLight" type="OmniLight3D" parent="Head/Camera3D/WeaponSway/WeaponReload/WeaponRecoil/Muzzle/MuzzleFlash"]
+[node name="FlashLight" type="OmniLight3D" parent="Head/Camera3D/ViewModel/WeaponSway/WeaponReload/WeaponRecoil/Muzzle/MuzzleFlash"]
 unique_name_in_owner = true
 light_color = Color(1, 0.75, 0.4, 1)
 light_energy = 4.0

@@ -108,7 +108,7 @@ const HIT_SOUNDS := [
 	preload("res://assets/sounds/impactPunch_medium_001.ogg"),
 	preload("res://assets/sounds/impactPunch_medium_002.ogg"),
 ]
-const RIFLE_MODEL := preload("res://assets/models/quaternius/ultimate_guns/ak_rifle.glb")
+const RIFLE_MODEL := preload("res://assets/models/guns/ak_low.glb")
 const SOLDIER_SHOT := preload("res://assets/sounds/gunshot_pistol.wav")
 const SOLDIER_WARNING := preload("res://assets/sounds/enemies/soldier_warning.ogg")
 const EXPLODER_BEEP := preload("res://assets/sounds/enemies/exploder_beep.ogg")

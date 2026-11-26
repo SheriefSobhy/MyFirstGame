@@ -1,151 +1,209 @@
 extends Node3D
-## First-person arms holding the current gun, made from Quaternius' CC0 SWAT
-## character. On load (once, nothing runs per frame):
-## 1. Only the arm triangles of the body mesh are kept, and the head, legs
-##    and feet are hidden, so the torso never shows up in front of the camera.
-## 2. A small two-bone IK solve puts both hands on the gun and curls the
-##    fingers. This runs again only when the weapon changes (see grip()); the
-##    arms follow the weapon's sway/recoil/reload because they're children
-##    of WeaponRecoil.
-## The hand targets and poles are in this node's space (= WeaponRecoil space,
-## where the gun grip is at the origin). The left_hand_* exports are the
-## pistol pose; other guns' left-hand spots are in weapon_stats.gd.
+## First-person arms (the Mixamo soldier's arms and gloves, made by
+## tools/blender/build_arms.py; the detail level follows the graphics quality).
+## Every frame both hands go to their targets (Node3Ds inside the current
+## weapon view, weapon_view.gd), so they follow the gun's sway, recoil and
+## reload, and the left hand can take the magazine or work the bolt:
+##  - the hand turns to the target's basis (X = thumb side for the right hand,
+##    Y = wrist -> knuckles, Z = palm) with its palm on the target's origin;
+##  - a two-bone IK bends shoulder -> elbow -> wrist, elbows pointing down and
+##    out; the collarbone swings forward when the arm can't reach;
+##  - half the wrist's twist goes to the forearm (no candy-wrapper wrists);
+##  - fingers curl by the target's "curl" (index..pinky) and "thumb" metadata.
+## Runs after player.gd's _process (child of the player), so there's no lag.
+## Costs ~40 bone writes a frame, no physics, no animation player.
 
-const ARM_BONES := ["UpperArm", "LowerArm", "Hand", "Index", "Middle", "Ring", "Pinky", "Thumb"]
+const MODEL_PATH := "res://assets/models/arms/arms_%s.glb"
+const LODS := ["low", "med", "high"]
 const FINGERS := ["Index", "Middle", "Ring", "Pinky"]
+## Bend per finger joint at curl = 1 (degrees): knuckle, middle, tip.
+const FINGER_BEND := [75.0, 95.0, 65.0]
+const THUMB_BEND := [25.0, 35.0, 40.0]
+const MAX_COLLARBONE := deg_to_rad(28.0)
 
-@export var right_hand_pos := Vector3(0.028, -0.02, 0.06)
-@export var right_hand_forward := Vector3(-0.2, 0.05, -1.0)  # wrist -> knuckles
-@export var right_hand_back := Vector3(1.0, 0.15, 0.1)          # back of the hand
-@export var right_elbow_pole := Vector3(0.6, -1.0, 0.3)
-@export var left_hand_pos := Vector3(-0.035, -0.06, 0.05)
-@export var left_hand_forward := Vector3(0.5, 0.35, -1.0)
-@export var left_hand_back := Vector3(-0.8, -0.6, 0.0)
-@export var left_elbow_pole := Vector3(-0.8, -1.0, 0.3)
-@export var finger_curl_deg := 75.0
-@export var thumb_curl_deg := 20.0
+## Where the middle of the shoulders sits, in this node's space (the view
+## rig, metres before VIEW_SCALE; the eye is at the origin).
+@export var shoulders := Vector3(0.0, -0.27, -0.06)
+## Elbow directions (this node's space).
+@export var right_pole := Vector3(0.55, -1.0, 0.25)
+@export var left_pole := Vector3(-0.7, -1.0, 0.1)
 
-@onready var model: Node3D = $Swat
 var skel: Skeleton3D
+var right_target: Node3D
+var left_target: Node3D
+var _sides := {}   # "Right"/"Left" -> chain data (see _chain())
 
 
 func _ready() -> void:
+	var q: int = Settings.effective_quality()
+	var model: Node3D = load(MODEL_PATH % LODS[clampi(q, 0, 2)]).instantiate()
+	add_child(model)
 	skel = model.find_children("*", "Skeleton3D", true, false)[0]
 	for mi: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
-		if mi.name.ends_with("Body"):
-			mi.mesh = _arms_only(mi.mesh)
-			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		else:
-			mi.visible = false
-	grip(Vector3.ZERO, left_hand_pos, left_hand_forward, left_hand_back)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		# The rest pose (T-pose) box is nowhere near where the arms are drawn.
+		mi.custom_aabb = AABB(Vector3(-3, -3, -3), Vector3(6, 6, 6))
+	for side in ["Right", "Left"]:
+		_sides[side] = _chain(side)
+	# Face forward (-Z) with the shoulders at `shoulders`.
+	var mid: Vector3 = (_sides.Right.arm_rest + _sides.Left.arm_rest) * 0.5
+	var at := to_local(skel.global_transform * mid)  # with the model untouched
+	model.transform = Transform3D(Basis(Vector3.UP, PI), shoulders - Basis(Vector3.UP, PI) * at)
 
 
-## Re-poses both arms. The player calls this on every weapon switch with the
-## values from weapon_stats.gd:
-##  - arms_offset moves the whole arm rig (the arms only reach ~35 cm, so for
-##    long guns the rig slides forward to reach the handguard);
-##  - left_pos is where the left hand holds the gun (WeaponRecoil space).
-## The right hand always stays on the grip.
-func grip(arms_offset: Vector3, left_pos: Vector3, left_forward: Vector3, left_back: Vector3) -> void:
-	position = arms_offset
-	skel.reset_bone_poses()
-	_solve_arm("R", right_hand_pos - arms_offset, right_hand_forward, right_hand_back, right_elbow_pole)
-	_solve_arm("L", left_pos - arms_offset, left_forward, left_back, left_elbow_pole)
+## The hands' targets (from the weapon view). null = leave that arm alone.
+func set_targets(right: Node3D, left: Node3D) -> void:
+	right_target = right
+	left_target = left
 
 
-# Keeps only triangles whose vertices are mostly skinned to arm/hand bones.
-func _arms_only(src: Mesh) -> ArrayMesh:
-	var keep_bone := PackedByteArray()
-	keep_bone.resize(skel.get_bone_count())
-	for i in skel.get_bone_count():
-		var n := skel.get_bone_name(i)
-		for prefix in ARM_BONES:
-			if n.begins_with(prefix):
-				keep_bone[i] = 1
-	var out := ArrayMesh.new()
-	for s in src.get_surface_count():
-		var arr := src.surface_get_arrays(s)
-		var bones: PackedInt32Array = arr[Mesh.ARRAY_BONES]
-		var weights: PackedFloat32Array = arr[Mesh.ARRAY_WEIGHTS]
-		var vcount: int = arr[Mesh.ARRAY_VERTEX].size()
-		@warning_ignore("integer_division")
-		var per: int = bones.size() / vcount  # bone slots per vertex (4 or 8)
-		var on_arm := PackedByteArray()
-		on_arm.resize(vcount)
-		for v in vcount:
-			var w := 0.0
-			for k in per:
-				if keep_bone[bones[v * per + k]]:
-					w += weights[v * per + k]
-			on_arm[v] = 1 if w > 0.5 else 0
-		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
-		var kept := PackedInt32Array()
-		for t in range(0, idx.size(), 3):
-			if on_arm[idx[t]] and on_arm[idx[t + 1]] and on_arm[idx[t + 2]]:
-				kept.append_array([idx[t], idx[t + 1], idx[t + 2]])
-		if kept.is_empty():
-			continue
-		arr[Mesh.ARRAY_INDEX] = kept
-		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr, [], {}, src.surface_get_format(s) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS)
-		out.surface_set_material(out.get_surface_count() - 1, src.surface_get_material(s))
-	return out
+func _process(_delta: float) -> void:
+	if not visible:
+		return
+	var to_skel := skel.global_transform.affine_inverse()
+	if right_target:
+		_solve(_sides.Right, right_target, to_skel, right_pole)
+	if left_target:
+		_solve(_sides.Left, left_target, to_skel, left_pole)
 
 
-# Rotates basis `b` (minimal rotation) so its Y axis points along `dir`.
-func _aim_y(b: Basis, dir: Vector3) -> Basis:
-	var from := b.y.normalized()
-	var to := dir.normalized()
-	if from.cross(to).length() < 1e-5:
-		return b
-	return Basis(Quaternion(from, to)) * b
+func _bone(n: String) -> int:
+	return skel.find_bone(n)
 
 
-func _solve_arm(side: String, hand_pos: Vector3, fwd: Vector3, back: Vector3, pole: Vector3) -> void:
-	var upper := skel.find_bone("UpperArm." + side)
-	var lower := skel.find_bone("LowerArm." + side)
-	var hand := skel.find_bone("Hand." + side)
-	# Everything below is in skeleton space.
-	var to_skel := skel.global_transform.affine_inverse() * global_transform
-	var basis_to_skel := to_skel.basis.orthonormalized()
-	var target := to_skel * hand_pos
-	var pole_dir := (basis_to_skel * pole).normalized()
+# Rest data for one arm, all in skeleton space.
+func _chain(side: String) -> Dictionary:
+	var c := {
+		"clav": _bone(side + "Shoulder"),
+		"upper": _bone(side + "Arm"),
+		"lower": _bone(side + "ForeArm"),
+		"hand": _bone(side + "Hand"),
+	}
+	var g := func(b: int) -> Transform3D: return skel.get_bone_global_rest(b)
+	var hand_rest: Transform3D = g.call(c.hand)
+	var mid1: Vector3 = g.call(_bone(side + "HandMiddle1")).origin
+	var idx1: Vector3 = g.call(_bone(side + "HandIndex1")).origin
+	var pinky1: Vector3 = g.call(_bone(side + "HandPinky1")).origin
+	var fwd := (mid1 - hand_rest.origin).normalized()
+	var palm := (idx1 - pinky1).normalized().cross(fwd).normalized()
+	if palm.y > 0.0:
+		palm = -palm  # T-pose: palms face down
+	palm = (palm - fwd * fwd.dot(palm)).normalized()
+	var frame := Basis(fwd.cross(palm), fwd, palm)
+	c.frame_inv = frame.inverse()
+	var palm_point: Vector3 = hand_rest.origin + fwd * hand_rest.origin.distance_to(mid1) * 0.55 + palm * 0.022
+	c.palm_local = hand_rest.basis.inverse() * (palm_point - hand_rest.origin)
+	c.arm_rest = g.call(c.upper).origin
+	c.l1 = g.call(c.upper).origin.distance_to(g.call(c.lower).origin)
+	c.l2 = g.call(c.lower).origin.distance_to(hand_rest.origin)
+	# Fingers: bone, rest rotation, local curl axis (curls towards the palm).
+	var side_axis := fwd.cross(palm)
+	c.fingers = []
+	for f in FINGERS:
+		var chain := []
+		for j in 3:
+			var b := _bone("%sHand%s%d" % [side, f, j + 1])
+			if b >= 0:
+				var axis: Vector3 = (g.call(b).basis.inverse() * side_axis).normalized()
+				chain.append([b, skel.get_bone_rest(b).basis.get_rotation_quaternion(), axis])
+		c.fingers.append(chain)
+	var t1: Vector3 = g.call(_bone(side + "HandThumb1")).origin
+	var t2: Vector3 = g.call(_bone(side + "HandThumb2")).origin
+	var thumb_axis := (t2 - t1).normalized().cross(palm).normalized()
+	c.thumb = []
+	for j in 3:
+		var b := _bone("%sHandThumb%d" % [side, j + 1])
+		if b >= 0:
+			var axis: Vector3 = (g.call(b).basis.inverse() * thumb_axis).normalized()
+			c.thumb.append([b, skel.get_bone_rest(b).basis.get_rotation_quaternion(), axis])
+	return c
 
-	var g_upper := skel.get_bone_global_pose(upper)
-	var g_lower := skel.get_bone_global_pose(lower)
-	var g_hand := skel.get_bone_global_pose(hand)
-	var s := g_upper.origin
-	var l1 := s.distance_to(g_lower.origin)
-	var l2 := g_lower.origin.distance_to(g_hand.origin)
-	var d := clampf(s.distance_to(target), (l1 + l2) * 0.05, (l1 + l2) * 0.999)
-	var dir := (target - s).normalized()
-	target = s + dir * d
+
+func _solve(c: Dictionary, target: Node3D, to_skel: Transform3D, pole_dir: Vector3) -> void:
+	var tg := to_skel * target.global_transform
+	var tb := tg.basis.orthonormalized()
+	# Hand orientation: rest hand frame -> target frame.
+	var frame := Basis(tb.x, tb.y, tb.z)
+	var spin: Basis = frame * (c.frame_inv as Basis)
+	var hand_rest := skel.get_bone_global_rest(c.hand)
+	var hand_basis: Basis = (spin * hand_rest.basis).orthonormalized()
+	var wrist: Vector3 = tg.origin - hand_basis * (c.palm_local as Vector3)
+	var reach: float = (c.l1 + c.l2) * 0.985
+
+	# Collarbone: swing it towards the wrist if the arm is too short.
+	var clav_rest := skel.get_bone_global_rest(c.clav)
+	var clav_basis := clav_rest.basis
+	var shoulder: Vector3 = c.arm_rest
+	if shoulder.distance_to(wrist) > reach:
+		var from: Vector3 = shoulder - clav_rest.origin
+		var to: Vector3 = wrist - clav_rest.origin
+		var axis := from.cross(to)
+		if axis.length_squared() > 1e-8:
+			axis = axis.normalized()
+			var angle := 0.0
+			var step := MAX_COLLARBONE / 6.0
+			while angle < MAX_COLLARBONE and (clav_rest.origin + from.rotated(axis, angle)).distance_to(wrist) > reach:
+				angle += step
+			clav_basis = Basis(axis, angle) * clav_rest.basis
+			shoulder = clav_rest.origin + from.rotated(axis, angle)
+	var parent_clav := skel.get_bone_global_rest(skel.get_bone_parent(c.clav)).basis
+	skel.set_bone_pose_rotation(c.clav, (parent_clav.inverse() * clav_basis).get_rotation_quaternion())
+
+	# Two-bone IK: shoulder -> elbow -> wrist.
+	var l1: float = c.l1
+	var l2: float = c.l2
+	var d := clampf(shoulder.distance_to(wrist), absf(l1 - l2) + 0.01, l1 + l2 - 0.001)
+	var dir: Vector3 = (wrist - shoulder).normalized()
 	var a := (l1 * l1 - l2 * l2 + d * d) / (2.0 * d)
 	var h := sqrt(maxf(l1 * l1 - a * a, 0.0))
-	var pv := (pole_dir - dir * pole_dir.dot(dir)).normalized()
-	var elbow := s + dir * a + pv * h
+	var pole := (to_skel.basis * (global_basis * pole_dir)).normalized()
+	var pv: Vector3 = pole - dir * pole.dot(dir)
+	if pv.length_squared() < 1e-6:
+		pv = Vector3.DOWN - dir * dir.y
+	pv = pv.normalized()
+	var elbow: Vector3 = shoulder + dir * a + pv * h
+	var hand_at: Vector3 = shoulder + dir * d
 
-	var parent_upper := skel.get_bone_global_pose(skel.get_bone_parent(upper)).basis
-	var new_upper := _aim_y(g_upper.basis, elbow - s)
-	skel.set_bone_pose_rotation(upper, (parent_upper.inverse() * new_upper).get_rotation_quaternion())
-	var new_lower := _aim_y(new_upper * (g_upper.basis.inverse() * g_lower.basis), target - elbow)
-	skel.set_bone_pose_rotation(lower, (new_upper.inverse() * new_lower).get_rotation_quaternion())
+	var upper_rest := skel.get_bone_global_rest(c.upper)
+	var lower_rest := skel.get_bone_global_rest(c.lower)
+	# Upper arm: the rest pose relative to the collarbone, then aimed at the elbow.
+	var upper_basis := clav_basis * (clav_rest.basis.inverse() * upper_rest.basis)
+	upper_basis = _aim(upper_basis, upper_basis * (upper_rest.basis.inverse() * (lower_rest.origin - upper_rest.origin)), elbow - shoulder)
+	var lower_basis := upper_basis * (upper_rest.basis.inverse() * lower_rest.basis)
+	var lower_to_hand := lower_rest.basis.inverse() * (hand_rest.origin - lower_rest.origin)
+	lower_basis = _aim(lower_basis, lower_basis * lower_to_hand, hand_at - elbow)
+	# Give the forearm half of the wrist's twist about the forearm's axis.
+	var axis_local := lower_to_hand.normalized()
+	var want_local: Basis = (lower_basis.inverse() * hand_basis) * (lower_rest.basis.inverse() * hand_rest.basis).inverse()
+	var q: Quaternion = want_local.get_rotation_quaternion()
+	var proj := axis_local * Vector3(q.x, q.y, q.z).dot(axis_local)
+	var twist := Quaternion(proj.x, proj.y, proj.z, q.w)
+	if twist.length_squared() > 1e-8:
+		twist = twist.normalized()
+		lower_basis = lower_basis * Basis(Quaternion.IDENTITY.slerp(twist, 0.5))
+	skel.set_bone_pose_rotation(c.upper, (clav_basis.inverse() * upper_basis).get_rotation_quaternion())
+	skel.set_bone_pose_rotation(c.lower, (upper_basis.inverse() * lower_basis).get_rotation_quaternion())
+	skel.set_bone_pose_rotation(c.hand, (lower_basis.inverse() * hand_basis).get_rotation_quaternion())
 
-	# Hand: Y = wrist->knuckles, Z = back of the hand (the rig's convention).
-	var y := (basis_to_skel * fwd).normalized()
-	var z := (basis_to_skel * back).normalized()
-	z = (z - y * z.dot(y)).normalized()
-	var new_hand := Basis(y.cross(z), y, z)
-	skel.set_bone_pose_rotation(hand, (new_lower.inverse() * new_hand).get_rotation_quaternion())
+	# Fingers.
+	var curl: Array = target.get_meta("curl", [0.5, 0.5, 0.5, 0.5])
+	for i in c.fingers.size():
+		var amount: float = curl[i]
+		var chain: Array = c.fingers[i]
+		for j in chain.size():
+			var e: Array = chain[j]
+			skel.set_bone_pose_rotation(e[0], e[1] * Quaternion(e[2], deg_to_rad(FINGER_BEND[j] * amount)))
+	var thumb: float = target.get_meta("thumb", 0.3)
+	for j in c.thumb.size():
+		var e: Array = c.thumb[j]
+		skel.set_bone_pose_rotation(e[0], e[1] * Quaternion(e[2], deg_to_rad(THUMB_BEND[j] * thumb)))
 
-	# Curl the fingers around the grip (rotate about each bone's X axis).
-	for f in FINGERS:
-		for j in [2, 3, 4]:
-			var b := skel.find_bone("%s%d.%s" % [f, j, side])
-			if b >= 0:
-				var rest := skel.get_bone_rest(b).basis.get_rotation_quaternion()
-				skel.set_bone_pose_rotation(b, rest * Quaternion(Vector3.RIGHT, deg_to_rad(-finger_curl_deg)))
-	for j in [2, 3]:
-		var b := skel.find_bone("Thumb%d.%s" % [j, side])
-		if b >= 0:
-			var rest := skel.get_bone_rest(b).basis.get_rotation_quaternion()
-			skel.set_bone_pose_rotation(b, rest * Quaternion(Vector3.RIGHT, deg_to_rad(-thumb_curl_deg)))
+
+# Basis `b` turned (smallest rotation) so its vector `from` points along `to`.
+func _aim(b: Basis, from: Vector3, to: Vector3) -> Basis:
+	var f := from.normalized()
+	var t := to.normalized()
+	var axis := f.cross(t)
+	if axis.length_squared() < 1e-10:
+		return b
+	return Basis(axis.normalized(), f.angle_to(t)) * b

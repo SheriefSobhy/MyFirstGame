@@ -11,6 +11,7 @@ const MAP_SELECT_SCENE := "res://ui/map_select.tscn"
 const Config := preload("res://progression_config.gd")
 const ArmoryMenu := preload("res://ui/armory_menu.gd")
 const LoadingScreen := preload("res://ui/loading_screen.gd")
+const WeaponTour := preload("res://weapon_tour.gd")
 const Maps := preload("res://maps.gd")
 const AchievementsMenu := preload("res://ui/achievements_menu.gd")
 const COLOR_GOLD := Color(1.0, 0.8, 0.35)
@@ -49,6 +50,9 @@ func _ready() -> void:
 	title_label.text = ProjectSettings.get_setting("application/config/name", "Dead Perimeter")
 	# A web page can't close itself, so there's no Quit button in the browser.
 	quit_button.visible = not OS.has_feature("web")
+	if WeaponTour.requested():  # debug builds: weapon_tour.gd
+		LoadingScreen.go.call_deferred(get_tree(), Maps.LIST[0])
+		return
 
 	armory = ArmoryMenu.new()
 	armory.name = "Armory"

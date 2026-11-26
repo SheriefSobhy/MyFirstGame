@@ -4,13 +4,19 @@ extends RefCounted
 ##
 ## Fields:
 ##  name            shown on the HUD and in pickup messages
-##  model           the gun model (barrel along +X, grip at the origin)
-##  view_length     how long the gun looks in first person, in metres
-##  view_offset     nudges the first-person model so the grip sits in the right hand
-##  arms_offset     slides the arm rig forward for long guns (arms only reach ~35 cm)
-##  left_hand       where the left wrist goes (same space as view_offset); the
-##                  fingers reach ~8 cm further along left_hand_forward
-##  left_hand_forward / left_hand_back   left hand direction (wrist->knuckles / back of hand)
+##  model           the gun model for pickups, the rack and the Armory (Medium detail;
+##                  barrel along +X, grip at the origin, real size in metres)
+##  view_model      first-person model: assets/models/guns/<view_model>_<low|med|high>.glb,
+##                  picked by graphics quality (tools/blender/build_guns.py)
+##  hold            hand poses (weapon_view.gd HOLDS): "pistol" (both hands on the
+##                  grip), "rifle" (left hand under the handguard), "shotgun" (pump)
+##  left_hand       where the left palm holds the gun, gun space (m: +X barrel, +Y up, +Z right)
+##  hip             where the grip sits at the hip, view space (m, before
+##                  player.gd VIEW_SCALE; +X right, -Z forward)
+##  ads_distance    eye to grip (m) while aiming down the sights
+##  sight_height    sight line above the grip (m); 0 = measured from the model at sight_at
+##  port            ejection port, gun space (spent casings come out here)
+##  casing          spent casing: "pistol", "rifle", "shell" or "" (none)
 ##  pickup_length   size of the floating pickup in the arena, in metres
 ##  (which weapons you start with, and the others' shop prices, are in economy.gd)
 ##  move_scale      walking / running speed while holding it (1 = normal)
@@ -44,19 +50,21 @@ extends RefCounted
 ##                  sniper: full-screen scope overlay, uses zoom_fov)
 ##  ads_fov         field of view while aiming down the sights (not "scope")
 ##  ads_spread      spread multiplier while aiming down the sights (0.5 = half)
-##  sight_at        where along the gun the sight sits, 0 = back .. 1 = muzzle
+##  sight_at        where along the gun the front sight sits, 0 = back .. 1 = muzzle
 ##  ads_offset      extra nudge (m) for the gun while aiming, if a hand is in the way
 
 const LIST := [
 	{
 		"name": "Pistol",
-		"model": preload("res://assets/models/quaternius/ultimate_guns/pistol.glb"),
-		"view_length": 0.155,
-		"view_offset": Vector3.ZERO,
-		"arms_offset": Vector3.ZERO,
-		"left_hand": Vector3(-0.035, -0.06, 0.05),
-		"left_hand_forward": Vector3(0.5, 0.35, -1.0),
-		"left_hand_back": Vector3(-0.8, -0.6, 0.0),
+		"model": preload("res://assets/models/guns/pistol_med.glb"),
+		"view_model": "pistol",
+		"hold": "pistol",
+		"left_hand": Vector3(-0.002, -0.004, -0.03),
+		"hip": Vector3(0.14, -0.17, -0.42),
+		"ads_distance": 0.40,
+		"sight_height": 0.089,
+		"port": Vector3(0.062, 0.077, 0.012),
+		"casing": "pistol",
 		"pickup_length": 0.35,
 		"move_scale": 1.0,
 		"automatic": false,
@@ -96,13 +104,15 @@ const LIST := [
 	},
 	{
 		"name": "Assault Rifle",
-		"model": preload("res://assets/models/quaternius/ultimate_guns/carbine.glb"),
-		"view_length": 0.42,
-		"view_offset": Vector3(0.0, -0.01, 0.0),
-		"arms_offset": Vector3(0.05, 0.0, -0.17),
-		"left_hand": Vector3(-0.02, -0.055, -0.05),
-		"left_hand_forward": Vector3(0.25, 0.45, -1.0),
-		"left_hand_back": Vector3(-0.7, -1.0, 0.1),
+		"model": preload("res://assets/models/guns/rifle_med.glb"),
+		"view_model": "rifle",
+		"hold": "rifle",
+		"left_hand": Vector3(0.24, 0.068, -0.006),
+		"hip": Vector3(0.15, -0.21, -0.34),
+		"ads_distance": 0.20,
+		"sight_height": 0.0,
+		"port": Vector3(0.138, 0.106, 0.02),
+		"casing": "rifle",
 		"pickup_length": 0.95,
 		"move_scale": 1.0,
 		"automatic": true,
@@ -142,13 +152,15 @@ const LIST := [
 	},
 	{
 		"name": "Shotgun",
-		"model": preload("res://assets/models/quaternius/ultimate_guns/shotgun.glb"),
-		"view_length": 0.46,
-		"view_offset": Vector3(0.0, -0.005, 0.03),
-		"arms_offset": Vector3(0.05, 0.0, -0.21),
-		"left_hand": Vector3(-0.02, -0.06, -0.09),
-		"left_hand_forward": Vector3(0.25, 0.45, -1.0),
-		"left_hand_back": Vector3(-0.7, -1.0, 0.1),
+		"model": preload("res://assets/models/guns/shotgun_med.glb"),
+		"view_model": "shotgun",
+		"hold": "shotgun",
+		"left_hand": Vector3(0.34, -0.045, -0.006),
+		"hip": Vector3(0.14, -0.2, -0.27),
+		"ads_distance": 0.22,
+		"sight_height": 0.1,
+		"port": Vector3(0.174, 0.049, 0.02),
+		"casing": "shell",
 		"pickup_length": 1.0,
 		"move_scale": 1.0,
 		"automatic": false,
@@ -190,13 +202,15 @@ const LIST := [
 	},
 	{
 		"name": "Sniper",
-		"model": preload("res://assets/models/quaternius/ultimate_guns/sniper.glb"),
-		"view_length": 0.52,
-		"view_offset": Vector3(0.0, -0.01, 0.0),
-		"arms_offset": Vector3(0.05, 0.0, -0.2),
-		"left_hand": Vector3(-0.02, -0.06, -0.08),
-		"left_hand_forward": Vector3(0.25, 0.45, -1.0),
-		"left_hand_back": Vector3(-0.7, -1.0, 0.1),
+		"model": preload("res://assets/models/guns/sniper_med.glb"),
+		"view_model": "sniper",
+		"hold": "rifle",
+		"left_hand": Vector3(0.24, 0.048, -0.006),
+		"hip": Vector3(0.15, -0.22, -0.33),
+		"ads_distance": 0.20,
+		"sight_height": 0.0,
+		"port": Vector3(0.047, 0.082, 0.02),
+		"casing": "rifle",
 		"pickup_length": 1.15,
 		"move_scale": 1.0,
 		"automatic": false,
@@ -237,13 +251,15 @@ const LIST := [
 	},
 	{
 		"name": "SMG",
-		"model": preload("res://assets/models/quaternius/ultimate_guns/smg.glb"),
-		"view_length": 0.36,
-		"view_offset": Vector3(0.0, -0.005, 0.0),
-		"arms_offset": Vector3(0.03, 0.0, -0.1),
-		"left_hand": Vector3(-0.02, -0.06, -0.06),
-		"left_hand_forward": Vector3(0.25, 0.45, -1.0),
-		"left_hand_back": Vector3(-0.7, -1.0, 0.1),
+		"model": preload("res://assets/models/guns/smg_med.glb"),
+		"view_model": "smg",
+		"hold": "rifle",
+		"left_hand": Vector3(0.24, 0.058, -0.006),
+		"hip": Vector3(0.15, -0.21, -0.34),
+		"ads_distance": 0.20,
+		"sight_height": 0.163,
+		"port": Vector3(0.127, 0.099, 0.02),
+		"casing": "rifle",
 		"pickup_length": 0.7,
 		"move_scale": 1.05,
 		"automatic": true,
@@ -284,13 +300,15 @@ const LIST := [
 	},
 	{
 		"name": "AK Rifle",
-		"model": preload("res://assets/models/quaternius/ultimate_guns/ak_rifle.glb"),
-		"view_length": 0.5,
-		"view_offset": Vector3(0.0, -0.005, 0.0),
-		"arms_offset": Vector3(0.05, 0.0, -0.19),
-		"left_hand": Vector3(-0.02, -0.055, -0.1),
-		"left_hand_forward": Vector3(0.25, 0.45, -1.0),
-		"left_hand_back": Vector3(-0.7, -1.0, 0.1),
+		"model": preload("res://assets/models/guns/ak_med.glb"),
+		"view_model": "ak",
+		"hold": "rifle",
+		"left_hand": Vector3(0.25, 0.058, -0.006),
+		"hip": Vector3(0.15, -0.21, -0.34),
+		"ads_distance": 0.20,
+		"sight_height": 0.155,
+		"port": Vector3(0.164, 0.095, 0.02),
+		"casing": "rifle",
 		"pickup_length": 0.95,
 		"move_scale": 0.95,
 		"automatic": true,
@@ -331,13 +349,15 @@ const LIST := [
 	},
 	{
 		"name": "LMG",
-		"model": preload("res://assets/models/quaternius/ultimate_guns/lmg.glb"),
-		"view_length": 0.54,
-		"view_offset": Vector3(0.0, -0.005, 0.0),
-		"arms_offset": Vector3(0.05, 0.0, -0.2),
-		"left_hand": Vector3(-0.02, -0.055, -0.11),
-		"left_hand_forward": Vector3(0.25, 0.45, -1.0),
-		"left_hand_back": Vector3(-0.7, -1.0, 0.1),
+		"model": preload("res://assets/models/guns/lmg_med.glb"),
+		"view_model": "lmg",
+		"hold": "rifle",
+		"left_hand": Vector3(0.24, 0.018, -0.006),
+		"hip": Vector3(0.16, -0.23, -0.33),
+		"ads_distance": 0.22,
+		"sight_height": 0.167,
+		"port": Vector3(0.07, 0.02, 0.0),
+		"casing": "rifle",
 		"pickup_length": 1.05,
 		"move_scale": 0.72,
 		"automatic": true,
@@ -378,13 +398,15 @@ const LIST := [
 	},
 	{
 		"name": "Revolver",
-		"model": preload("res://assets/models/quaternius/ultimate_guns/revolver.glb"),
-		"view_length": 0.2,
-		"view_offset": Vector3.ZERO,
-		"arms_offset": Vector3.ZERO,
-		"left_hand": Vector3(-0.035, -0.06, 0.05),
-		"left_hand_forward": Vector3(0.5, 0.35, -1.0),
-		"left_hand_back": Vector3(-0.8, -0.6, 0.0),
+		"model": preload("res://assets/models/guns/revolver_med.glb"),
+		"view_model": "revolver",
+		"hold": "pistol",
+		"left_hand": Vector3(-0.002, -0.004, -0.03),
+		"hip": Vector3(0.14, -0.17, -0.42),
+		"ads_distance": 0.40,
+		"sight_height": 0.099,
+		"port": Vector3.ZERO,
+		"casing": "",
 		"pickup_length": 0.4,
 		"move_scale": 1.0,
 		"automatic": false,

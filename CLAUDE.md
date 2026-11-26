@@ -6,7 +6,7 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 - Godot: `C:\Godot\Godot_v4.7.2-stable_win64_console.exe`
 - Renderer: GL Compatibility (web/desktop), Mobile on Android. Keep every
   effect working in Compatibility. Third-party assets are CC0, except the
-  Mixamo enemy characters (CREDITS.md). Raw art goes in `art_source/`
+  Mixamo characters/arms and the CC BY 4.0 Sketchfab guns (CREDITS.md). Raw art goes in `art_source/`
   (git-ignored: some FBX files are over 100 MB). Never commit raw FBX.
 - Style: plain GDScript, `preload()` constants instead of `class_name`,
   UI mostly built in code, every balance number in a config script.
@@ -17,7 +17,7 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 |---|---|
 | Main menu → map select → match | `ui/main_menu.*`, `ui/map_select.*`, `ui/loading_screen.*` (tip + progress bar, threaded load), a map scene (`main.tscn`, `maps/*.tscn`) |
 | Match flow (waves, score, spawns, Game Over) | `main.gd` (every map scene runs it; `map_id` picks the save key) |
-| Player, weapons, upgrades, skins on the view models | `player.gd`, `weapon_stats.gd`, `weapon_model.gd`, `fp_arms.gd` |
+| Player, weapons, upgrades, skins on the view models | `player.gd`, `weapon_stats.gd`, `weapon_view.gd`, `weapon_model.gd`, `fp_arms.gd`, `effects/casings.gd` (see "First-person weapons") |
 | Enemies | `enemy.gd`, `enemy_types.gd`, models in `assets/models/enemies/` (see "Enemy models") |
 | HUD, pause, Game Over, level-up popup, toasts | `hud.gd` / `hud.tscn`, `combat_feedback.gd`, `touch_controls.gd` |
 | First-match tutorial | `tutorial.gd` (added to the HUD by `main.gd`) |
@@ -195,6 +195,39 @@ used headless only (`blender -b --factory-startup --python ...`).
   ~1.7 MB, a larger yard lightmap).
 - `tools/map_shots.gd -- --shots <dir> --bench` (with a window): screenshots
   from fixed views per map, and FPS / draw calls / triangles per quality.
+
+## First-person weapons
+
+Sources (git-ignored): `art_source/sketchfab/*.zip` (CC BY 4.0) and
+`art_source/mixamo/soldier.fbx`. `tools/blender/build_guns.bat` rebuilds
+everything: `build_guns.py` -> `assets/models/guns/<id>_high/med/low.glb`
+(barrel +X, grip at origin, real metres; parts named `mag`, `slide`, `bolt`,
+`charger`, `pump`, `cover`, `cylinder`, `trigger`, rest `body`),
+`build_arms.py` -> `assets/models/arms/arms_<lod>.glb`, then
+`tools/gun_imports.gd` sets import options (no auto LODs/shadow meshes, VRAM
+textures). Colour maps 1024/512/256 px, normal + metal/rough maps half that
+(Low: colour only).
+
+- `Camera3D/ViewModel` is scaled 0.5 (`player.gd` VIEW_SCALE) about the eye:
+  life-size picture, half the wall clipping. View-space numbers
+  (`hip`, `ads_distance`, sway, recoil) are in its unscaled metres.
+- `weapon_view.gd` (one per weapon, model LOD = graphics quality): part
+  animations (slide/bolt kick, pump, sniper bolt, revolver cylinder; reloads
+  with the left hand on the magazine, LMG cover, revolver swing-out, shotgun
+  shells), hand targets (`HANDS` shapes per `hold`), ejection port.
+- `fp_arms.gd`: per-frame two-bone IK of the Mixamo arms to the hand
+  targets (collarbone reach, forearm twist, finger curls from target meta).
+  Re-parenting a target onto a part makes the hand follow it.
+- `effects/casings.gd`: pooled MultiMesh casings, no physics bodies.
+- ADS: `sight_height` (m above the grip; 0 = measured) on the camera axis;
+  the rifle gets the procedural reflex sight (`RedDotSight`).
+- Tuning tools (window needed): `tools/viewmodel_lab.gd -- --out <dir>
+  [--weapon 1] [--ads] [--reload 0.4] [--views fp,side,top,front]` (arms + gun
+  alone, from outside too), `tools/weapon_shots.gd -- --shots <dir>`.
+- On a phone (debug APK): `adb shell run-as <package> touch files/weapon_tour`
+  then start the app: `weapon_tour.gd` screenshots every gun (hip / ADS /
+  fire / reload) into `files/tour/` with an FPS report, then quits. Pull with
+  `adb exec-out run-as <package> tar c files/tour > tour.tar`.
 
 ## Enemy models (Mixamo)
 

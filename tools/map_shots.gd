@@ -91,7 +91,7 @@ func _open(m: Dictionary) -> Camera3D:
 	main.get_node("HUD").visible = false
 	var player: Node3D = main.get_node("Player")
 	player.process_mode = Node.PROCESS_MODE_DISABLED
-	player.get_node("Head/Camera3D/WeaponSway").visible = false
+	player.get_node("Head/Camera3D/ViewModel").visible = false
 	var cam := Camera3D.new()
 	cam.fov = (player.get_node("Head/Camera3D") as Camera3D).fov
 	cam.far = 200.0

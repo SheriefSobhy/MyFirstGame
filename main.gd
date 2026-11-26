@@ -10,6 +10,7 @@ extends Node3D
 ## with at most max_enemies in the yard at once. After a wave is cleared the
 ## player gets a short break (and some health back) before the next one.
 
+const WeaponTour := preload("res://weapon_tour.gd")
 const ENEMY_SCENE := preload("res://enemy.tscn")
 const MENU_SCENE := "res://ui/main_menu.tscn"
 const START_ENEMIES := 5
@@ -106,6 +107,8 @@ func _ready() -> void:
 	# past 0. Path queries are only trusted after it has synced again.
 	_nav_iteration_start = NavigationServer3D.map_get_iteration_id(get_world_3d().navigation_map)
 	_player_start = player.global_position
+	if WeaponTour.requested():  # debug builds: an automatic weapon tour (weapon_tour.gd)
+		add_child(WeaponTour.new())
 
 	# Looping ambient wind, and the gameplay music.
 	wind.stream.loop = true

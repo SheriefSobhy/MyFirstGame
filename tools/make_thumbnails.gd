@@ -32,7 +32,7 @@ func _run() -> void:
 			e.queue_free()
 		main.get_node("HUD").visible = false
 		var player: Node3D = main.get_node("Player")
-		player.get_node("Head/Camera3D/WeaponSway").visible = false
+		player.get_node("Head/Camera3D/ViewModel").visible = false
 		var view: Array = VIEWS.get(m.id, [0.0, 0.0])
 		player.rotation.y += deg_to_rad(view[0])
 		player.get_node("Head").rotation.x = deg_to_rad(view[1])
