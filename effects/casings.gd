@@ -82,6 +82,19 @@ func spawn(kind: String, at: Vector3, basis: Basis, vel: Vector3, start_scale: f
 		s.next = (s.next + 1) % POOL
 
 
+## Shows one casing of each kind at `at` (on = true) for the level's
+## prewarm (main.gd), so their material is compiled before the first shot;
+## on = false hides them again.
+func warm(on: bool, at := Vector3.ZERO) -> void:
+	for kind: String in _sets:
+		var s: Dictionary = _sets[kind]
+		if not (s.items as Array).is_empty():
+			continue
+		var mm: MultiMesh = s.mmi.multimesh
+		mm.set_instance_transform(0, Transform3D(Basis(), at))
+		mm.visible_instance_count = 1 if on else 0
+
+
 ## How many casings of `kind` are flying or lying around (tests).
 func count(kind: String) -> int:
 	return _sets[kind].items.size() if _sets.has(kind) else 0

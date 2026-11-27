@@ -11,6 +11,11 @@ extends CharacterBody3D
 ## VIEW_SCALE about the eye: the picture is the same as life size, but the
 ## gun reaches half as far, so it pokes into walls no more than before.
 ## Positions below that are "view space" are in ViewModel's (life-size) metres.
+## A weapon can set its own "view_scale" (smaller = the gun stays further from
+## walls) and "view_fov": the gun and arms are then drawn as if through a
+## camera with that FOV (ViewModel is also scaled sideways and up by
+## tan(fov / 2) / tan(view_fov / 2), the same picture as a second projection,
+## without the cost), so a wide phone screen doesn't stretch them.
 
 signal health_changed(health: int)
 ## reserve is -1 when the weapon has unlimited spare ammo.
@@ -37,6 +42,7 @@ const Economy := preload("res://economy.gd")
 const WeaponModel := preload("res://weapon_model.gd")
 const WeaponView := preload("res://weapon_view.gd")
 const Casings := preload("res://effects/casings.gd")
+const FpArms := preload("res://fp_arms.gd")
 const Progression := preload("res://progression_config.gd")
 const Grenade := preload("res://effects/grenade.gd")
 
@@ -58,7 +64,7 @@ const SHOT_MASK := 1        # physics layers bullets can hit
 const MAX_SPARKS_PER_SHOT := 2  # shotgun: limit wall sparks (phones)
 const SWITCH_DOWN_TIME := 0.16
 const SWITCH_UP_TIME := 0.24
-const VIEW_SCALE := 0.5     # ViewModel's scale (see above); keep in sync with player.tscn
+const VIEW_SCALE := 0.5     # ViewModel's scale (see above) unless the weapon sets "view_scale"
 const DRY_FIRE_SOUND := preload("res://assets/sounds/metalClick.ogg")
 
 # Grenades.
@@ -86,6 +92,15 @@ const SPRINT_POS := Vector3(-0.05, -0.07, 0.05)
 const SPRINT_TURN := Vector3(-24.0, 38.0, 14.0)  # degrees
 const SPRINT_BLEND := 7.0       # 1/s, how fast it goes in and out
 const CASING_SPEED := Vector3(1.6, 1.3, 0.35)  # right, up, back (m/s)
+# Weapons with "recoil_spring" (the Pistol): the kick springs back with a
+# little overshoot instead of fading out.
+const SPRING_RATE := 26.0       # 1/s (angular frequency)
+const SPRING_DAMPING := 0.5     # 1 = no overshoot
+# Weapons with "breath" (the Pistol): idle breathing sway and a walk roll.
+const BREATH_RATE := 1.55       # rad/s (one breath ~4 s)
+const BREATH_MOVE := Vector3(0.0016, 0.0024, 0.0)   # view space, m
+const BREATH_TURN := Vector3(0.35, 0.25, 0.3)       # degrees
+const WALK_ROLL := 1.6          # degrees of roll per bob step
 const SHAKE_ON_HIT := 0.8
 const HEADSHOT_MULTIPLIER := 2
 
@@ -182,6 +197,10 @@ var _bob_blend := 0.0      # 0 = standing still, 1 = full bob
 var _last_step := 0
 var _sway := Vector2.ZERO  # recent look movement, makes the gun lag behind
 var _recoil := 0.0
+var _recoil_vel := 0.0     # spring recoil (see SPRING_RATE)
+var _recoil_side := 0.0    # random sideways part of the last kick (-1..1)
+var _breath_time := 0.0
+var _arms_sets := {}       # fp_arms model name -> its Arms node ("arms", "gloves")
 var _shake := 0.0
 var _sprint := 0.0         # 0 = gun up, 1 = sprint pose
 var _casings: Node3D
@@ -204,6 +223,20 @@ var _casings: Node3D
 
 func _ready() -> void:
 	muzzle_flash.visible = false
+	# Weapons can use other first-person arms ("arms" in weapon_stats.gd, e.g.
+	# the Pistol's gloves); each set is built once, only one is shown.
+	_arms_sets["arms"] = arms
+	for w: Dictionary in Weapons.LIST:
+		var set_name: String = w.get("arms", "arms")
+		if not _arms_sets.has(set_name):
+			var a: Node3D = FpArms.new()
+			a.name = "Arms_" + set_name
+			a.model_name = set_name
+			a.model_scale = w.get("arms_scale", 1.0)
+			a.shoulders = w.get("arms_shoulders", a.shoulders)
+			a.visible = false
+			view_model.add_child(a)
+			_arms_sets[set_name] = a
 	for i in Weapons.LIST.size():
 		var w: Dictionary = Weapons.LIST[i]
 		# Pistol and Assault Rifle; the rest are bought in the shop (economy.gd).
@@ -242,7 +275,7 @@ func _add_view_model(w: Dictionary) -> void:
 		var aabb: AABB = view.aabb
 		sight = WeaponModel.top_at(view.model, aabb, aabb.position.x + aabb.size.x * w.sight_at)
 		sight.z = 0.0
-	var drop := ADS_SIGHT_DROP
+	var drop: float = w.get("ads_drop", ADS_SIGHT_DROP)
 	if w.sight == "red_dot":
 		sight = WeaponModel.add_red_dot(view, sight, 1.0)
 		drop = 0.0  # look straight through the window
@@ -441,12 +474,17 @@ func shoot() -> void:
 	# Flash, sound, kick and shake.
 	muzzle_flash.visible = true
 	muzzle_flash.rotation.z = randf() * TAU
-	# x1.4: the flash is inside the half-size ViewModel, closer to the eye.
-	muzzle_flash.scale = Vector3.ONE * w.flash_size * 1.4 * randf_range(0.8, 1.2)
+	# x1.4 at VIEW_SCALE 0.5: the flash is inside the scaled-down ViewModel,
+	# closer to the eye.
+	muzzle_flash.scale = Vector3.ONE * w.flash_size * 0.7 / view_scale_of(w) * randf_range(0.8, 1.2)
 	_flash_timer = FLASH_TIME
 	shoot_sound.pitch_scale = w.shot_pitch * randf_range(0.95, 1.05)
 	shoot_sound.play()
 	_recoil = minf(_recoil + w.recoil, maxf(1.5, w.recoil))
+	if w.get("recoil_spring", false):
+		_recoil = w.recoil  # each shot snaps to the full kick, the spring brings it back
+		_recoil_vel = 0.0
+		_recoil_side = randf_range(-1.0, 1.0)
 	_shake = maxf(_shake, w.shake)
 	_view().fire(_mag[weapon_index] == 0)
 	if w.cycle_sound:
@@ -547,7 +585,12 @@ func _on_eject(count: int, view: Node3D) -> void:
 		if count > 1:  # revolver: the whole cylinder falls out
 			v = b.y * -0.6 + b.x * randf_range(-0.4, 0.2) + velocity
 			at = view.port.global_position + b * Vector3(randf_range(-0.01, 0.01), randf_range(-0.01, 0.01), 0.0)
-		_casings.spawn(w.casing, at, view.global_basis.orthonormalized() * Basis(Vector3.FORWARD, PI / 2.0), v, VIEW_SCALE)
+		_casings.spawn(w.casing, at, view.global_basis.orthonormalized() * Basis(Vector3.FORWARD, PI / 2.0), v, view_scale_of(w))
+
+
+## ViewModel's scale for weapon `w` (see the top of this file).
+func view_scale_of(w: Dictionary) -> float:
+	return w.get("view_scale", VIEW_SCALE)
 
 
 # --- Reloading --------------------------------------------------------------
@@ -566,7 +609,10 @@ func start_reload() -> void:
 	_emit_ammo()
 
 	_sound_tween = create_tween()
+	var empty := _mag[weapon_index] == 0
 	for entry: Array in w.reload_sounds:
+		if entry.size() > 2 and entry[2] == "empty" and not empty:
+			continue  # e.g. the slide release, only after the last round
 		# Faster reloads (upgrades) play the sounds faster too.
 		_sound_tween.parallel().tween_callback(_play_reload_sound.bind(entry[1])).set_delay(entry[0] * _reload_timer / w.reload_time)
 
@@ -612,13 +658,33 @@ func switch_to(index: int) -> void:
 	_emit_ammo()
 	# Lower the current gun (dipping and rolling out of view), swap models,
 	# raise the new one with a little overshoot.
+	# Weapons with a "holster" pose (the Pistol) go down / come up through it
+	# on a smooth curve instead.
 	_kill_weapon_tween()
 	_weapon_tween = create_tween()
-	_weapon_tween.tween_property(weapon_reload, "position", Vector3(-0.04, -0.4, 0.12), SWITCH_DOWN_TIME).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-	_weapon_tween.parallel().tween_property(weapon_reload, "rotation", Vector3(deg_to_rad(-45), deg_to_rad(10), deg_to_rad(25)), SWITCH_DOWN_TIME).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	var down_pos := Vector3(-0.04, -0.4, 0.12)
+	var down_rot := Vector3(deg_to_rad(-45), deg_to_rad(10), deg_to_rad(25))
+	var down_trans := Tween.TRANS_CUBIC
+	var holster: Array = current_weapon().get("holster", [])
+	if not holster.is_empty():
+		down_pos = holster[0]
+		down_rot = holster[1] * (PI / 180.0)
+		down_trans = Tween.TRANS_SINE
+	_weapon_tween.tween_property(weapon_reload, "position", down_pos, SWITCH_DOWN_TIME).set_trans(down_trans).set_ease(Tween.EASE_IN)
+	_weapon_tween.parallel().tween_property(weapon_reload, "rotation", down_rot, SWITCH_DOWN_TIME).set_trans(down_trans).set_ease(Tween.EASE_IN)
 	_weapon_tween.tween_callback(_show_weapon.bind(index))
-	_weapon_tween.tween_property(weapon_reload, "position", Vector3.ZERO, SWITCH_UP_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_weapon_tween.parallel().tween_property(weapon_reload, "rotation", Vector3.ZERO, SWITCH_UP_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var up_trans := Tween.TRANS_BACK
+	var up_time := SWITCH_UP_TIME
+	var draw: Array = Weapons.LIST[index].get("holster", [])
+	if not draw.is_empty():
+		# Start the new gun from its own holster pose.
+		_weapon_tween.tween_callback(func() -> void:
+			weapon_reload.position = draw[0]
+			weapon_reload.rotation = draw[1] * (PI / 180.0))
+		up_trans = Tween.TRANS_QUART
+		up_time = SWITCH_UP_TIME * 1.25
+	_weapon_tween.tween_property(weapon_reload, "position", Vector3.ZERO, up_time).set_trans(up_trans).set_ease(Tween.EASE_OUT)
+	_weapon_tween.parallel().tween_property(weapon_reload, "rotation", Vector3.ZERO, up_time).set_trans(up_trans).set_ease(Tween.EASE_OUT)
 	_weapon_tween.tween_callback(func() -> void: _switching = false)
 
 
@@ -644,6 +710,10 @@ func _show_weapon(index: int) -> void:
 	shoot_sound.stream = w.shot_sound
 	shoot_sound.volume_db = w.shot_volume_db
 	_spread = 0.0
+	var set_name: String = w.get("arms", "arms")
+	for k: String in _arms_sets:
+		_arms_sets[k].visible = k == set_name
+	arms = _arms_sets[set_name]
 	arms.set_targets(_view().right_target, _view().left_target)
 	weapon_changed.emit(w.name)
 	_emit_ammo()
@@ -946,6 +1016,10 @@ func _emit_ammo() -> void:
 func show_all_view_models(on: bool) -> void:
 	for i in _views.size():
 		_views[i].visible = on or i == weapon_index
+	var current: Node3D = arms
+	for a: Node3D in _arms_sets.values():
+		a.visible = on or a == current
+	_casings.warm(on, camera.global_position - camera.global_basis.z * 0.5)
 
 
 # --- Health -----------------------------------------------------------------
@@ -1217,7 +1291,8 @@ func _update_feel(delta: float) -> void:
 	_sprint = move_toward(_sprint, 1.0 if sprinting else 0.0, delta * SPRINT_BLEND)
 	var sprint := smoothstep(0.0, 1.0, _sprint)
 	var steady := lerpf(1.0, ADS_SWAY, _ads)
-	var hip: Vector3 = current_weapon().hip
+	var w := current_weapon()
+	var hip: Vector3 = w.hip
 	var bob_amount := _bob_blend * steady * (1.0 + sprint)
 	weapon_sway.position = hip.lerp(_ads_positions[weapon_index], _ads) \
 			+ Vector3(-_sway.x * SWAY_AMOUNT, _sway.y * SWAY_AMOUNT, 0.0) * steady \
@@ -1225,11 +1300,41 @@ func _update_feel(delta: float) -> void:
 			+ SPRINT_POS * sprint
 	var turn := (HIP_TURN * (1.0 - _ads) + SPRINT_TURN * sprint) * (PI / 180.0)
 	weapon_sway.rotation = Vector3(_sway.y * 0.002, _sway.x * 0.002, -_sway.x * 0.001) * steady + turn
+	# Breathing while standing (less when aiming) and a roll with each step.
+	var breath: float = w.get("breath", 0.0)
+	if breath > 0.0:
+		_breath_time += delta * BREATH_RATE
+		var t := _breath_time
+		var idle := breath * (1.0 - _bob_blend * 0.7) * lerpf(1.0, 0.3, _ads)
+		weapon_sway.position += Vector3(sin(t * 0.5) * BREATH_MOVE.x, sin(t) * BREATH_MOVE.y, 0.0) * idle
+		weapon_sway.rotation += Vector3(sin(t + 0.6) * BREATH_TURN.x, sin(t * 0.5 + 1.3) * BREATH_TURN.y,
+				sin(t * 0.5) * BREATH_TURN.z) * (idle * PI / 180.0)
+		weapon_sway.rotation.z += cos(_bob_time) * deg_to_rad(WALK_ROLL) * breath * bob_amount * lerpf(1.0, 0.3, _ads)
 
 	# Recoil: the gun kicks back and up about the grip, then settles.
-	_recoil = lerpf(_recoil, 0.0, clampf(delta * 12.0, 0.0, 1.0))
-	weapon_recoil.position = Vector3(0.0, 0.0, _recoil * RECOIL_BACK * lerpf(1.0, 0.6, _ads))
-	weapon_recoil.rotation = Vector3(_recoil * RECOIL_PITCH * lerpf(1.0, 0.5, _ads), 0.0, 0.0)
+	if w.get("recoil_spring", false):
+		# Damped spring: snaps back in ~0.12 s with a small overshoot.
+		var acc := -SPRING_RATE * SPRING_RATE * _recoil - 2.0 * SPRING_DAMPING * SPRING_RATE * _recoil_vel
+		var dt := minf(delta, 1.0 / 30.0)
+		_recoil_vel += acc * dt
+		_recoil += _recoil_vel * dt
+	else:
+		_recoil = lerpf(_recoil, 0.0, clampf(delta * 12.0, 0.0, 1.0))
+	var back: float = w.get("recoil_back", RECOIL_BACK)
+	var pitch: float = w.get("recoil_pitch", RECOIL_PITCH)
+	weapon_recoil.position = Vector3(0.0, absf(_recoil) * back * 0.15, _recoil * back * lerpf(1.0, 0.6, _ads)) \
+			if w.get("recoil_spring", false) else Vector3(0.0, 0.0, _recoil * back * lerpf(1.0, 0.6, _ads))
+	weapon_recoil.rotation = Vector3(_recoil * pitch * lerpf(1.0, 0.5, _ads),
+			_recoil * _recoil_side * pitch * 0.12, -_recoil * _recoil_side * pitch * 0.2) \
+			if w.get("recoil_spring", false) else Vector3(_recoil * pitch * lerpf(1.0, 0.5, _ads), 0.0, 0.0)
+
+	# The view model's own scale and FOV (see the top of this file).
+	var vs := view_scale_of(w)
+	var k := 1.0
+	if w.has("view_fov"):
+		var vfov: float = lerpf(w.view_fov, w.get("ads_view_fov", w.view_fov), _ads)
+		k = tan(deg_to_rad(camera.fov) * 0.5) / tan(deg_to_rad(vfov) * 0.5)
+	view_model.scale = Vector3(vs * k, vs * k, vs)
 
 	# Camera shake: small random rotations that fade out quickly.
 	_shake = move_toward(_shake, 0.0, delta * 2.5)

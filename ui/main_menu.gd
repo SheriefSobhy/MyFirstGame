@@ -12,6 +12,7 @@ const Config := preload("res://progression_config.gd")
 const ArmoryMenu := preload("res://ui/armory_menu.gd")
 const LoadingScreen := preload("res://ui/loading_screen.gd")
 const WeaponTour := preload("res://weapon_tour.gd")
+const SoldiersDemo := preload("res://soldiers/soldiers_demo.gd")
 const Maps := preload("res://maps.gd")
 const AchievementsMenu := preload("res://ui/achievements_menu.gd")
 const COLOR_GOLD := Color(1.0, 0.8, 0.35)
@@ -35,6 +36,8 @@ const COLOR_DONE := Color(0.45, 1.0, 0.45)
 @onready var reset_label: Label = %ResetLabel
 @onready var login_label: Label = %LoginLabel
 
+## Soldiers (Test) mode (soldiers/soldiers_mode.gd), under Training.
+var soldiers_button: Button
 var armory: ArmoryMenu
 var achievements: AchievementsMenu
 ## The daily login reward popup (shown once a day).
@@ -53,6 +56,9 @@ func _ready() -> void:
 	if WeaponTour.requested():  # debug builds: weapon_tour.gd
 		LoadingScreen.go.call_deferred(get_tree(), Maps.LIST[0])
 		return
+	if SoldiersDemo.requested():  # debug builds: soldiers/soldiers_demo.gd
+		LoadingScreen.go.call_deferred(get_tree(), Maps.SOLDIERS)
+		return
 
 	armory = ArmoryMenu.new()
 	armory.name = "Armory"
@@ -63,9 +69,14 @@ func _ready() -> void:
 	move_child(settings_menu, -1)
 	_build_login_popup()
 
+	soldiers_button = training_button.duplicate()
+	soldiers_button.name = "SoldiersButton"
+	soldiers_button.text = "Soldiers (Test)"
+	training_button.add_sibling(soldiers_button)
 	_compact_buttons()
 	play_button.pressed.connect(_on_play)
 	training_button.pressed.connect(_on_training)
+	soldiers_button.pressed.connect(_on_soldiers)
 	armory_button.pressed.connect(armory.open)
 	achievements_button.pressed.connect(achievements.open)
 	settings_button.pressed.connect(settings_menu.open)
@@ -271,9 +282,14 @@ func _on_training() -> void:
 	LoadingScreen.go(get_tree(), Maps.TRAINING)
 
 
+func _on_soldiers() -> void:
+	_disable_buttons()
+	LoadingScreen.go(get_tree(), Maps.SOLDIERS)
+
+
 # The buttons under Play: a little smaller, so all six fit on a 720 px screen.
 func _compact_buttons() -> void:
-	for b: Button in [training_button, armory_button, achievements_button, settings_button, quit_button]:
+	for b: Button in [training_button, soldiers_button, armory_button, achievements_button, settings_button, quit_button]:
 		b.add_theme_font_size_override("font_size", 27)
 		for state in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
 			var sb := b.get_theme_stylebox(state)
@@ -286,5 +302,5 @@ func _compact_buttons() -> void:
 
 
 func _disable_buttons() -> void:
-	for button: Button in [play_button, training_button, armory_button, achievements_button, settings_button, quit_button]:
+	for button: Button in [play_button, training_button, soldiers_button, armory_button, achievements_button, settings_button, quit_button]:
 		button.disabled = true

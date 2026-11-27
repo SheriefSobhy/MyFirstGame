@@ -8,7 +8,7 @@ extends RefCounted
 ##                  barrel along +X, grip at the origin, real size in metres)
 ##  view_model      first-person model: assets/models/guns/<view_model>_<low|med|high>.glb,
 ##                  picked by graphics quality (tools/blender/build_guns.py)
-##  hold            hand poses (weapon_view.gd HOLDS): "pistol" (both hands on the
+##  hold            hand poses (weapon_view.gd HOLDS): "pistol" / "handgun" (both hands on the
 ##                  grip), "rifle" (left hand under the handguard), "shotgun" (pump)
 ##  left_hand       where the left palm holds the gun, gun space (m: +X barrel, +Y up, +Z right)
 ##  hip             where the grip sits at the hip, view space (m, before
@@ -52,17 +52,42 @@ extends RefCounted
 ##  ads_spread      spread multiplier while aiming down the sights (0.5 = half)
 ##  sight_at        where along the gun the front sight sits, 0 = back .. 1 = muzzle
 ##  ads_offset      extra nudge (m) for the gun while aiming, if a hand is in the way
+##
+## Optional first-person fields (only the Pistol sets them; see player.gd):
+##  arms            fp_arms.gd model: "arms" (default) or "gloves" (hands + short sleeves)
+##  arms_scale      size of that model; arms_shoulders: where its shoulders sit (fp_arms.gd)
+##  view_scale      player.gd ViewModel scale (default VIEW_SCALE): smaller = less wall clipping
+##  view_fov        FOV the gun and arms are drawn with; ads_view_fov while aiming
+##  ads_drop        sights this far (m) below the screen centre (default ADS_SIGHT_DROP)
+##  breath          idle breathing sway / walk roll amount (0 = none)
+##  recoil_spring   true = the kick springs back (snappy) instead of fading out
+##  recoil_back, recoil_pitch   kick per unit of recoil (default RECOIL_BACK / RECOIL_PITCH)
+##  holster         [position, rotation in degrees] of WeaponReload when switched out / in
+##  reload_sounds entries may end with "empty": only played when reloading an empty gun
 
 const LIST := [
 	{
 		"name": "Pistol",
 		"model": preload("res://assets/models/guns/pistol_med.glb"),
 		"view_model": "pistol",
-		"hold": "pistol",
+		"hold": "handgun",
 		"left_hand": Vector3(-0.002, -0.004, -0.03),
-		"hip": Vector3(0.14, -0.17, -0.42),
+		"hip": Vector3(0.115, -0.125, -0.43),
 		"ads_distance": 0.40,
-		"sight_height": 0.089,
+		# Rear notch (x -0.014) and front post (x 0.140) tops: 0.0895 / 0.0901.
+		"sight_height": 0.0898,
+		"ads_drop": 0.0,
+		"arms": "gloves",
+		"arms_scale": 0.85,
+		"arms_shoulders": Vector3(0.0, -0.25, -0.14),
+		"view_scale": 0.25,
+		"view_fov": 56.0,
+		"ads_view_fov": 50.0,
+		"breath": 1.0,
+		"recoil_spring": true,
+		"recoil_back": 0.07,
+		"recoil_pitch": 0.16,
+		"holster": [Vector3(0.05, -0.3, 0.06), Vector3(-30.0, -12.0, -25.0)],
 		"port": Vector3(0.062, 0.077, 0.012),
 		"casing": "pistol",
 		"pickup_length": 0.35,
@@ -82,10 +107,13 @@ const LIST := [
 		"fire_delay": 0.16,
 		"cycle_sound": null,
 		"cycle_delay": 0.0,
-		"reload_time": 1.3,
+		"reload_time": 1.8,
+		# Mag release / magazine seated / slide release (empty gun only);
+		# weapon_view.gd _pistol_reload times its animation from these.
 		"reload_sounds": [
-			[0.05, preload("res://assets/sounds/guns/pistol_mag_out.wav")],
-			[0.75, preload("res://assets/sounds/guns/pistol_mag_in.wav")],
+			[0.26, preload("res://assets/sounds/guns/pistol_mag_out.wav")],
+			[1.06, preload("res://assets/sounds/guns/pistol_mag_in.wav")],
+			[1.34, preload("res://assets/sounds/guns/smg_bolt.wav"), "empty"],
 		],
 		"shot_sound": preload("res://assets/sounds/gunshot_pistol.wav"),
 		"shot_volume_db": -4.0,
@@ -93,7 +121,7 @@ const LIST := [
 		"recoil": 1.0,
 		"view_kick": 0.4,
 		"shake": 0.25,
-		"flash_size": 1.0,
+		"flash_size": 0.6,
 		"zoom_fov": 0.0,
 		"scoped_spread": 0.0,
 		"sight": "iron",

@@ -13,7 +13,7 @@ extends Node3D
 ## Runs after player.gd's _process (child of the player), so there's no lag.
 ## Costs ~40 bone writes a frame, no physics, no animation player.
 
-const MODEL_PATH := "res://assets/models/arms/arms_%s.glb"
+const MODEL_PATH := "res://assets/models/arms/%s_%s.glb"
 const LODS := ["low", "med", "high"]
 const FINGERS := ["Index", "Middle", "Ring", "Pinky"]
 ## Bend per finger joint at curl = 1 (degrees): knuckle, middle, tip.
@@ -27,6 +27,12 @@ const MAX_COLLARBONE := deg_to_rad(28.0)
 ## Elbow directions (this node's space).
 @export var right_pole := Vector3(0.55, -1.0, 0.25)
 @export var left_pole := Vector3(-0.7, -1.0, 0.1)
+## "arms" (whole arms, most guns) or "gloves" (hands + short sleeves, the
+## Pistol); set before the node enters the tree.
+@export var model_name := "arms"
+## Size of the model (the IK works in its own space, so smaller hands just
+## reach a little further with the collarbone).
+@export var model_scale := 1.0
 
 var skel: Skeleton3D
 var right_target: Node3D
@@ -36,7 +42,7 @@ var _sides := {}   # "Right"/"Left" -> chain data (see _chain())
 
 func _ready() -> void:
 	var q: int = Settings.effective_quality()
-	var model: Node3D = load(MODEL_PATH % LODS[clampi(q, 0, 2)]).instantiate()
+	var model: Node3D = load(MODEL_PATH % [model_name, LODS[clampi(q, 0, 2)]]).instantiate()
 	add_child(model)
 	skel = model.find_children("*", "Skeleton3D", true, false)[0]
 	for mi: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
@@ -48,7 +54,8 @@ func _ready() -> void:
 	# Face forward (-Z) with the shoulders at `shoulders`.
 	var mid: Vector3 = (_sides.Right.arm_rest + _sides.Left.arm_rest) * 0.5
 	var at := to_local(skel.global_transform * mid)  # with the model untouched
-	model.transform = Transform3D(Basis(Vector3.UP, PI), shoulders - Basis(Vector3.UP, PI) * at)
+	var turn := Basis(Vector3.UP, PI).scaled(Vector3.ONE * model_scale)
+	model.transform = Transform3D(turn, shoulders - turn * at)
 
 
 ## The hands' targets (from the weapon view). null = leave that arm alone.

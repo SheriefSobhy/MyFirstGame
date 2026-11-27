@@ -31,6 +31,7 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 | **Lighting mood** (3 maps, not Training) | config `atmosphere_config.gd`, builder `atmosphere.gd` (created by `main.gd`), shader `effects/light_shaft.gdshader` |
 | Maps list | `maps.gd` (`LIST` for map select, `TRAINING` for the arena) |
 | **Training Arena** (main menu > Training) | scene `maps/training.tscn` (built by `build_maps.gd`), `training/training.gd` (extends `main.gd`), `training/target.gd`, `training/weapon_rack.gd`, `training/training_ui.gd`, config `training_config.gd` |
+| **Soldiers (Test)** (main menu, under Training) | scene `maps/soldiers.tscn` (main.tscn + `soldiers/soldiers_mode.gd`, extends `main.gd`; zombie mode untouched), cover AI `soldiers/tactical_soldier.gd` (extends `enemy.gd`), `soldiers/damage_indicator.gd`, config `soldiers/soldiers_config.gd` (waves, cover objects, accuracy, regen). Phone demo: `adb shell run-as <package> touch files/soldiers_demo` (`soldiers_demo.gd` autopilot, 75 s, FPS report in `files/soldiers_demo.txt`) |
 | Settings + best scores | `settings.gd` (autoload `Settings`), `ui/settings_menu.*` |
 | Music | `music.gd` (autoload `Music`) |
 | Level kit (Blender-made walls, frames, roofs, pipes, signs...) | `tools/blender/build_kit.py` → `assets/models/kit/kit.glb` + `assets/textures/kit/`, placed by `tools/kit_builder.gd`, material `materials/kit.tres` (`kit_surface.gdshader`) |
@@ -136,7 +137,7 @@ Each test is a SceneTree script that prints PASS/FAIL and exits 1 on failure:
 
 Tests: `test_progression`, `test_economy`, `test_game_loop`, `test_maps`,
 `test_weapons`, `test_combat_feel`, `test_enemies`, `test_mobile`,
-`test_training`, `test_navigation` (run that one with `--fixed-fps 60`). Most accept `-- --shots <folder>`
+`test_training`, `test_soldiers`, `test_navigation` (run that one with `--fixed-fps 60`). Most accept `-- --shots <folder>`
 (without `--headless`) to save screenshots for a visual check.
 
 - Under a tool script, `Progress` starts empty and saves to
@@ -219,6 +220,15 @@ textures). Colour maps 1024/512/256 px, normal + metal/rough maps half that
   targets (collarbone reach, forearm twist, finger curls from target meta).
   Re-parenting a target onto a part makes the hand follow it.
 - `effects/casings.gd`: pooled MultiMesh casings, no physics bodies.
+- Pistol only (optional keys in `weapon_stats.gd`, others keep defaults):
+  `gloves_<lod>.glb` (`build_gloves.py`: hands + short plain sleeve, 2K bake),
+  `view_scale` 0.25 (no wall clipping), `view_fov` (ViewModel scaled in X/Y,
+  no extra pass), spring recoil, breathing, holster switch, 1.8 s reload with
+  a falling magazine copy (`_pistol_reload`). On the phone, `touch
+  files/pistol_test` instead of `weapon_tour` runs a pistol-only pass with
+  per-step frame times (record it with `adb shell screenrecord`).
+- The first Android vibration costs ~80 ms: `Haptics.warm_up()` runs in
+  `main._prewarm_effects`.
 - ADS: `sight_height` (m above the grip; 0 = measured) on the camera axis;
   the rifle gets the procedural reflex sight (`RedDotSight`).
 - Tuning tools (window needed): `tools/viewmodel_lab.gd -- --out <dir>

@@ -18,6 +18,15 @@ static var _busy_until_ms := 0
 static var _busy_amp := 0.0
 
 
+## The first vibration of a run costs ~80 ms on Android (the vibrator
+## service is looked up then): main.gd calls this while the level loads, so
+## the first shot doesn't stutter. Too short and weak to feel.
+static func warm_up() -> void:
+	var settings := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Settings")
+	if settings != null and settings.haptics and DisplayServer.is_touchscreen_available():
+		Input.vibrate_handheld(1, 0.01)
+
+
 static func shot() -> void:
 	_pulse("shot", SHOT.ms, SHOT.amp)
 

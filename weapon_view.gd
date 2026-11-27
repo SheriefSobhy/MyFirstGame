@@ -39,6 +39,14 @@ const HANDS := {
 	# Left hand over the right one on a pistol grip.
 	"cup": {"fwd": Vector3(0.94, -0.3, 0.1), "palm": Vector3(0.1, 0.0, 1.0), "at": Vector3(0.008, -0.012, -0.012),
 			"curl": [0.8, 0.85, 0.9, 0.95], "thumb": 0.6},
+	# Pistol (two-hand "thumbs forward" grip): the right hand high on the
+	# grip, thumb along the frame's left side pointing forward...
+	"pistol_grip": {"fwd": Vector3(0.9, -0.4, -0.15), "palm": Vector3(-0.1, 0.0, -1.0), "at": Vector3(-0.012, 0.0, 0.02),
+			"curl": [0.35, 0.85, 0.9, 0.95], "thumb": 0.15},
+	# ...the left hand wrapped under and round it from the left, fingers over
+	# the right hand's fingers, its thumb forward under the slide.
+	"pistol_support": {"fwd": Vector3(0.55, -0.8, 0.25), "palm": Vector3(0.2, 0.1, 1.0), "at": Vector3(0.006, -0.01, -0.012),
+			"curl": [0.8, 0.85, 0.9, 0.95], "thumb": 0.05},
 	# Holding a magazine / shell, palm towards the gun.
 	"hold": {"fwd": Vector3(0.4, 0.9, 0.1), "palm": Vector3(0.0, 0.0, 1.0), "at": Vector3(0.0, 0.0, -0.015),
 			"curl": [0.7, 0.75, 0.8, 0.85], "thumb": 0.6},
@@ -49,6 +57,7 @@ const HANDS := {
 ## Right hand / left hand shape per weapon "hold" (weapon_stats.gd).
 const HOLDS := {
 	"pistol": ["grip", "cup"],
+	"handgun": ["pistol_grip", "pistol_support"],
 	"rifle": ["grip", "support"],
 	"shotgun": ["stock", "support"],
 }
@@ -67,6 +76,15 @@ var _hold_left := ""
 var _tween: Tween          # reload / cycle
 var _kick: Tween           # per-shot part kick
 var _slide_locked := false
+var _hand_meta := {}       # hand target -> [curl, thumb] of its hold (reset())
+# Pistol: a copy of the magazine that falls out of view on a reload (made
+# with the model, so a reload never instantiates or compiles anything).
+var _drop_mag: Node3D
+var _drop_t := -1.0        # s since it was let go (-1 = not falling)
+var _drop_from: Transform3D   # its start, in _view_root space
+var _drop_vel := Vector3.ZERO
+var _drop_spin := Vector3.ZERO
+var _view_root: Node3D     # the camera's child holding the view model
 
 
 ## Builds the model. quality: Settings.Quality LOW / MEDIUM / HIGH.
@@ -95,7 +113,37 @@ func setup(w: Dictionary, quality: int) -> void:
 	port.position = w.port
 	add_child(port)
 	WeaponSkins.apply(model, Progress.skin_of(w.name))
+	for t: Node3D in [right_target, left_target]:
+		_hand_meta[t] = [t.get_meta("curl"), t.get_meta("thumb")]
+	if String(w.view_model) == "pistol" and parts.has("mag"):
+		_drop_mag = parts.mag.duplicate()
+		_drop_mag.name = "DroppedMag"
+		_drop_mag.visible = false
+		add_child(_drop_mag)
 
+
+func _enter_tree() -> void:
+	_view_root = self
+	while _view_root.get_parent() is Node3D and not (_view_root.get_parent() is Camera3D):
+		_view_root = _view_root.get_parent()
+
+
+# The dropped magazine falls (view space, life-size gravity, spinning) until
+# it is out of sight.
+func _process(delta: float) -> void:
+	if _drop_t < 0.0:
+		return
+	_drop_t += delta
+	if _drop_t > 0.7 or not visible:
+		_drop_t = -1.0
+		_drop_mag.visible = false
+		return
+	var t := _drop_t
+	var down := (_view_root.global_basis.inverse() * Vector3.DOWN).normalized()
+	var xf := _drop_from
+	xf.origin += _drop_vel * t + down * (4.9 * t * t)
+	xf.basis = Basis(_drop_spin.normalized(), _drop_spin.length() * t) * xf.basis
+	_drop_mag.global_transform = _view_root.global_transform * xf
 
 func _hand_target(node_name: String, hand: String, at: Vector3) -> Node3D:
 	var t := Node3D.new()
@@ -153,6 +201,13 @@ func reset() -> void:
 		n.visible = true
 	if _slide_locked and parts.has("slide"):
 		parts.slide.position = _rest[parts.slide].origin + Vector3(-0.022, 0, 0)
+	for t: Node3D in _hand_meta:
+		t.set_meta("curl", _hand_meta[t][0])
+		t.set_meta("thumb", _hand_meta[t][1])
+	position = Vector3.ZERO
+	if _drop_mag:
+		_drop_t = -1.0
+		_drop_mag.visible = false
 
 
 func _home(n: Node3D) -> Node:
@@ -173,15 +228,28 @@ func fire(empty: bool) -> void:
 	_kick = create_tween()
 	match String(stats.view_model):
 		"pistol":
+			# Slide slams back (the casing leaves at the back of its travel)
+			# and springs home; after the last round it stays locked back.
+			# The trigger and the index finger snap back meanwhile.
 			var slide: Node3D = parts.slide
 			var rest: Vector3 = _rest[slide].origin
-			_kick.tween_property(slide, "position", rest + Vector3(-0.024, 0, 0), 0.03)
+			_kick.tween_property(slide, "position", rest + Vector3(-0.03, 0, 0), 0.022).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			_kick.tween_callback(eject.emit.bind(1))
 			if empty:
 				_slide_locked = true
 				_kick.tween_property(slide, "position", rest + Vector3(-0.022, 0, 0), 0.03)
 			else:
-				_kick.tween_property(slide, "position", rest, 0.05).set_trans(Tween.TRANS_SINE)
-			eject.emit(1)
+				_kick.tween_property(slide, "position", rest, 0.045).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			var trig: Node3D = parts.get("trigger")
+			if trig:
+				var tr: Vector3 = _rest[trig].origin
+				trig.position = tr + Vector3(-0.004, 0, 0)
+				_kick.parallel().tween_property(trig, "position", tr, 0.09).set_delay(0.03)
+			var curl: Array = (_hand_meta[right_target][0] as Array).duplicate()
+			_kick.parallel().tween_method(func(v: float) -> void:
+				var c := curl.duplicate()
+				c[0] = curl[0] + v
+				right_target.set_meta("curl", c), 0.18, 0.0, 0.1)
 		"ak", "smg":
 			var bolt: Node3D = parts.bolt
 			var rest: Vector3 = _rest[bolt].origin
@@ -285,10 +353,9 @@ func reload(time: float, pose: Node3D) -> void:
 	var lift := Vector3(-0.015, 0.02, 0.02)
 	match String(stats.view_model):
 		"pistol":
-			_mag_swap(cues[0], cues[1], Vector3(-0.05, -0.2, 0.02), 0.0)
-			if _slide_locked:
-				_slide_release(cues[1] + 0.2 * f)
-			tilt = Vector3(deg_to_rad(14), deg_to_rad(6), deg_to_rad(-28))
+			_pistol_reload(cues, f)
+			tilt = Vector3(deg_to_rad(10), deg_to_rad(14), deg_to_rad(-32))
+			lift = Vector3(-0.02, 0.035, -0.01)
 		"rifle":
 			_mag_swap(cues[0], cues[1], Vector3(0.02, -0.26, 0.0), 0.0)
 		"ak":
@@ -347,6 +414,99 @@ func _mag_swap(t_out: float, t_in: float, away: Vector3, rock: float) -> void:
 	_tween.tween_property(left_target, "transform", _rest[left_target], 0.22).set_delay(t_in + 0.02).set_trans(Tween.TRANS_SINE)
 
 
+# Pistol (cues: mag release, magazine seated, slide release if empty; f =
+# speed factor): the gun tilts (reload()), the left hand lets go and drops
+# below the magazine well, the right thumb presses the release and the empty
+# magazine falls out; the left hand goes down out of view, comes back with a
+# fresh magazine (the hand stays on it), lines it up under the well and
+# pushes it home (the gun bumps). An empty gun's slide then snaps forward
+# under the right thumb. The left hand goes back round the grip.
+func _pistol_reload(cues: Array, f: float) -> void:
+	var mag: Node3D = parts.get("mag")
+	if mag == null:
+		return
+	var rest: Transform3D = _rest[mag]
+	var t_out: float = cues[0]
+	var t_in: float = cues[1]
+	var hold := _hand_basis("hold")
+	# Where the palm sits on a magazine: on its left side, low.
+	var grip_on := Vector3(0.0, -0.05, -0.02)
+	# 1. Left hand off the grip, under the well, ready to catch nothing.
+	var under := rest.origin + grip_on + Vector3(0.0, -0.06, -0.03)
+	_tween.tween_property(left_target, "position", under, 0.22 * f).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_tween.tween_property(left_target, "basis", hold, 0.22 * f).set_trans(Tween.TRANS_SINE)
+	_tween.tween_method(_set_curl.bind(left_target, -1.0), 0.0, 1.0, 0.22 * f)
+	# 2. Right thumb on the release.
+	var thumb0: float = _hand_meta[right_target][1]
+	_tween.tween_method(func(v: float) -> void: right_target.set_meta("thumb", v), thumb0, 0.95, 0.1 * f).set_delay(t_out - 0.12 * f)
+	_tween.tween_method(func(v: float) -> void: right_target.set_meta("thumb", v), 0.95, thumb0, 0.12 * f).set_delay(t_out + 0.04 * f)
+	# 3. The empty magazine drops (the copy falls; the real one is hidden
+	# until the hand brings it back).
+	_tween.tween_callback(_drop_magazine).set_delay(t_out)
+	# 4. Left hand down out of view (to the pouch), back with the new one.
+	var pouch := Transform3D(rest.basis.rotated(Vector3.BACK, 0.5).rotated(Vector3.RIGHT, -0.4),
+			rest.origin + Vector3(-0.12, -0.34, -0.1))
+	var below := rest
+	below.origin += Vector3(0.0, -0.055, 0.0)
+	var t_down := t_out + 0.05 * f
+	var t_pouch := t_out + 0.3 * f
+	var t_below := t_in - 0.12 * f
+	_tween.tween_property(left_target, "position", pouch.origin + grip_on, t_pouch - t_down).set_delay(t_down).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	_tween.tween_callback(func() -> void:
+		mag.transform = pouch
+		mag.visible = true
+		left_target.reparent(mag, true)).set_delay(t_pouch)
+	# Up and lined up under the well (the hand rides on the magazine)...
+	_tween.tween_property(mag, "transform", below, t_below - t_pouch - 0.04 * f).set_delay(t_pouch + 0.04 * f).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	# ...then pushed home, and the gun takes the bump.
+	_tween.tween_property(mag, "transform", rest, t_in - t_below).set_delay(t_below).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_bump(t_in, Vector3(0.0, 0.009, 0.0))
+	_tween.tween_callback(left_target.reparent.bind(self, true)).set_delay(t_in + 0.03 * f)
+	var t_back := t_in + 0.06 * f
+	if _slide_locked:
+		# 5. Slide release: thumb down on the stop, the slide flies home.
+		var t_rel: float = cues[2] if cues.size() > 2 else t_in + 0.28 * f
+		_tween.tween_method(func(v: float) -> void: right_target.set_meta("thumb", v), thumb0, 1.0, 0.1 * f).set_delay(t_rel - 0.1 * f)
+		_tween.tween_method(func(v: float) -> void: right_target.set_meta("thumb", v), 1.0, thumb0, 0.15 * f).set_delay(t_rel + 0.03 * f)
+		var slide: Node3D = parts.slide
+		_tween.tween_property(slide, "position", _rest[slide].origin, 0.035).set_delay(t_rel).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		_tween.tween_callback(func() -> void: _slide_locked = false).set_delay(t_rel)
+		_bump(t_rel + 0.03, Vector3(-0.004, 0.006, 0.0))
+	# 6. Left hand back round the grip.
+	_tween.tween_property(left_target, "transform", _rest[left_target], 0.3 * f).set_delay(t_back).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_tween.tween_method(_set_curl.bind(left_target, 1.0), 0.0, 1.0, 0.3 * f).set_delay(t_back)
+
+
+# Blends a hand's finger curl between its hold and the "hold" (magazine)
+# shape: towards = -1 goes to the magazine shape, 1 back to the hold.
+func _set_curl(v: float, t: Node3D, towards: float) -> void:
+	var a: Array = _hand_meta[t][0]
+	var b: Array = HANDS.hold.curl
+	var k := v if towards < 0.0 else 1.0 - v
+	var c := []
+	for i in a.size():
+		c.append(lerpf(a[i], b[i], k))
+	t.set_meta("curl", c)
+
+
+func _drop_magazine() -> void:
+	var mag: Node3D = parts.mag
+	_drop_from = _view_root.global_transform.affine_inverse() * mag.global_transform
+	var out := _view_root.global_basis.inverse() * (mag.global_basis * Vector3.DOWN)
+	_drop_vel = out.normalized() * 0.45
+	_drop_spin = Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(4, 6))
+	_drop_mag.visible = true
+	_drop_t = 0.0
+	_drop_mag.global_transform = mag.global_transform
+	mag.visible = false
+
+
+# The whole gun (and the hands on it) jolts by `by` (parent space) at `t`.
+func _bump(t: float, by: Vector3) -> void:
+	_tween.tween_property(self, "position", by, 0.035).set_delay(t).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(self, "position", Vector3.ZERO, 0.14).set_delay(t + 0.035).set_trans(Tween.TRANS_SINE)
+
+
 # Left hand pulls a charging handle / bolt back `dist` m at `t` and lets go
 # (`also` moves with it, e.g. the bolt inside an AR).
 func _charge(t: float, handle: Node3D, dist: float, also: Node3D = null) -> void:
@@ -367,11 +527,6 @@ func _charge(t: float, handle: Node3D, dist: float, also: Node3D = null) -> void
 	_tween.tween_callback(left_target.reparent.bind(self, true)).set_delay(start + 0.12)
 	_tween.tween_property(left_target, "transform", _rest[left_target], 0.2).set_delay(start + 0.2).set_trans(Tween.TRANS_SINE)
 
-
-func _slide_release(t: float) -> void:
-	var slide: Node3D = parts.slide
-	_tween.tween_property(slide, "position", _rest[slide].origin, 0.05).set_delay(t)
-	_tween.tween_callback(func() -> void: _slide_locked = false).set_delay(t)
 
 
 # LMG: open the feed cover, swap the box, close the cover, charge.

@@ -577,6 +577,8 @@ func _apply_quality() -> void:
 # effect once, tiny and in front of the camera, while the level loads moves
 # that pause to the start of the game.
 func _prewarm_effects() -> void:
+	# The first phone vibration is slow (~80 ms): do it now, not on the first shot.
+	preload("res://effects/haptics.gd").warm_up()
 	var camera := get_viewport().get_camera_3d()
 	var spot := camera.global_position - camera.global_basis.z * 2.0
 	var warm: Array[Node3D] = []

@@ -61,3 +61,17 @@ static func find(id: String) -> Dictionary:
 		if m.id == id:
 			return m
 	return LIST[0]
+
+
+## Soldiers (Test) mode (main menu > Soldiers (Test)): the Industrial Yard
+## against soldiers fighting from cover (soldiers/soldiers_mode.gd). Not on
+## the map selection screen; the scores are saved under its own id.
+const SOLDIERS := {
+	"id": "soldiers",
+	"short": "Soldiers",
+	"name": "Soldiers (Test)",
+	"description": "The Industrial Yard against soldiers who fight from cover.",
+	"scene": "res://maps/soldiers.tscn",
+	"thumbnail": "res://ui/thumbnails/yard.jpg",
+	"color": Color(0.9, 0.55, 0.35),
+}

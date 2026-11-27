@@ -133,7 +133,7 @@ func _test_pistol() -> void:
 	await seconds(0.2)
 	player.start_reload()
 	check(hud.ammo_label.text == "Reloading...", "HUD shows Reloading...")
-	await seconds(1.5)
+	await seconds(2.0)
 	check(player.ammo() == 12 and player.reserve() == -1, "pistol reloads to 12, reserve stays unlimited")
 
 
@@ -735,14 +735,41 @@ func _test_view_models() -> void:
 	check(slide.position.x < rest.x - 0.005, "pistol slide kicks back")
 	await seconds(0.4)
 	check(slide.position.is_equal_approx(rest), "pistol slide returns")
-	# Reload: the magazine leaves the gun with the left hand, then comes back.
+	# Reload: the empty magazine drops out (a copy falls), the left hand
+	# brings the magazine back from below and seats it.
 	player.start_reload()
-	var mag: Node3D = player._view().part("mag")
+	var pview: Node3D = player._view()
+	var mag: Node3D = pview.part("mag")
 	var mag_rest := mag.position
-	await seconds(0.45)
-	check(mag.position.y < mag_rest.y - 0.05, "reload: magazine pulled out (%.2f m)" % (mag_rest.y - mag.position.y))
-	await seconds(1.2)
-	check(mag.position.is_equal_approx(mag_rest) and not player.is_reloading(), "reload: magazine back in")
+	await seconds(0.4)
+	check(not mag.visible and pview._drop_mag.visible, "reload: empty magazine drops out")
+	await seconds(0.55)
+	check(mag.visible and mag.position.y < mag_rest.y - 0.02 and pview.left_target.get_parent() == mag,
+			"reload: left hand brings the new magazine up (%.2f m below)" % (mag_rest.y - mag.position.y))
+	await seconds(1.0)
+	check(mag.position.is_equal_approx(mag_rest) and not player.is_reloading() and not pview._drop_mag.visible,
+			"reload: magazine back in")
+	check(player.arms.model_name == "gloves" and player.view_model.scale.z == 0.25,
+			"pistol uses the gloves and its own view model scale")
+	# Aiming lines the rear and front sights up on the screen centre.
+	player.toggle_aim()
+	await seconds(0.4)
+	var centre: Vector2 = player.get_viewport().get_visible_rect().size * 0.5
+	var rear: Vector2 = player.camera.unproject_position(pview.global_transform * Vector3(-0.014, 0.0898, 0.0))
+	var front: Vector2 = player.camera.unproject_position(pview.global_transform * Vector3(0.14, 0.0898, 0.0))
+	check(rear.distance_to(centre) < 6.0 and front.distance_to(centre) < 6.0,
+			"pistol sights on the screen centre (rear %.1f px, front %.1f px off)" % [rear.distance_to(centre), front.distance_to(centre)])
+	player.toggle_aim()
+	await seconds(0.4)
+	# Empty gun: the slide stays back, and the reload releases it.
+	player._mag[0] = 1
+	await _tap_trigger()
+	await seconds(0.3)
+	var slide_rest: Vector3 = pview._rest[slide].origin
+	check(slide.position.x < slide_rest.x - 0.015, "last round: the slide locks back")
+	player.start_reload()
+	await seconds(2.0)
+	check(slide.position.is_equal_approx(slide_rest), "empty reload: the slide release sends the slide home")
 	# The revolver's cylinder turns on each shot.
 	player.switch_to(7)
 	await seconds(0.6)
