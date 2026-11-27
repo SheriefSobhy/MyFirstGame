@@ -3,9 +3,9 @@ extends "res://missions/objective.gd"
 ## reinforcements, hostage_target_chance, par_time). The hostage
 ## (missions/hostage.gd) is held with guards around him; guards stand at
 ## their posts until they hear / see the player, are shot, hear shots
-## (GUNSHOT_ALERT) or another guard near them is alerted. Hold USE
-## FREE_TIME s next to him to free him; he then follows the player, and
-## reinforcements arrive. Reach the extraction zone with him alive = win;
+## (GUNSHOT_ALERT) or another guard near them is alerted (objective.gd).
+## Hold USE FREE_TIME s next to him to free him; he then follows the player,
+## and reinforcements arrive. Reach the extraction zone with him alive = win;
 ## he dies = fail. Soldiers sometimes fire their burst at him.
 
 const M := preload("res://missions/missions_config.gd")
@@ -15,7 +15,6 @@ const GREEN := Color(0.35, 1.0, 0.45)
 
 var hostage: Hostage
 var extraction: Node3D
-var guards: Array[Node] = []
 var freed := false
 var freed_at := 0.0
 var _reinforcements_sent := 0
@@ -33,18 +32,8 @@ func setup() -> void:
 	mode.add_child(extraction)
 	extraction.global_position = mode.snap(mission.extraction.pos)
 	extraction.visible = false
-	for g: Array in mission.guards:
-		var post: Vector3 = g[0]
-		var yaw: float = g[1]
-		var s: Node = mode.spawn_soldier_at(post, func(s: Node) -> void:
-			s.alert = false
-			s.guard_post = mode.snap(post)
-			s.guard_yaw = yaw
-			s.rotation.y = deg_to_rad(yaw)
-			_target_hostage(s))
-		s.alerted.connect(_on_guard_alerted.bind(s))
-		guards.append(s)
-	mode.player.fired.connect(_on_player_fired)
+	spawn_guards(mission.guards, _target_hostage)
+	listen_for_gunshots()
 	mode.add_interactable(hostage, "FREE HOSTAGE", M.FREE_TIME, _free)
 
 
@@ -72,7 +61,7 @@ func tick(_delta: float) -> void:
 
 
 func star2() -> bool:
-	return mode.elapsed <= float(mission.par_time)
+	return under_par()
 
 
 func _free() -> void:
@@ -81,30 +70,9 @@ func _free() -> void:
 	hostage.free_hostage()
 	extraction.visible = true
 	mode.hud.show_message("Hostage freed! Get him out.")
-	for g in guards:
-		if is_instance_valid(g):
-			g.raise_alert()
+	alert_all_guards()
 
 
 func _target_hostage(s: Node) -> void:
 	s.alt_target = hostage
 	s.alt_chance = float(mission.hostage_target_chance)
-
-
-func _on_guard_alerted(guard: Node) -> void:
-	for g in guards:
-		if is_instance_valid(g) and g != guard and g.state != g.State.DEAD \
-				and g.global_position.distance_to(guard.global_position) <= M.GUARD_ALERT_RADIUS:
-			g.raise_alert()
-
-
-func _on_player_fired() -> void:
-	for g in guards:
-		if is_instance_valid(g) and not g.alert and g.state != g.State.DEAD \
-				and g.global_position.distance_to(mode.player.global_position) <= M.GUNSHOT_ALERT:
-			g.raise_alert()
-
-
-## Guards that have noticed the player (for tests).
-func alerted_count() -> int:
-	return guards.filter(func(g: Node) -> bool: return is_instance_valid(g) and g.alert).size()

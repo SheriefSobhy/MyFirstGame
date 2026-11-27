@@ -123,6 +123,20 @@ Both maps also reuse assets listed elsewhere on this page:
 The warehouse's pallet racks, boxes and forklifts, the lamp fixtures and the road markings are made from simple shapes in `tools/build_maps.gd`.
 No CC0 forklift model was found.
 
+### Combat missions: vehicles (CC0)
+
+| File (`assets/models/vehicles/`) | Used for | Author / pack | Source |
+| --- | --- | --- | --- |
+| `helicopter.glb` | The Extraction missions' pick-up helicopter | "Helicopter" by z3eus, OpenGameArt, CC0 | https://opengameart.org/content/helicopter-4 |
+| `truck.glb`, `suv.glb` | The Sabotage truck, the Commander's escape car | Kenney, Car Kit, CC0 (copies of the files above, so they ship with the game) | https://kenney.nl/assets/car-kit |
+
+The helicopter's downloads (`HelicopterBody.fbx`, `HelicopterWings.fbx`) are kept in
+`art_source/opengameart/helicopter/` (git-ignored). `tools/blender/build_helicopter.py`
+recolours it (olive, dark grey), scales the rotor down to 9 m, simplifies it and
+exports the body and the rotor as separate meshes so the game can spin the rotor.
+The Sabotage generator and fuel tank are made from simple shapes in
+`missions/sabotage_target.gd` (the tank's red barrels are Poly Haven's Barrel 01).
+
 ## Sounds
 
 | File(s) | Used for | Author / pack | Source |
@@ -201,5 +215,5 @@ These were made for this project, so no license applies:
 - The pallets, electricity poles, wires, chain-link fences and grime quads in `level/generated/`. `tools/build_level.gd` builds them from boxes and cylinders.
 - The baked lighting (`main.lmbake`, `main.exr`), made with Godot's LightmapGI.
 - The map pictures on the map selection screen (`ui/thumbnails/`), rendered from the game by `tools/make_thumbnails.gd`.
-- The hit marker tick, headshot ring, kill sound and heartbeat are synthesized in code by `effects/synth_sounds.gd` (no audio files).
+- The hit marker tick, headshot ring, kill sound and heartbeat, and the missions' C4 beep, radio call, helicopter rotor and car engine, are synthesized in code by `effects/synth_sounds.gd` (no audio files).
 - The modular level kit (`assets/models/kit/kit.glb`: walls, pillars, shed, containers, barriers, crates, dumpsters, roof trusses, pipes, signs) and its textures (`assets/textures/kit/`), made in Blender by `tools/blender/build_kit.py`. The atlas cells are resized copies of the CC0 Poly Haven textures listed above (factory brick, concrete wall 008, rusty corrugated iron, rusty metal 02, rough wood); the sign faces and the baked ambient occlusion are generated.

@@ -20,6 +20,9 @@ const MissionUI := preload("res://missions/mission_ui.gd")
 const TYPES := {
 	"defend": preload("res://missions/defend.gd"),
 	"rescue": preload("res://missions/rescue.gd"),
+	"sabotage": preload("res://missions/sabotage.gd"),
+	"extraction": preload("res://missions/extraction.gd"),
+	"hunt": preload("res://missions/hunt.gd"),
 }
 const MAP_SELECT := "res://ui/map_select.tscn"
 
@@ -53,6 +56,7 @@ func _ready() -> void:
 	player.rotation.y = deg_to_rad(mission.player_yaw)
 	super._ready()
 	hud.wave_label.visible = false
+	hud.score_label.visible = false  # no score in missions (it sat under the tracker)
 	hud.set_shop_available(false)
 	ui = MissionUI.new()
 	ui.name = "MissionUI"
@@ -250,10 +254,10 @@ func _on_spawn_tick() -> void:
 	spawn_soldier_at(pos, configure)
 
 
-## Something the player can hold USE on: within USE_REACH of `node`, USE
-## shows `text`; held for `hold` s, on_done is called once.
-func add_interactable(node: Node3D, text: String, hold: float, on_done: Callable) -> Dictionary:
-	var it := {"node": node, "text": text, "hold": hold, "on_done": on_done, "active": true}
+## Something the player can hold USE on: within `reach` m (default USE_REACH)
+## of `node`, USE shows `text`; held for `hold` s, on_done is called once.
+func add_interactable(node: Node3D, text: String, hold: float, on_done: Callable, reach := Missions.USE_REACH) -> Dictionary:
+	var it := {"node": node, "text": text, "hold": hold, "on_done": on_done, "active": true, "reach": reach}
 	interactables.append(it)
 	return it
 
@@ -263,13 +267,13 @@ func interactable_in_reach() -> Dictionary:
 	if player.is_dead:
 		return {}
 	var best := {}
-	var best_d := Missions.USE_REACH
+	var best_d := INF
 	for it in interactables:
 		if not it.active or not is_instance_valid(it.node):
 			continue
 		var p: Vector3 = (it.node as Node3D).global_position
 		var d := Vector2(p.x - player.global_position.x, p.z - player.global_position.z).length()
-		if d <= best_d:
+		if d <= float(it.reach) and d < best_d:
 			best_d = d
 			best = it
 	return best

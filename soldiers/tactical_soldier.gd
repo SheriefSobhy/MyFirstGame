@@ -49,6 +49,18 @@ var guard_yaw := 0.0
 var alt_target: Node3D = null
 var alt_chance := 0.0
 var _target: Node3D = null
+## Hunt the Commander: once alert, it runs to this spot (its escape vehicle)
+## at flee_speed x walking speed without stopping to fight (INF = no), and
+## emits fled on arrival.
+signal fled
+var flee_to := Vector3.INF
+var flee_speed := 1.5
+var _fled := false
+## Share of non-headshot damage it takes (the Commander's vest). Fractions
+## are rolled per hit.
+var armor := 1.0
+## The Commander's beret (make_commander()): follows the head every frame.
+var _beret: MeshInstance3D
 
 ## Where it is in the cover loop (see the top of this file).
 var tac := Tac.FIND
@@ -204,6 +216,8 @@ func _update_crouch(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	_update_crouch(delta)
+	if _beret:
+		_place_beret()
 	if _flash_left > 0.0:
 		_flash_left -= delta
 		_muzzle_flash.global_position = _muzzle.global_position
@@ -275,6 +289,79 @@ func raise_alert() -> void:
 	_go(Tac.FIND)
 	alerted.emit()
 
+
+# Hunt: run for the escape vehicle (no cover, no shooting); fled on arrival.
+func _flee_move(delta: float) -> void:
+	if _fled:
+		_stop()
+		return
+	if _arrived(flee_to):
+		_fled = true
+		_stop()
+		fled.emit()
+		return
+	_walk_to(flee_to, delta, flee_speed)
+
+
+## True once it reached its escape spot.
+func has_fled() -> bool:
+	return _fled
+
+
+## Hunt the Commander: a darker red uniform (`tint` on every material), a red
+## beret on the head, `armor` on body shots. Call after it entered the tree.
+func make_commander(tint: Color, beret_color: Color, body_armor: float) -> void:
+	armor = body_armor
+	for mi: MeshInstance3D in meshes:
+		for s in mi.mesh.get_surface_count():
+			var src := mi.get_active_material(s) as BaseMaterial3D
+			if src == null:
+				continue
+			var m := src.duplicate() as BaseMaterial3D
+			m.albedo_color = src.albedo_color * tint
+			mi.set_surface_override_material(s, m)
+	_beret = MeshInstance3D.new()
+	_beret.name = "Beret"
+	var cap := SphereMesh.new()
+	cap.radius = 0.13
+	cap.height = 0.12
+	cap.radial_segments = 12
+	cap.rings = 4
+	cap.is_hemisphere = true
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = beret_color
+	mat.roughness = 0.9
+	cap.material = mat
+	_beret.mesh = cap
+	_beret.top_level = true
+	_beret.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_beret)
+	_place_beret()
+
+
+# On top of the head, tilted to one side like a beret.
+func _place_beret() -> void:
+	if state == State.DEAD and _state_time > 0.6:
+		_beret.visible = false  # the death fall would leave it floating
+		return
+	var head := head_sphere()
+	if head.is_empty():
+		return
+	var top: Vector3 = _skel.global_transform * _skel.get_bone_global_pose(_head_end_bone).origin \
+			if _head_end_bone >= 0 else head.center + Vector3.UP * head.radius
+	var up: Vector3 = (top - head.center).normalized()
+	var fwd := -global_basis.z
+	var side := up.cross(fwd).normalized()
+	if side.length_squared() < 0.5:
+		side = global_basis.x
+	var b := Basis(side, up, side.cross(up)).rotated(fwd.normalized(), 0.25)
+	_beret.global_transform = Transform3D(b, head.center + up * head.radius * 0.55)
+
+
+## The beret (for tests).
+func beret() -> Node3D:
+	return _beret
+
 # --- Cover loop ----------------------------------------------------------------
 
 # Called by enemy.gd every physics frame while in CHASE (its own soldier move
@@ -286,6 +373,10 @@ func _soldier_move(delta: float) -> void:
 		return
 	if not alert:
 		_guard_move(delta)
+		_update_move_anim()
+		return
+	if flee_to != Vector3.INF:
+		_flee_move(delta)
 		_update_move_anim()
 		return
 	if _player_in_range(stats.attack_range):
@@ -623,6 +714,10 @@ func is_gun_sound_playing() -> bool:
 # --- Hits, death, relocation ---------------------------------------------------
 
 func take_damage(amount: int, hit_position := Vector3.ZERO, hit_normal := Vector3.UP, headshot := false) -> void:
+	if armor < 1.0 and not headshot:
+		# The vest: body hits lose part of their damage (fractions rolled).
+		var scaled := amount * armor
+		amount = int(scaled) + (1 if randf() < scaled - int(scaled) else 0)
 	super.take_damage(amount, hit_position, hit_normal, headshot)
 	raise_alert()
 	# Shot while out: duck back behind the cover.

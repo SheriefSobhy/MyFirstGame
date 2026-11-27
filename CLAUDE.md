@@ -106,21 +106,24 @@ Play → choose a mode (`maps.gd` `MODES`) → choose a map. Both modes on all
 ## Combat missions (`missions/`)
 
 Play → Combat → Waves (the mode above) or Missions → map → 5 slots
-(`missions_config.gd` `SLOTS`; empty slots say "Coming soon"). Slot n
+(`missions_config.gd` `SLOTS`; an empty slot would say "Coming soon"). Slot n
 unlocks when slot n-1 is cleared (`Progress.is_mission_unlocked`).
 
-- Data + every number: `missions_config.gd` (`LIST`: 6 missions, Defend in
-  slot 1 and Rescue in slot 2 on each map, positions in map metres).
-  `Missions.pending` = the mission to load; scenes `maps/mission_<map>.tscn`
-  run `mission_mode.gd` (extends `soldiers_mode.gd`; no waves/shop/score/
-  Waves progress; `_end_progress` returns {}).
+- Data + every number: `missions_config.gd` (`LIST`: 15 missions, slots
+  1-5 = Defend, Rescue, Sabotage, Extraction, Hunt on each map, positions in
+  map metres, yaw 0 = facing -Z). `Missions.pending` = the mission to load;
+  scenes `maps/mission_<map>.tscn` run `mission_mode.gd` (extends
+  `soldiers_mode.gd`; no waves/shop/score/Waves progress; `_end_progress`
+  returns {}).
 - Framework: briefing (paused) → START → objective → `finish()` → result
   screen (Retry / Next / Missions / Menu). Objective types extend
-  `objective.gd` (`setup/begin/tick/star2`), registered in `mission_mode.gd`
+  `objective.gd` (`setup/begin/tick/star2`; guards: `spawn_guard(s)`,
+  alert spreading, `listen_for_gunshots`), registered in `mission_mode.gd`
   `TYPES`. Helpers: `snap`, `spawn_soldier_at`, `queue_soldier`,
-  `add_interactable` (USE button / hold E, `mission_ui.gd`). Stars: complete
-  / `star2()` / health > 50%; `Progress.complete_mission` keeps the best and
-  pays first-clear or repeat rewards (`mission_stars` in progress.cfg [missions]).
+  `add_interactable` (USE button / hold E, `mission_ui.gd`, optional reach).
+  Stars: complete / `star2()` (par time for all but Defend) / health > 50%;
+  `Progress.complete_mission` keeps the best and pays first-clear or repeat
+  rewards (`mission_stars` in progress.cfg [missions]).
 - Defend (`defend.gd`): `zone_ring.gd`; pushers (`tactical_soldier.gd`
   `push_spot`) walk in; capture fills only without the player inside.
   Star 2 = capture never above 50% (the timer is fixed).
@@ -131,8 +134,27 @@ unlocks when slot n-1 is cleared (`Progress.is_mission_unlocked`).
   Mesh = Exploder (Ch35 officer); anims `hostage_anims.res` from
   `mixamo_anims.gd -- --only hostage` (`HOSTAGE_SET`: placeholders until
   Terrified / Walking / Running are downloaded).
-- `test_missions` runs both types on all 3 maps (`-- --map town` for one).
-  test_soldiers' town "damage direction indicator" check is flaky (~1 in 3).
+- Sabotage (`sabotage.gd`, `sabotage_target.gd`): generator / fuel tank
+  (primitives) / Kenney truck, box collider + NavigationObstacle3D (the
+  baked navmesh doesn't know them). Hold USE 4 s to plant (guards within
+  PLANT_NOISE hear it), reinforcements per charge, countdown + exit zone;
+  blasts = `Blast.detonate` + extra fireballs + a burning wreck. In the exit
+  zone when they blow = win.
+- Extraction (`extraction.gd`, `helicopter.gd`): reach the LZ, hold it 30 s
+  (the clock stops outside), waves; the helicopter's approach is driven by
+  the hold clock (`driven`, last HELI_APPROACH s), it lands, stepping within
+  BOARD_RADIUS = win. Model `assets/models/vehicles/helicopter.glb` from
+  `tools/blender/build_helicopter.py` (CC0 source in `art_source/opengameart/`).
+- Hunt (`hunt.gd`, `escape_vehicle.gd`): Commander = guard with
+  `make_commander()` (tint, beret, `armor` 0.5 on non-headshots, more hp);
+  random spot (`Hunt.force_spot` for tests), intel ring; alerted = `flee_to`
+  the car's door spot (picked when spotted: the navmesh must be ready),
+  radio after RADIO_DELAY → backup; reaches the car = fail, killed = win.
+- Rotor / engine / C4 / radio sounds are synthesized (`synth_sounds.gd`).
+- `test_missions` runs all 5 types on all 3 maps (`-- --map town` for one);
+  path checks wait for `navmesh_ready()` after START (not during the paused
+  briefing). test_soldiers' town "damage direction indicator" check is
+  flaky (~1 in 3).
 
 ## Persistent progression (`progress.gd`)
 
