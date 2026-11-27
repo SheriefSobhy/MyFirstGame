@@ -1,7 +1,7 @@
 extends RefCounted
-## Soldiers (Test) mode: every balance number in one place (like economy.gd).
-## The mode itself is soldiers/soldiers_mode.gd (Industrial Yard only), the
-## cover-to-cover AI is soldiers/tactical_soldier.gd.
+## Combat mode: every balance number in one place (like economy.gd).
+## The mode itself is soldiers/soldiers_mode.gd (all 3 maps, scenes
+## maps/combat_<map>.tscn), the cover-to-cover AI is soldiers/tactical_soldier.gd.
 
 # --- Waves --------------------------------------------------------------------
 const START_SOLDIERS := 3       # wave 1
@@ -10,29 +10,50 @@ const MAX_ALIVE := 8            # at once (bodies count until they sink away)
 const SPAWN_INTERVAL := 1.5     # seconds between spawns within a wave
 
 # --- Cover --------------------------------------------------------------------
-## Tall objects in the Yard (main.tscn) a standing soldier can hide behind:
-## centre and footprint on the ground (x, z), axis-aligned. Cover points are
-## made along each side, near both ends (COVER_EDGE_IN from the corner,
-## COVER_OUT off the face), each with a peek spot just past the corner
-## (PEEK_OUT). Points the small enemies' navmesh doesn't reach are dropped.
-## Low things (barriers, the 1.2 m crate pair, pallets) don't hide a soldier.
-const COVER_OBJECTS := [
-	{"name": "Warehouse", "center": Vector2(-7.0, -9.0), "size": Vector2(8.0, 5.0)},
-	{"name": "ContainerRed", "center": Vector2(5.0, -4.0), "size": Vector2(6.1, 2.44)},
-	{"name": "ContainerBlue", "center": Vector2(-6.0, 3.0), "size": Vector2(2.44, 6.1)},
-	{"name": "CrateStack", "center": Vector2(-1.7, 2.1), "size": Vector2(1.8, 1.4)},
-]
+## Cover is found on every map (soldiers_mode.gd _build_cover) from the box
+## colliders of the level (NavigationRegion3D/Level, sight-blocking layer 1)
+## that stand on the ground: houses, containers, cars, racks, forklifts,
+## crates, dumpsters, short walls. Each side gets a point near both ends
+## (COVER_EDGE_IN from the corner, COVER_OUT off the face):
+##  - tall (top >= TALL_COVER m): the soldier stands behind it and peeks out
+##    PEEK_OUT m past the corner;
+##  - low (LOW_COVER..TALL_COVER m: cars, crates, dumpsters): it crouches
+##    behind it (CROUCH_*) and stands up on the spot to fire over the top.
+## Thin things (poles: a side under MIN_COVER_SIDE m) and the long outer walls
+## (a side over MAX_COVER_SIDE m) are skipped, and so are points the navmesh
+## doesn't reach. COVER_SKIP: collider names never used (per map id).
+const TALL_COVER := 1.75
+const LOW_COVER := 1.0
+const MIN_COVER_SIDE := 0.9
+const MAX_COVER_SIDE := 20.0
+const COVER_SKIP := {
+	"yard": [],
+	"town": [],
+	"warehouse": ["DoorHeader"],
+}
 const COVER_OUT := 0.75         # m off the face
 const COVER_EDGE_IN := 0.7      # m in from the corner
+const COVER_SLIDE := [0.0, 0.6, 1.2]  # m further in tried when that spot is blocked
 const PEEK_OUT := 1.1           # m past the corner
 const COVER_SNAP := 0.35        # m: a point further than this from the navmesh is dropped
 const COVER_MERGE := 0.9        # m: points closer than this are one point
 const EYE_HEIGHT := 1.55        # soldier's eyes above the ground (cover checks)
+const CROUCH_EYE_HEIGHT := 0.95 # ... crouched behind low cover
+const CROUCH_DROP := 0.5        # m the hips go down when crouching
+const CROUCH_LEAN := 18.0       # degrees the upper body leans forward
+const CROUCH_TIME := 0.22       # s to crouch / stand up
+const CROUCH_HEIGHT := 1.2      # m: the body's hit capsule while crouched
+
+# --- Spawns -------------------------------------------------------------------
+## Soldiers come in at the map's spawn points at least this far from the
+## player, preferring points the player can't see (else the farthest ones).
+const SPAWN_MIN_DISTANCE := 16.0
 
 # --- Soldier AI ---------------------------------------------------------------
 const COVER_RANGE := Vector2(6.0, 24.0)  # m from the player a cover point may be
 const COVER_BEST_DISTANCE := 12.0        # preferred distance to the player
-const COVER_RAY_BUDGET := 10             # raycasts per cover search (2 per candidate)
+const COVER_RAY_BUDGET := 16             # raycasts per cover search (2 per candidate)
+const NO_VIEW_RESET := 4.0               # m the player moves before a cover that gave no view is tried again
 const RUN_SPEED := 1.3                   # x walking speed between covers
 const PEEK_SPEED := 0.7                  # x walking speed stepping out / back
 const HIDE_TIME := Vector2(1.0, 2.2)     # seconds behind cover between peeks

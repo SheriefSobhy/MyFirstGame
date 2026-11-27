@@ -143,7 +143,7 @@ const ACHIEVEMENTS := [
 	{"id": "giant_killer", "name": "Giant Killer", "text": "Kill 25 Brutes", "stat": "kills_brute", "target": 25, "reward": 250},
 	{"id": "boss_slayer", "name": "Boss Slayer", "text": "Defeat the Brute Boss", "stat": "kills_boss", "target": 1, "reward": 150},
 	{"id": "globetrotter", "name": "Globetrotter", "text": "Play every map", "stat": "maps_played", "target": 3, "reward": 200},
-	{"id": "star_collector", "name": "Star Collector", "text": "Earn all 9 map stars", "stat": "stars", "target": 9, "reward": 800},
+	{"id": "star_collector", "name": "Star Collector", "text": "Earn 9 map stars", "stat": "stars", "target": 9, "reward": 800},
 	{"id": "rising_star", "name": "Rising Star", "text": "Reach level 10", "stat": "level", "target": 10, "reward": 200},
 	{"id": "legend", "name": "Legend", "text": "Reach level 50", "stat": "level", "target": 50, "reward": 2000},
 	{"id": "gunsmith", "name": "Gunsmith", "text": "Max out a permanent upgrade", "stat": "max_upgrade", "target": 5, "reward": 300},

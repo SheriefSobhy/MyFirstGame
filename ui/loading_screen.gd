@@ -31,6 +31,18 @@ const TIPS := [
 	"Try your Armory upgrades and skins in the Training Arena first.",
 ]
 
+## Combat mode (maps.gd for_mode(..., COMBAT)) shows these instead.
+const COMBAT_TIPS := [
+	"Soldiers hide behind cover and peek out to fire: shoot when they show.",
+	"Flank a soldier to drive them out of their cover.",
+	"Keep moving: soldiers hit a moving target far less often.",
+	"Out of fire for 4 seconds, your health comes back.",
+	"The red arrow shows where the shots came from.",
+	"Soldiers crouch behind cars and crates and pop up to shoot.",
+	"Headshots do double damage and pay extra cash.",
+	"Combat has its own best scores and stars on every map.",
+]
+
 ## The map being loaded (set by go()).
 static var target := {}
 
@@ -87,9 +99,10 @@ func _build(map: Dictionary) -> void:
 	box.offset_bottom = -50
 	box.add_theme_constant_override("separation", 14)
 	add_child(box)
-	title_label = _label(map.get("name", ""), 48, map.get("color", Color.WHITE))
+	var combat: bool = map.get("mode", "") == Maps.COMBAT
+	title_label = _label(map.get("name", "") + (" - Combat" if combat else ""), 48, map.get("color", Color.WHITE))
 	box.add_child(title_label)
-	tip_label = _label("Tip: " + TIPS.pick_random(), 24, Color(1, 1, 1, 0.9))
+	tip_label = _label("Tip: " + (COMBAT_TIPS if combat else TIPS).pick_random(), 24, Color(1, 1, 1, 0.9))
 	tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(tip_label)
 	progress_bar = ProgressBar.new()

@@ -283,7 +283,8 @@ func end_match(waves: int, kills: int, cash_earned: int) -> Dictionary:
 		add_coins(match_coins)
 		current.match_coins = match_coins
 		stats.matches += 1
-		maps_played[map_id] = maps_played.get(map_id, 0) + 1
+		var played := Maps.base_id(map_id)  # either mode counts as playing the map
+		maps_played[played] = maps_played.get(played, 0) + 1
 		for m: Dictionary in _missions():
 			match m.type:
 				"matches":
@@ -303,14 +304,18 @@ func end_match(waves: int, kills: int, cash_earned: int) -> Dictionary:
 
 # --- Map stars ------------------------------------------------------------------------
 
+## A map's stars in a mode: `map_id` is a save key (maps.gd save_key:
+## "town" for Zombies, "combat_town" for Combat).
 func stars(map_id: String) -> int:
 	return Config.stars_for_wave(best_wave.get(map_id, 0))
 
 
+## Stars on every map in every mode.
 func total_stars() -> int:
 	var total := 0
-	for m: Dictionary in Maps.LIST:
-		total += stars(m.id)
+	for mode: Dictionary in Maps.MODES:
+		for m: Dictionary in Maps.LIST:
+			total += stars(Maps.save_key(m.id, mode.id))
 	return total
 
 
@@ -358,10 +363,16 @@ func make_missions(date: String) -> Array:
 		var m := {"id": t.id, "type": t.type, "kind": t.get("kind", ""), "map": "",
 				"target": t.targets[i], "reward": t.rewards[i], "progress": 0, "done": false}
 		if t.type == "reach_wave":
+			# On one unlocked map in one mode (m.map is the save key:
+			# "town" for Zombies, "combat_town" for Combat).
 			var open := Maps.LIST.filter(func(map: Dictionary) -> bool: return is_map_unlocked(map.id))
 			var map: Dictionary = open[rng.randi_range(0, open.size() - 1)]
-			m.map = map.id
-			m.text = t.text % [m.target, map.get("short", map.name)]
+			var mode: String = Maps.MODES[rng.randi_range(0, Maps.MODES.size() - 1)].id
+			m.map = Maps.save_key(map.id, mode)
+			var where: String = map.get("short", map.name)
+			if mode != Maps.ZOMBIES:
+				where += " (%s)" % Maps.mode_info(mode).name
+			m.text = t.text % [m.target, where]
 		else:
 			m.text = t.text % m.target
 		list.append(m)
@@ -519,6 +530,13 @@ func load_progress() -> void:
 	achievements = _dict(cfg.get_value("stats", "achievements", {}))
 	best_wave = _dict(cfg.get_value("stats", "best_wave", {}))
 	maps_played = _dict(cfg.get_value("stats", "maps_played", {}))
+	# The old "Soldiers (Test)" mode (the Yard) is now Combat on the Yard.
+	if best_wave.has("soldiers"):
+		best_wave["combat_yard"] = maxi(int(best_wave.get("combat_yard", 0)), int(best_wave["soldiers"]))
+		best_wave.erase("soldiers")
+	if maps_played.has("soldiers"):
+		maps_played["yard"] = int(maps_played.get("yard", 0)) + int(maps_played["soldiers"])
+		maps_played.erase("soldiers")
 	daily = _dict(cfg.get_value("daily", "daily", {}))
 	if not daily.get("missions", null) is Array:
 		daily = {}

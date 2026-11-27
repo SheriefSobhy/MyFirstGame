@@ -261,6 +261,11 @@ func _load() -> void:
 		# Saves from before there were several maps: that score was the yard's.
 		if save.has_section("best") and not bests.has("yard"):
 			bests["yard"] = {"score": int(save.get_value("best", "score", 0)), "wave": int(save.get_value("best", "wave", 0))}
+		# The old "Soldiers (Test)" mode (the Yard) is now Combat on the Yard.
+		if bests.has("soldiers"):
+			if not bests.has("combat_yard"):
+				bests["combat_yard"] = bests["soldiers"]
+			bests.erase("soldiers")
 	_update_overall()
 
 

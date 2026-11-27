@@ -1,14 +1,16 @@
 extends "res://main.gd"
-## Soldiers (Test) mode (main menu > Soldiers (Test)): the Industrial Yard
-## (maps/soldiers.tscn is main.tscn with this script) against soldiers only,
-## who fight from cover (tactical_soldier.gd). The zombie mode (main.gd) is
-## unchanged; this only replaces what differs:
+## Combat mode (Play > Combat > a map): any of the 3 maps against soldiers
+## only, who fight from cover (tactical_soldier.gd). Each map's Combat scene
+## is maps/combat_<map id>.tscn: the map's scene with this script. The zombie
+## mode (main.gd) is unchanged; this only replaces what differs:
 ##  - waves: START_SOLDIERS, +SOLDIERS_PER_WAVE each wave, MAX_ALIVE at once
-##  - cover points round the Yard's tall objects (get_cover_points)
+##  - spawns at least SPAWN_MIN_DISTANCE m from the player, out of sight if possible
+##  - cover points round the map's tall and low objects (get_cover_points)
 ##  - the player: a red damage direction indicator (damage_indicator.gd) and
 ##    health regen after REGEN_DELAY s without damage
-## Cash, the shop, XP, missions and achievements count as normal. Best score
-## and best wave are saved under "soldiers", not the Yard's.
+## Cash, the shop, XP, missions and achievements count as normal. Best score,
+## stars and "reach wave" missions are saved under "combat_<map id>"
+## (maps.gd save_key), apart from the map's zombie ones.
 ## Balance numbers: soldiers_config.gd.
 
 const Cfg := preload("res://soldiers/soldiers_config.gd")
@@ -16,10 +18,13 @@ const SOLDIER_SCENE := preload("res://soldiers/tactical_soldier.tscn")
 const TacticalSoldier := preload("res://soldiers/tactical_soldier.gd")
 const DamageIndicator := preload("res://soldiers/damage_indicator.gd")
 const SoldiersDemo := preload("res://soldiers/soldiers_demo.gd")
-const MODE_ID := "soldiers"
+const MapList := preload("res://maps.gd")
 
-## Cover spots: {pos, peek, normal (away from the object), object, owner
-## (the soldier using it, or null)}. Built once the navmesh is ready.
+## The map's own id ("yard", "town", "warehouse"); map_id becomes the save key.
+var base_map_id := ""
+## Cover spots: {pos, peek, normal (away from the object), object, low
+## (crouch behind it, stand up to fire over it), eye (eye height hidden
+## there), owner (the soldier using it, or null)}. Built once the navmesh is ready.
 var cover_points: Array[Dictionary] = []
 var indicator: DamageIndicator
 var _since_hit := 0.0
@@ -30,10 +35,11 @@ var _last_health := 0
 func _ready() -> void:
 	if SoldiersDemo.requested():
 		Settings.tutorial_done = true  # the recorded demo plays straight away (not saved)
-	# main.tscn's map_id ("yard") picks the Yard's lighting mood in main.gd;
-	# the scores are saved under this mode's id from here on.
+	# The scene's map_id ("town") picks the map's lighting mood in main.gd;
+	# the scores are saved under the Combat key from here on.
+	base_map_id = map_id
 	super._ready()
-	map_id = MODE_ID
+	map_id = MapList.save_key(base_map_id, MapList.COMBAT)
 	max_enemies = Cfg.MAX_ALIVE
 	spawn_timer.wait_time = Cfg.SPAWN_INTERVAL
 	indicator = DamageIndicator.new()
@@ -49,7 +55,7 @@ func _ready() -> void:
 
 
 func _setup_progress() -> void:
-	Progress.start_match(MODE_ID)
+	Progress.start_match(MapList.save_key(base_map_id, MapList.COMBAT))
 	Progress.leveled_up.connect(hud.show_level_up)
 	Progress.mission_completed.connect(hud.on_mission_completed)
 	Progress.achievement_unlocked.connect(hud.on_achievement)
@@ -103,6 +109,28 @@ func spawn_enemy() -> void:
 	_alive += 1
 
 
+# Soldiers come in far from the player: spawn points SPAWN_MIN_DISTANCE m
+# away or more that the player can't see, else any of those, else one of
+# the 2 farthest.
+func _pick_spawn_point(layer := EnemyTypes.NAV_SMALL) -> Node3D:
+	var usable := _spawn_points_for(layer)
+	var player_pos := player.global_position
+	var far := usable.filter(func(p: Node3D) -> bool:
+		return p.global_position.distance_to(player_pos) >= Cfg.SPAWN_MIN_DISTANCE)
+	if far.is_empty():
+		var sorted := usable.duplicate()
+		sorted.sort_custom(func(a: Node3D, b: Node3D) -> bool:
+			return a.global_position.distance_to(player_pos) > b.global_position.distance_to(player_pos))
+		return sorted.slice(0, 2).pick_random()
+	var space := get_world_3d().direct_space_state
+	var eye := player_pos + Vector3.UP * 1.6
+	var exclude: Array[RID] = [player.get_rid()]
+	var hidden := far.filter(func(p: Node3D) -> bool:
+		var q := PhysicsRayQueryParameters3D.create(eye, p.global_position + Vector3.UP * 1.5, 1, exclude)
+		return not space.intersect_ray(q).is_empty())
+	return (hidden if not hidden.is_empty() else far).pick_random()
+
+
 func _on_soldier_shot(from: Vector3, hit: bool) -> void:
 	if hit:
 		indicator.add_hit(from)
@@ -118,37 +146,83 @@ func get_cover_points() -> Array[Dictionary]:
 	return cover_points
 
 
-# Two spots along each side of every COVER_OBJECTS entry (near each end, a
-# little off the face), each with its peek spot just past that corner.
-# Spots the navmesh doesn't reach (between the warehouse and the outer wall)
-# are dropped.
+## The level's box colliders that can hide a soldier (soldiers_config.gd
+## "Cover"): [{name, center, axes [x, z] (flat unit vectors), half (x, z
+## half sizes), top}], tallest first.
+func cover_objects() -> Array[Dictionary]:
+	var list: Array[Dictionary] = []
+	var skip: Array = Cfg.COVER_SKIP.get(base_map_id, [])
+	var level := get_node_or_null("NavigationRegion3D")
+	if level == null:
+		return list
+	for shape_node: Node in level.find_children("*", "CollisionShape3D", true, false):
+		var cs := shape_node as CollisionShape3D
+		var body := cs.get_parent() as StaticBody3D
+		if body == null or not (cs.shape is BoxShape3D) or (body.collision_layer & 1) == 0 or skip.has(String(body.name)):
+			continue
+		var xf := cs.global_transform
+		if absf(xf.basis.y.normalized().y) < 0.95:
+			continue  # tilted
+		var size: Vector3 = (cs.shape as BoxShape3D).size
+		var hy := size.y * xf.basis.y.length() * 0.5
+		var top := xf.origin.y + hy
+		if xf.origin.y - hy > 0.5 or top < Cfg.LOW_COVER:
+			continue  # off the ground, or too low
+		var ax := Vector3(xf.basis.x.x, 0.0, xf.basis.x.z)
+		var az := Vector3(xf.basis.z.x, 0.0, xf.basis.z.z)
+		var half := Vector2(size.x * ax.length(), size.z * az.length()) * 0.5
+		if minf(half.x, half.y) * 2.0 < Cfg.MIN_COVER_SIDE or maxf(half.x, half.y) * 2.0 > Cfg.MAX_COVER_SIDE:
+			continue  # a pole, or a long outer wall
+		list.append({"name": String(body.name), "center": Vector3(xf.origin.x, 0.0, xf.origin.z),
+				"axes": [ax.normalized(), az.normalized()], "half": half, "top": top})
+	list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.top > b.top)
+	return list
+
+
+# Two spots along each side of every cover object (near each end, a little
+# off the face). Tall ones get a peek spot just past that corner; behind low
+# ones the soldier crouches and stands up on the spot to fire (peek = pos).
+# Spots the navmesh doesn't reach (or inside other objects) are dropped.
 func _build_cover() -> void:
 	var region := nav_region(EnemyTypes.nav_layer("soldier"))
 	if region == null:
 		return
-	for o: Dictionary in Cfg.COVER_OBJECTS:
-		var center: Vector2 = o.center
-		var half: Vector2 = o.size * 0.5
+	for o: Dictionary in cover_objects():
+		var low: bool = o.top < Cfg.TALL_COVER
 		for axis in 2:
 			for side: float in [-1.0, 1.0]:
-				var n := Vector2(side, 0.0) if axis == 0 else Vector2(0.0, side)
-				var t := Vector2(0.0, 1.0) if axis == 0 else Vector2(1.0, 0.0)
-				var half_n := half.x if axis == 0 else half.y
-				var half_t := half.y if axis == 0 else half.x
-				var face := center + n * (half_n + Cfg.COVER_OUT)
+				var n: Vector3 = o.axes[axis] * side
+				var t: Vector3 = o.axes[1 - axis]
+				var half_n: float = o.half[axis]
+				var half_t: float = o.half[1 - axis]
+				var face: Vector3 = o.center + n * (half_n + Cfg.COVER_OUT)
 				for end: float in [-1.0, 1.0]:
-					var pos: Variant = _snap(region, face + t * end * maxf(half_t - Cfg.COVER_EDGE_IN, 0.0))
-					var peek: Variant = _snap(region, face + t * end * (half_t + Cfg.PEEK_OUT))
-					if pos == null or peek == null or _near_cover(pos):
+					# Something in the way (a prop, a wall): slide in along the face.
+					var pos: Variant = null
+					for slide: float in Cfg.COVER_SLIDE:
+						var along := half_t - Cfg.COVER_EDGE_IN - slide
+						if along < 0.0 and slide > 0.0:
+							break
+						pos = _snap(region, face + t * end * maxf(along, 0.0))
+						if pos != null:
+							break
+					if pos == null or _near_cover(pos):
 						continue
-					cover_points.append({"pos": pos, "peek": peek, "normal": Vector3(n.x, 0.0, n.y),
-							"object": o.name, "owner": null})
+					var peek: Variant = pos if low else null
+					if not low:
+						for out: float in [Cfg.PEEK_OUT, Cfg.PEEK_OUT * 0.7]:
+							peek = _snap(region, face + t * end * (half_t + out))
+							if peek != null:
+								break
+					if peek == null:
+						continue
+					cover_points.append({"pos": pos, "peek": peek, "normal": n, "object": o.name, "low": low,
+							"eye": Cfg.CROUCH_EYE_HEIGHT if low else Cfg.EYE_HEIGHT, "owner": null})
 
 
-func _snap(region: NavigationRegion3D, p: Vector2) -> Variant:
-	var want := Vector3(p.x, 0.0, p.y)
-	var q := NavigationServer3D.region_get_closest_point(region.get_rid(), want)
-	if Vector2(q.x - want.x, q.z - want.z).length() > Cfg.COVER_SNAP:
+func _snap(region: NavigationRegion3D, p: Vector3) -> Variant:
+	var q := NavigationServer3D.region_get_closest_point(region.get_rid(), p)
+	if Vector2(q.x - p.x, q.z - p.z).length() > Cfg.COVER_SNAP:
 		return null
 	return q
 

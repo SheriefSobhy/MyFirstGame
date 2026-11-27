@@ -63,15 +63,62 @@ static func find(id: String) -> Dictionary:
 	return LIST[0]
 
 
-## Soldiers (Test) mode (main menu > Soldiers (Test)): the Industrial Yard
-## against soldiers fighting from cover (soldiers/soldiers_mode.gd). Not on
-## the map selection screen; the scores are saved under its own id.
-const SOLDIERS := {
-	"id": "soldiers",
-	"short": "Soldiers",
-	"name": "Soldiers (Test)",
-	"description": "The Industrial Yard against soldiers who fight from cover.",
-	"scene": "res://maps/soldiers.tscn",
-	"thumbnail": "res://ui/thumbnails/yard.jpg",
-	"color": Color(0.9, 0.55, 0.35),
-}
+## Game modes (Play > choose a mode > choose a map). Every map is played in
+## both; each mode+map has its own best score, stars and missions
+## (save_key()). Combat: soldiers who fight from cover
+## (soldiers/soldiers_mode.gd, scenes maps/combat_<map id>.tscn).
+const ZOMBIES := "zombies"
+const COMBAT := "combat"
+const MODES := [
+	{
+		"id": ZOMBIES,
+		"name": "Zombies",
+		"description": "Survive endless waves of the undead: runners, brutes, exploders and the Brute Boss.",
+		"color": Color(0.55, 0.9, 0.4),
+	},
+	{
+		"id": COMBAT,
+		"name": "Combat",
+		"description": "Armed soldiers fight from cover, peek and fire bursts. Flank them, keep moving.",
+		"color": Color(0.95, 0.55, 0.3),
+	},
+]
+
+
+static func mode_info(mode: String) -> Dictionary:
+	for m: Dictionary in MODES:
+		if m.id == mode:
+			return m
+	return MODES[0]
+
+
+## The id best scores, stars and missions are saved under: the map id in
+## Zombies ("town"), "combat_<map id>" in Combat ("combat_town").
+static func save_key(map_id: String, mode := ZOMBIES) -> String:
+	return map_id if mode == ZOMBIES else mode + "_" + map_id
+
+
+## The map id of a save key ("combat_town" -> "town").
+static func base_id(key: String) -> String:
+	for m: Dictionary in MODES:
+		if key.begins_with(m.id + "_"):
+			return key.substr(m.id.length() + 1)
+	return key
+
+
+## The mode of a save key ("combat_town" -> "combat").
+static func mode_of(key: String) -> String:
+	for m: Dictionary in MODES:
+		if key.begins_with(m.id + "_"):
+			return m.id
+	return ZOMBIES
+
+
+## The map entry to load (LoadingScreen.go) for a map in a mode: Combat gets
+## its own scene (maps/combat_<id>.tscn) and "mode".
+static func for_mode(map_id: String, mode := ZOMBIES) -> Dictionary:
+	var m := find(map_id).duplicate()
+	m.mode = mode
+	if mode == COMBAT:
+		m.scene = "res://maps/combat_%s.tscn" % map_id
+	return m

@@ -1,21 +1,23 @@
 extends "res://enemy.gd"
-## Soldiers (Test) mode only: the Mixamo soldier fighting from cover. The
-## zombie mode's soldier (enemy.gd) is not changed; this script replaces its
+## Combat mode only: the Mixamo soldier fighting from cover. The zombie
+## mode's soldier (enemy.gd) is not changed; this script replaces its
 ## movement and shooting. Health, headshots (head_sphere / is_head_hit), hit
 ## reactions (flinch + stagger), death, navigation and the stuck handling
 ## all come from enemy.gd unchanged.
 ##
 ## Cover points come from the mode (soldiers_mode.gd get_cover_points(): spots
-## beside the Yard's containers, warehouse and crate stack, each with a peek
-## spot just past the corner). The loop:
+## beside the map's houses, containers, racks, cars, crates...; tall cover
+## has a peek spot just past the corner, behind low cover the soldier
+## crouches (crouch_modifier.gd) and stands up to fire over it). The loop:
 ##   FIND   pick a free cover point 6-24 m from the player that hides it from
 ##          the player and whose peek spot can see the player (a few rays)
 ##   MOVE   run there
-##   HIDE   wait 1-2 s, checking the player can't see it; if they can (they
-##          flanked it, or came too close) it looks for another cover
-##   PEEK   step out to the peek spot; with a view of the player: a short
-##          burst (AIM state), then RETURN behind the cover and HIDE again;
-##          after 2-3 peeks it moves to another cover
+##   HIDE   wait 1-2 s (crouched behind low cover), checking the player can't
+##          see it; if they can (they flanked it, or came too close) it looks
+##          for another cover
+##   PEEK   step out to the peek spot (or stand up behind low cover); with a
+##          view of the player: a short burst (AIM state), then RETURN behind
+##          the cover and HIDE again; after 2-3 peeks it moves to another cover
 ##   OPEN   no usable cover: fights in the open like the zombie mode's
 ##          soldier (but with bursts) and looks for cover again soon
 ## Each bullet's hit chance falls with distance and when the player moves
@@ -27,6 +29,7 @@ signal shot_at_player(from: Vector3, hit: bool)
 
 const Cfg := preload("res://soldiers/soldiers_config.gd")
 const RIFLE_SHOT := preload("res://assets/sounds/guns/ak_shot.wav")
+const CrouchModifier := preload("res://soldiers/crouch_modifier.gd")
 
 enum Tac { FIND, MOVE, HIDE, PEEK, RETURN, OPEN }
 
@@ -51,6 +54,10 @@ var _tracers: Array[MeshInstance3D] = []
 var _tracer_runs: Array[Dictionary] = []   # per tracer: from, dir, length, travelled
 var _next_tracer := 0
 var _gun_sfx: AudioStreamPlayer3D
+var _crouch: SkeletonModifier3D
+var _crouched_capsule := false
+var _crouch_head := {}   # crouched head hitbox: offset from the feet, radius
+var _no_view: Array[Dictionary] = []  # covers whose peek showed nothing: {cover, player (where they were)}
 
 static var _tracer_material: StandardMaterial3D
 static var _flash_material: StandardMaterial3D
@@ -87,6 +94,11 @@ func _ready() -> void:
 	_gun_sfx.volume_db = -3.0
 	_gun_sfx.position.y = stats.height * 0.8
 	add_child(_gun_sfx)
+	_crouch = CrouchModifier.new()
+	_crouch.name = "Crouch"
+	_crouch.influence = 0.0
+	_skel.add_child(_crouch)
+	_skel.skeleton_updated.connect(_on_skeleton_updated)
 
 
 ## The tracer and muzzle flash materials (shared by every soldier; the mode
@@ -126,7 +138,53 @@ static func hit_chance(distance: float, player_speed: float) -> float:
 	return c * lerpf(1.0, Cfg.MOVING_FACTOR, clampf(player_speed / Cfg.MOVING_SPEED, 0.0, 1.0))
 
 
+## True while it hides crouched behind low cover (and isn't shot, aiming or dead).
+func wants_crouch() -> bool:
+	return tac == Tac.HIDE and state == State.CHASE and cover.get("low", false)
+
+
+## 0 = standing .. 1 = crouched.
+func crouch_amount() -> float:
+	return _crouch.influence
+
+
+# The crouch only exists in the bone poses while the skeleton reports its
+# update (the next animation step resets them), so the head hitbox is
+# remembered here, relative to the soldier's feet.
+func _on_skeleton_updated() -> void:
+	if _crouch.influence <= 0.001:
+		_crouch_head = {}
+		return
+	var head := super.head_sphere()
+	if not head.is_empty():
+		_crouch_head = {"offset": head.center - global_position, "radius": head.radius}
+
+
+## The head hitbox, lowered while crouched (see _on_skeleton_updated).
+func head_sphere() -> Dictionary:
+	if _crouch.influence > 0.001 and not _crouch_head.is_empty():
+		return {"center": global_position + _crouch_head.offset, "radius": _crouch_head.radius}
+	return super.head_sphere()
+
+
+# Blends the crouch in and out; the hit capsule is shortened while crouched
+# (bullets over the cover miss).
+func _update_crouch(delta: float) -> void:
+	var want := 1.0 if wants_crouch() else 0.0
+	if _crouch.influence == want:
+		return
+	_crouch.influence = move_toward(_crouch.influence, want, delta / Cfg.CROUCH_TIME)
+	_crouch.forward = -global_basis.z
+	var low := _crouch.influence > 0.5
+	if low != _crouched_capsule and state != State.DEAD:
+		_crouched_capsule = low
+		var capsule := collision.shape as CapsuleShape3D
+		capsule.height = Cfg.CROUCH_HEIGHT if low else stats.height
+		collision.position.y = capsule.height * 0.5
+
+
 func _process(delta: float) -> void:
+	_update_crouch(delta)
 	if _flash_left > 0.0:
 		_flash_left -= delta
 		_muzzle_flash.global_position = _muzzle.global_position
@@ -181,7 +239,7 @@ func _soldier_move(delta: float) -> void:
 			_hide_left -= delta
 			if _check_timer <= 0.0:
 				_check_timer = Cfg.FLANK_CHECK
-				if _player_too_close() or _exposed_at(cover.pos):
+				if _player_too_close() or _exposed_at(cover.pos, cover.get("eye", Cfg.EYE_HEIGHT)):
 					flanked_count += 1
 					_go(Tac.FIND)
 					return
@@ -197,8 +255,10 @@ func _soldier_move(delta: float) -> void:
 				_stop()
 				_face_player(delta)
 				if _tac_time > Cfg.PEEK_WAIT:
+					# No view from here: remember it and go to another cover.
+					_no_view.append({"cover": cover, "player": _player.global_position})
 					_peeks_left -= 1
-					_go(Tac.RETURN)
+					_go(Tac.FIND)
 			else:
 				_walk_to(cover.peek, delta, Cfg.PEEK_SPEED)
 				if _tac_time > 5.0:
@@ -252,13 +312,15 @@ func _cover_points() -> Array:
 ## Picks the cover point: free, in range, on the far side of its object from
 ## the player (cheap checks first), then by distance; the best few get two
 ## rays (hidden from the player at the point, a view from its peek spot).
-## Hidden-but-no-view is kept as a fallback. Nothing found: fight in the open.
+## Hidden-but-no-view (tall cover only) is kept as a fallback. Nothing found: fight in the open.
 func _find_cover() -> void:
 	var player_pos := _player.global_position
 	var candidates: Array = []
 	for c: Dictionary in _cover_points():
 		var owner_node: Variant = c.owner
 		if owner_node != null and owner_node != self and is_instance_valid(owner_node):
+			continue
+		if _gave_no_view(c):
 			continue
 		var d := _flat_distance(c.pos, player_pos)
 		if d < maxf(Cfg.COVER_RANGE.x, Cfg.TOO_CLOSE + 0.5) or d > Cfg.COVER_RANGE.y:
@@ -277,13 +339,13 @@ func _find_cover() -> void:
 			break
 		var c: Dictionary = entry[1]
 		rays += 1
-		if _exposed_at(c.pos):
+		if _exposed_at(c.pos, c.get("eye", Cfg.EYE_HEIGHT)):
 			continue
 		rays += 1
 		if _clear_view_from(c.peek):
 			chosen = c
 			break
-		if fallback.is_empty():
+		if fallback.is_empty() and not c.get("low", false):  # low cover without a view is useless
 			fallback = c
 	if chosen.is_empty():
 		chosen = fallback
@@ -297,14 +359,27 @@ func _find_cover() -> void:
 	_go(Tac.MOVE)
 
 
-## True if the player could see this soldier's head standing at `pos`
-## (only walls and props block the view; the see-through fence doesn't).
-func _exposed_at(pos: Vector3) -> bool:
+# True if peeking from `c` showed nothing and the player hasn't moved
+# NO_VIEW_RESET m since (older entries are dropped).
+func _gave_no_view(c: Dictionary) -> bool:
+	var player_pos := _player.global_position
+	_no_view = _no_view.filter(func(e: Dictionary) -> bool:
+		return _flat_distance(e.player, player_pos) < Cfg.NO_VIEW_RESET)
+	for e in _no_view:
+		if e.cover == c:
+			return true
+	return false
+
+
+## True if the player could see this soldier's head at `pos`, eyes `eye` m
+## up (standing, or crouched behind low cover). Only walls and props block
+## the view; the see-through fence doesn't.
+func _exposed_at(pos: Vector3, eye_height := Cfg.EYE_HEIGHT) -> bool:
 	var eye := _player.global_position + Vector3.UP * 1.6
 	var cam := get_viewport().get_camera_3d()
 	if cam:
 		eye = cam.global_position
-	var q := PhysicsRayQueryParameters3D.create(pos + Vector3.UP * Cfg.EYE_HEIGHT, eye, 1, _sight_exclusions())
+	var q := PhysicsRayQueryParameters3D.create(pos + Vector3.UP * eye_height, eye, 1, _sight_exclusions())
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	return hit.is_empty() or hit.collider == _player
 

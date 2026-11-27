@@ -15,7 +15,7 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 
 | What | Where |
 |---|---|
-| Main menu → map select → match | `ui/main_menu.*`, `ui/map_select.*`, `ui/loading_screen.*` (tip + progress bar, threaded load), a map scene (`main.tscn`, `maps/*.tscn`) |
+| Main menu → Play: mode → map → match | `ui/main_menu.*`, `ui/map_select.*` (mode step, then map cards), `ui/loading_screen.*` (tip + progress bar, threaded load), a map scene (`main.tscn`, `maps/*.tscn`, `maps/combat_*.tscn`) |
 | Match flow (waves, score, spawns, Game Over) | `main.gd` (every map scene runs it; `map_id` picks the save key) |
 | Player, weapons, upgrades, skins on the view models | `player.gd`, `weapon_stats.gd`, `weapon_view.gd`, `weapon_model.gd`, `fp_arms.gd`, `effects/casings.gd` (see "First-person weapons") |
 | Enemies | `enemy.gd`, `enemy_types.gd`, models in `assets/models/enemies/` (see "Enemy models") |
@@ -29,9 +29,9 @@ A first-person wave-survival shooter in Godot 4.7 (GDScript). Ships to the web
 | Armory / Achievements screens | `ui/armory_menu.gd`, `ui/achievements_menu.gd` (overlays on the main menu) |
 | Weapon skins (material tint / camo) | `weapon_skins.gd` |
 | **Lighting mood** (3 maps, not Training) | config `atmosphere_config.gd`, builder `atmosphere.gd` (created by `main.gd`), shader `effects/light_shaft.gdshader` |
-| Maps list | `maps.gd` (`LIST` for map select, `TRAINING` for the arena) |
+| Maps list, modes | `maps.gd` (`LIST` for map select, `MODES`, `save_key`, `for_mode`, `TRAINING` for the arena) |
 | **Training Arena** (main menu > Training) | scene `maps/training.tscn` (built by `build_maps.gd`), `training/training.gd` (extends `main.gd`), `training/target.gd`, `training/weapon_rack.gd`, `training/training_ui.gd`, config `training_config.gd` |
-| **Soldiers (Test)** (main menu, under Training) | scene `maps/soldiers.tscn` (main.tscn + `soldiers/soldiers_mode.gd`, extends `main.gd`; zombie mode untouched), cover AI `soldiers/tactical_soldier.gd` (extends `enemy.gd`), `soldiers/damage_indicator.gd`, config `soldiers/soldiers_config.gd` (waves, cover objects, accuracy, regen). Phone demo: `adb shell run-as <package> touch files/soldiers_demo` (`soldiers_demo.gd` autopilot, 75 s, FPS report in `files/soldiers_demo.txt`) |
+| **Combat mode** (Play > Combat > map) | see "Game modes" |
 | Settings + best scores | `settings.gd` (autoload `Settings`), `ui/settings_menu.*` |
 | Music | `music.gd` (autoload `Music`) |
 | Level kit (Blender-made walls, frames, roofs, pipes, signs...) | `tools/blender/build_kit.py` → `assets/models/kit/kit.glb` + `assets/textures/kit/`, placed by `tools/kit_builder.gd`, material `materials/kit.tres` (`kit_surface.gdshader`) |
@@ -74,6 +74,34 @@ coins, missions, achievements or best scores (a test checks this).
   (`user://save.cfg` [training]), cleared with the best scores.
 - Lit by the sun + a baked lightmap (`maps/training.lmbake/.exr`, ~0.9 MB);
   the hall lamps are `BAKE_STATIC` (no runtime cost).
+
+## Game modes: Zombies and Combat (`soldiers/`)
+
+Play → choose a mode (`maps.gd` `MODES`) → choose a map. Both modes on all
+3 maps, same level unlocks. Zombies = the map scene (`main.gd`), unchanged.
+
+- **Save keys** (`Maps.save_key(map, mode)`): Zombies `"town"`, Combat
+  `"combat_town"`: best scores, best wave / stars and "reach wave" missions
+  are per mode and map. `maps_played` counts the base map (`Maps.base_id`).
+  The old `"soldiers"` key loads as `combat_yard`.
+- **Scenes**: `maps/combat_<map>.tscn` = the map scene with
+  `soldiers/soldiers_mode.gd` (extends `main.gd`; `base_map_id` keeps the
+  map id for the lighting mood, `map_id` becomes the save key).
+  `Maps.for_mode(id, mode)` gives the entry for `LoadingScreen.go`.
+- **Cover** is generated at runtime from the level's ground box colliders
+  (`soldiers_mode.gd` `cover_objects` / `_build_cover`, numbers in
+  `soldiers_config.gd`): tall (>= 1.75 m: houses, containers, racks,
+  forklifts) = stand + peek past the corner; low (1-1.75 m: cars, crates,
+  dumpsters) = crouch (`crouch_modifier.gd`, procedural SkeletonModifier3D:
+  hips down + leg IK; the pose only exists during `skeleton_updated`, so the
+  crouched head hitbox is cached there) and stand up to fire. Poles and
+  outer walls are skipped. The warehouse map has no low objects.
+- Soldier AI `tactical_soldier.gd` (extends `enemy.gd`); a cover whose peek
+  showed nothing is skipped until the player moves. Spawns >= 16 m from the
+  player, out of sight if possible. Damage indicator + regen.
+- Phone demo: `adb shell "run-as <package> sh -c 'echo town > files/soldiers_demo'"`
+  (`soldiers_demo.gd` autopilot, 75 s, FPS report in `files/soldiers_demo.txt`).
+- `test_soldiers` runs all 3 maps (`-- --map town` for one).
 
 ## Persistent progression (`progress.gd`)
 
