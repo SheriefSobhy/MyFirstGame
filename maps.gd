@@ -122,3 +122,12 @@ static func for_mode(map_id: String, mode := ZOMBIES) -> Dictionary:
 	if mode == COMBAT:
 		m.scene = "res://maps/combat_%s.tscn" % map_id
 	return m
+
+
+## The entry to load for a Combat mission on a map (missions/mission_mode.gd
+## reads which mission from its static `pending`): maps/mission_<id>.tscn.
+static func for_mission(map_id: String, mission_name: String) -> Dictionary:
+	var m := for_mode(map_id, COMBAT)
+	m.scene = "res://maps/mission_%s.tscn" % map_id
+	m.name = mission_name
+	return m

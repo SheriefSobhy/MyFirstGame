@@ -129,8 +129,10 @@ func _test_menu_flow(id: String) -> void:
 			"Play shows the mode choice first (Zombies / Combat)")
 	select.mode_buttons[Maps.COMBAT].pressed.emit()
 	await frames(2)
+	select.combat_buttons["waves"].pressed.emit()  # Combat > Waves (Missions: test_missions.gd)
+	await frames(2)
 	check(not select.choosing_mode and select.mode == Maps.COMBAT and select.play_buttons.size() == 3,
-			"choosing Combat shows the 3 maps")
+			"choosing Combat > Waves shows the 3 maps")
 	var button: Button = select.play_buttons[id]
 	check(not button.disabled, "the map is unlocked at level 15")
 	button.pressed.emit()

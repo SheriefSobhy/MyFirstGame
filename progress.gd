@@ -29,6 +29,7 @@ signal star_earned(map_id: String, stars: int)
 const Config := preload("res://progression_config.gd")
 const Weapons := preload("res://weapon_stats.gd")
 const Maps := preload("res://maps.gd")
+const Missions := preload("res://missions/missions_config.gd")
 const SAVE_PATH := "user://progress.cfg"
 const TEST_SAVE_PATH := "user://progress_test.cfg"
 const SAVE_VERSION := 1
@@ -54,6 +55,8 @@ var achievements := {}
 var best_wave := {}
 ## Matches played on each map (map id -> count).
 var maps_played := {}
+## Combat missions: best stars per mission id (0-3; cleared = 1 or more).
+var mission_stars := {}
 ## Today's missions: {"date": "YYYY-MM-DD", "missions": [mission, ...]}.
 ## mission: {id, type, kind, map, text, target, reward, progress, done}.
 var daily := {}
@@ -467,6 +470,56 @@ func _check_achievements() -> void:
 			achievement_unlocked.emit(a.name, a.reward)
 
 
+# --- Combat missions (missions/missions_config.gd) ----------------------------
+
+## Best stars on a mission (0 = never cleared).
+func mission_best(id: String) -> int:
+	return int(mission_stars.get(id, 0))
+
+
+## Missions unlock in order per map: slot 1 once the map is unlocked, each
+## next slot once the one before it is cleared.
+func is_mission_unlocked(id: String) -> bool:
+	var m := Missions.find(id)
+	if m.is_empty() or not is_map_unlocked(m.map):
+		return false
+	if m.slot <= 1:
+		return true
+	var before := Missions.in_slot(m.map, m.slot - 1)
+	return before.is_empty() or mission_best(before.id) > 0
+
+
+## A mission ended: stars = 0 (failed) .. 3. Pays the first-clear reward the
+## first time, the repeat reward after that (nothing for a fail), keeps the
+## best stars and saves. Returns {coins, xp, first, stars, best, best_before}.
+func complete_mission(id: String, stars: int) -> Dictionary:
+	var m := Missions.find(id)
+	var before := mission_best(id)
+	var result := {"coins": 0, "xp": 0, "first": false, "stars": stars, "best": before, "best_before": before}
+	if m.is_empty() or stars <= 0:
+		return result
+	var first := before == 0
+	var reward: Dictionary = m.first if first else m.repeat
+	mission_stars[id] = maxi(before, stars)
+	result.first = first
+	result.best = mission_stars[id]
+	result.coins = reward.coins
+	result.xp = reward.xp
+	add_coins(reward.coins)
+	add_xp(reward.xp)
+	save()
+	changed.emit()
+	return result
+
+
+## Stars over every mission on a map (map id): (got, out of).
+func mission_stars_on(map_id: String) -> Vector2i:
+	var got := 0
+	var ms := Missions.for_map(map_id)
+	for m: Dictionary in ms:
+		got += mission_best(m.id)
+	return Vector2i(got, ms.size() * 3)
+
 # --- Saving -----------------------------------------------------------------------------
 
 ## Back to a brand new player (Settings "Debug: reset progress"). Also forgets
@@ -493,6 +546,7 @@ func _set_defaults() -> void:
 	achievements = {}
 	best_wave = {}
 	maps_played = {}
+	mission_stars = {}
 	daily = {}
 	login = {"last": "", "streak": 0, "best": 0}
 
@@ -509,6 +563,7 @@ func save() -> void:
 	cfg.set_value("stats", "achievements", achievements)
 	cfg.set_value("stats", "best_wave", best_wave)
 	cfg.set_value("stats", "maps_played", maps_played)
+	cfg.set_value("missions", "stars", mission_stars)
 	cfg.set_value("daily", "daily", daily)
 	cfg.set_value("daily", "login", login)
 	cfg.save(save_path)
@@ -530,6 +585,7 @@ func load_progress() -> void:
 	achievements = _dict(cfg.get_value("stats", "achievements", {}))
 	best_wave = _dict(cfg.get_value("stats", "best_wave", {}))
 	maps_played = _dict(cfg.get_value("stats", "maps_played", {}))
+	mission_stars = _dict(cfg.get_value("missions", "stars", {}))
 	# The old "Soldiers (Test)" mode (the Yard) is now Combat on the Yard.
 	if best_wave.has("soldiers"):
 		best_wave["combat_yard"] = maxi(int(best_wave.get("combat_yard", 0)), int(best_wave["soldiers"]))

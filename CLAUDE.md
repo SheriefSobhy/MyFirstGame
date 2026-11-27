@@ -103,6 +103,37 @@ Play → choose a mode (`maps.gd` `MODES`) → choose a map. Both modes on all
   (`soldiers_demo.gd` autopilot, 75 s, FPS report in `files/soldiers_demo.txt`).
 - `test_soldiers` runs all 3 maps (`-- --map town` for one).
 
+## Combat missions (`missions/`)
+
+Play → Combat → Waves (the mode above) or Missions → map → 5 slots
+(`missions_config.gd` `SLOTS`; empty slots say "Coming soon"). Slot n
+unlocks when slot n-1 is cleared (`Progress.is_mission_unlocked`).
+
+- Data + every number: `missions_config.gd` (`LIST`: 6 missions, Defend in
+  slot 1 and Rescue in slot 2 on each map, positions in map metres).
+  `Missions.pending` = the mission to load; scenes `maps/mission_<map>.tscn`
+  run `mission_mode.gd` (extends `soldiers_mode.gd`; no waves/shop/score/
+  Waves progress; `_end_progress` returns {}).
+- Framework: briefing (paused) → START → objective → `finish()` → result
+  screen (Retry / Next / Missions / Menu). Objective types extend
+  `objective.gd` (`setup/begin/tick/star2`), registered in `mission_mode.gd`
+  `TYPES`. Helpers: `snap`, `spawn_soldier_at`, `queue_soldier`,
+  `add_interactable` (USE button / hold E, `mission_ui.gd`). Stars: complete
+  / `star2()` / health > 50%; `Progress.complete_mission` keeps the best and
+  pays first-clear or repeat rewards (`mission_stars` in progress.cfg [missions]).
+- Defend (`defend.gd`): `zone_ring.gd`; pushers (`tactical_soldier.gd`
+  `push_spot`) walk in; capture fills only without the player inside.
+  Star 2 = capture never above 50% (the timer is fixed).
+- Rescue (`rescue.gd`, `hostage.gd`): guards (`alert = false`, `guard_post`)
+  wake on sight/sound/shots; hold USE 3 s; the hostage follows on the small
+  navmesh, ducks (crouch_modifier), is on physics layer 4 (player bullets
+  pass through); soldiers aim bursts at him (`alt_target`, `alt_chance`).
+  Mesh = Exploder (Ch35 officer); anims `hostage_anims.res` from
+  `mixamo_anims.gd -- --only hostage` (`HOSTAGE_SET`: placeholders until
+  Terrified / Walking / Running are downloaded).
+- `test_missions` runs both types on all 3 maps (`-- --map town` for one).
+  test_soldiers' town "damage direction indicator" check is flaky (~1 in 3).
+
 ## Persistent progression (`progress.gd`)
 
 Saved to `user://progress.cfg` (browser storage on the web) after every wave,
@@ -165,7 +196,7 @@ Each test is a SceneTree script that prints PASS/FAIL and exits 1 on failure:
 
 Tests: `test_progression`, `test_economy`, `test_game_loop`, `test_maps`,
 `test_weapons`, `test_combat_feel`, `test_enemies`, `test_mobile`,
-`test_training`, `test_soldiers`, `test_navigation` (run that one with `--fixed-fps 60`). Most accept `-- --shots <folder>`
+`test_training`, `test_soldiers`, `test_missions`, `test_navigation` (run that one with `--fixed-fps 60`). Most accept `-- --shots <folder>`
 (without `--headless`) to save screenshots for a visual check.
 
 - Under a tool script, `Progress` starts empty and saves to

@@ -38,30 +38,53 @@ const SOLDIER_SET := {
 	"shoot": ["Firing Rifle", false, ""],
 	"death": ["Dying", false, ""],
 }
+## Combat missions' hostage (missions/hostage.gd) on the Exploder's mesh
+## (the Ch35 officer, without the glow). Each entry may list a fallback FBX
+## after the special: used while the wanted clip isn't in art_source/mixamo/
+## yet (download the Mixamo clips named first, "Without Skin", 30 fps, and
+## rerun with `-- --only hostage`).
+const HOSTAGE_SET := {
+	"idle": ["Terrified", true, "", "Rifle Walk", "pose"],
+	"walk": ["Walking", true, "", "Rifle Walk", ""],
+	"run": ["Running", true, "", "Rifle Walk", ""],
+	"death": ["Dying", false, ""],
+}
 const CHARACTERS := {
 	"zombie": ZOMBIE_SET,
 	"runner": ZOMBIE_SET,
 	"brute": ZOMBIE_SET,
 	"exploder": ZOMBIE_SET,
 	"soldier": SOLDIER_SET,
+	"hostage": HOSTAGE_SET,
 }
+## Characters that reuse another one's mesh (id -> mesh id).
+const MESH_OF := {"hostage": "exploder"}
 
 var _sources := {}  # file -> {skel: Skeleton3D, anim: Animation, path: String}
 
 
 func _initialize() -> void:
 	_set_texture_imports()
-	if "--textures-only" in OS.get_cmdline_user_args():
+	var args := OS.get_cmdline_user_args()
+	if "--textures-only" in args:
 		quit(0)
 		return
+	var only := ""
+	if args.has("--only"):
+		only = args[args.find("--only") + 1]
 	var failed := false
 	for id: String in CHARACTERS:
-		var scene: Node = load(OUT + id + "_high.glb").instantiate()
+		if only != "" and id != only:
+			continue
+		var scene: Node = load(OUT + MESH_OF.get(id, id) + "_high.glb").instantiate()
 		var skel: Skeleton3D = scene.find_children("*", "Skeleton3D", true, false)[0]
 		var lib := AnimationLibrary.new()
 		var set_def: Dictionary = CHARACTERS[id]
 		for anim_name: String in set_def:
 			var def: Array = set_def[anim_name]
+			if def.size() > 3 and not FileAccess.file_exists(SRC + def[0] + ".fbx"):
+				print("%s %s: no %s.fbx yet, placeholder %s" % [id, anim_name, def[0], def[3]])
+				def = [def[3], def[1], def[4]]
 			var src := _source(def[0])
 			if src.is_empty():
 				failed = true

@@ -30,8 +30,25 @@ signal shot_at_player(from: Vector3, hit: bool)
 const Cfg := preload("res://soldiers/soldiers_config.gd")
 const RIFLE_SHOT := preload("res://assets/sounds/guns/ak_shot.wav")
 const CrouchModifier := preload("res://soldiers/crouch_modifier.gd")
+const Mission := preload("res://missions/missions_config.gd")
+
+## Missions: a guard noticed the player (raise_alert()).
+signal alerted
 
 enum Tac { FIND, MOVE, HIDE, PEEK, RETURN, OPEN }
+
+## Missions (missions/mission_mode.gd) only; defaults = the Waves soldier.
+## Defend: a "pusher" walks to this spot in the zone and holds it (INF = no).
+var push_spot := Vector3.INF
+## Rescue: false = a guard at guard_post looking along guard_yaw (degrees,
+## 0 = -Z) that hasn't noticed the player yet.
+var alert := true
+var guard_post := Vector3.INF
+var guard_yaw := 0.0
+## Rescue: the hostage; a burst goes at him with this chance (if it sees him).
+var alt_target: Node3D = null
+var alt_chance := 0.0
+var _target: Node3D = null
 
 ## Where it is in the cover loop (see the top of this file).
 var tac := Tac.FIND
@@ -152,6 +169,8 @@ func crouch_amount() -> float:
 # update (the next animation step resets them), so the head hitbox is
 # remembered here, relative to the soldier's feet.
 func _on_skeleton_updated() -> void:
+	if not is_inside_tree():
+		return  # leaving the scene (Retry / scene change)
 	if _crouch.influence <= 0.001:
 		_crouch_head = {}
 		return
@@ -204,6 +223,58 @@ func _process(delta: float) -> void:
 		_stretch(_tracers[i], run.from + run.dir * tail, run.from + run.dir * head)
 
 
+# --- Missions: pushers and guards ---------------------------------------------
+
+# Defend: walk into the zone (push_spot) and hold it, firing a burst at the
+# player whenever they show (every PUSH_FIRE_COOLDOWN s at most).
+func _push_move(delta: float) -> void:
+	_shot_cooldown -= delta
+	_check_timer -= delta
+	if _check_timer <= 0.0:
+		_check_timer = 0.25
+		if _shot_cooldown <= 0.0 and _flat_distance_to_player() < Cfg.SHOT_RANGE and can_see_player():
+			_set_state(State.AIM)
+			return
+	if _arrived(push_spot):
+		_stop()
+		_face_player(delta)
+	else:
+		_walk_to(push_spot, delta, Mission.PUSH_SPEED)
+
+
+# Rescue: stand at the post looking out until the player is heard (close)
+# or seen in front of it; then the normal cover fight.
+func _guard_move(delta: float) -> void:
+	if guard_post != Vector3.INF and not _arrived(guard_post):
+		_walk_to(guard_post, delta, 0.6)
+	else:
+		_stop()
+		_turn_towards(Vector3(-sin(deg_to_rad(guard_yaw)), 0.0, -cos(deg_to_rad(guard_yaw))), delta)
+	_check_timer -= delta
+	if _check_timer > 0.0:
+		return
+	_check_timer = 0.3
+	var d := _flat_distance_to_player()
+	if d < Mission.GUARD_HEAR:
+		raise_alert()
+		return
+	if d < Mission.GUARD_SIGHT:
+		var to := _player.global_position - global_position
+		to.y = 0.0
+		var fwd := -global_basis.z
+		fwd.y = 0.0
+		if fwd.normalized().dot(to.normalized()) > Mission.GUARD_FOV and can_see_player():
+			raise_alert()
+
+
+## A guard notices the player (heard, seen, shot, or told by another guard).
+func raise_alert() -> void:
+	if alert or state == State.DEAD:
+		return
+	alert = true
+	_go(Tac.FIND)
+	alerted.emit()
+
 # --- Cover loop ----------------------------------------------------------------
 
 # Called by enemy.gd every physics frame while in CHASE (its own soldier move
@@ -213,8 +284,16 @@ func _soldier_move(delta: float) -> void:
 		_stop()
 		_update_move_anim()
 		return
+	if not alert:
+		_guard_move(delta)
+		_update_move_anim()
+		return
 	if _player_in_range(stats.attack_range):
 		_set_state(State.ATTACK)  # rifle jab, as in enemy.gd
+		return
+	if push_spot != Vector3.INF:
+		_push_move(delta)
+		_update_move_anim()
 		return
 	var points := _cover_points()
 	if points.is_empty() and tac != Tac.OPEN:
@@ -414,13 +493,34 @@ func _set_state(new_state: State) -> void:
 	_play_from_start(stats.anims.shoot, 0.15)
 	anim.seek(AIM_POSE_TIME, true)
 	anim.pause()
+	# Rescue missions: some bursts go at the hostage (when it can see him).
+	_target = _player
+	if is_instance_valid(alt_target) and alt_chance > 0.0 and randf() < alt_chance \
+			and alt_target.has_method("is_targetable") and alt_target.call("is_targetable") \
+			and _clear_view_to(alt_target.global_position + Vector3.UP * 0.9):
+		_target = alt_target
+
+
+## What the current burst is aimed at (the player unless it chose the hostage).
+func _burst_target() -> Node3D:
+	return _target if is_instance_valid(_target) else _player
+
+
+## True if nothing solid is between the soldier's eyes and `point`.
+func _clear_view_to(point: Vector3) -> bool:
+	var from: Vector3 = global_position + Vector3.UP * stats.height * 0.85
+	var q := PhysicsRayQueryParameters3D.create(from, point, SIGHT_MASK, _sight_exclusions())
+	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 
 # AIM state: raise, then fire _shots_left bullets BURST_INTERVAL apart.
 func _aim(delta: float) -> void:
 	_stop()
-	_face_player(delta)
-	if not _player_alive():
+	var tgt := _burst_target()
+	var to := tgt.global_position - global_position
+	to.y = 0.0
+	_turn_towards(to.normalized(), delta)
+	if not _player_alive() or (tgt != _player and not tgt.call("is_targetable")):
 		_end_burst()
 		return
 	if _state_time < Cfg.AIM_TIME:
@@ -441,25 +541,33 @@ func _aim(delta: float) -> void:
 func _end_burst() -> void:
 	_shot_cooldown = randf_range(SHOT_COOLDOWN.x, SHOT_COOLDOWN.y)
 	_set_state(State.CHASE)
+	if push_spot != Vector3.INF:
+		_shot_cooldown = randf_range(Mission.PUSH_FIRE_COOLDOWN.x, Mission.PUSH_FIRE_COOLDOWN.y)
+		return
 	if tac == Tac.OPEN:
 		return
 	_peeks_left -= 1
 	_go(Tac.RETURN if not cover.is_empty() and _peeks_left > 0 else Tac.FIND)
 
 
-## One bullet: hits with hit_chance(), otherwise goes past the player.
-## Walls and props stop it.
+## One bullet at the burst's target (the player, or the hostage in a Rescue
+## mission): hits with hit_chance(), otherwise goes past. Walls and props stop it.
 func _fire() -> void:
+	var tgt := _burst_target()
 	var from := _muzzle.global_position
-	var chest := _player.global_position + Vector3.UP * 1.2
-	var speed := Vector2(_player.velocity.x, _player.velocity.z).length()
+	var chest := tgt.global_position + Vector3.UP * (1.2 if tgt == _player else 0.9)
+	var tv: Vector3 = tgt.get("velocity") if tgt.get("velocity") is Vector3 else Vector3.ZERO
+	var speed := Vector2(tv.x, tv.z).length()
 	var target := chest
-	if randf() > hit_chance(_flat_distance_to_player(), speed):
+	if randf() > hit_chance(_flat_distance(global_position, tgt.global_position), speed):
 		var side := (chest - from).cross(Vector3.UP).normalized()
 		target += side * randf_range(Cfg.MISS_OFFSET.x, Cfg.MISS_OFFSET.y) * (1.0 if randf() < 0.5 else -1.0) \
 				+ Vector3.UP * randf_range(-0.3, 0.6)
 	var dir := (target - from).normalized()
-	var q := PhysicsRayQueryParameters3D.create(from, from + dir * Cfg.SHOT_RANGE, SIGHT_MASK, _sight_exclusions())
+	var mask := SIGHT_MASK
+	if tgt != _player and tgt is CollisionObject3D:
+		mask |= (tgt as CollisionObject3D).collision_layer
+	var q := PhysicsRayQueryParameters3D.create(from, from + dir * Cfg.SHOT_RANGE, mask, _sight_exclusions())
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	var end := from + dir * Cfg.SHOT_RANGE
 	var hit_player := false
@@ -469,6 +577,10 @@ func _fire() -> void:
 			hit_player = true
 			_player.take_damage(Cfg.SHOT_DAMAGE)
 			end -= dir * minf(Cfg.TRACER_HIT_SHORT, from.distance_to(end) * 0.5)
+		elif hit.collider == tgt and tgt.has_method("take_bullet"):
+			tgt.call("take_bullet", global_position)
+	if is_instance_valid(alt_target) and alt_target.has_method("bullet_passed"):
+		alt_target.call("bullet_passed", from, end)  # the hostage ducks when bullets fly close
 	shots_fired += 1
 	_launch_tracer(from, end)
 	_muzzle_flash.global_position = from
@@ -477,7 +589,8 @@ func _fire() -> void:
 	_flash_left = Cfg.FLASH_TIME
 	_gun_sfx.pitch_scale = randf_range(0.93, 1.07)
 	_gun_sfx.play()
-	shot_at_player.emit(global_position, hit_player)
+	if tgt == _player:
+		shot_at_player.emit(global_position, hit_player)
 
 
 func _launch_tracer(from: Vector3, to: Vector3) -> void:
@@ -511,6 +624,7 @@ func is_gun_sound_playing() -> bool:
 
 func take_damage(amount: int, hit_position := Vector3.ZERO, hit_normal := Vector3.UP, headshot := false) -> void:
 	super.take_damage(amount, hit_position, hit_normal, headshot)
+	raise_alert()
 	# Shot while out: duck back behind the cover.
 	if state != State.DEAD and not cover.is_empty() and tac == Tac.PEEK:
 		_go(Tac.RETURN)
