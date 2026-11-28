@@ -23,6 +23,7 @@ extends SceneTree
 const M := preload("res://missions/missions_config.gd")
 const Maps := preload("res://maps.gd")
 const Progression := preload("res://progression_config.gd")
+const SoldierCfg := preload("res://soldiers/soldiers_config.gd")
 
 var failures := 0
 var main: Node
@@ -317,7 +318,7 @@ func _test_rescue() -> void:
 	var guard: Node = obj.guards[0]
 	var post: Vector3 = guard.guard_post
 	check(not guard.alert and Vector2(guard.global_position.x - post.x, guard.global_position.z - post.z).length() < 1.0,
-			"an unalerted guard stays at its post")
+			"an unalerted guard starts at its post (then patrols)")
 	check(main.ui.use_text == "", "no USE button away from interactables")
 	check(main.ui.marker_pos.distance_to(hostage.global_position) < 0.1, "the marker points at the hostage")
 	# Next to the hostage: USE.
@@ -330,7 +331,6 @@ func _test_rescue() -> void:
 	check(hostage.state == hostage.State.CAPTIVE and main.ui.use_progress > 0.25 and main.ui.use_progress < 0.75,
 			"holding USE fills the ring (%.2f)" % main.ui.use_progress)
 	_hold_use(false)
-	check(obj.alerted_count() > 0, "guards notice the player close by")
 	await frames(3)
 	check(main.ui.use_progress == 0.0 and hostage.state == hostage.State.CAPTIVE, "letting go resets it")
 	_hold_use(true)
@@ -494,7 +494,7 @@ func _test_sabotage() -> void:
 	await seconds(M.PLANT_NOISE_AFTER + 0.8)
 	check(not first.planted and main.ui.use_progress > 0.3 and main.ui.use_progress < 0.75, "planting takes a while (%.2f)" % main.ui.use_progress)
 	if near_guards > 0:
-		check(obj.alerted_count() >= near_guards, "guards nearby hear the planting (%d)" % obj.alerted_count())
+		check(obj.noticed_count() >= near_guards, "guards nearby hear the planting and come to look (%d)" % obj.noticed_count())
 	var enemies_before: int = _soldiers().size() + main.queued_soldiers()
 	await seconds(M.PLANT_TIME - M.PLANT_NOISE_AFTER - 0.4)
 	_hold_use(false)
@@ -638,9 +638,12 @@ func _test_hunt() -> void:
 	var d0: float = c.global_position.distance_to(c.flee_to)
 	c.raise_alert()
 	await frames(2)
-	check(obj.spotted and obj.bodyguards.all(func(g: Node) -> bool: return g.alert), "spotted: his bodyguards are alerted too")
+	check(obj.spotted and not obj.bodyguards.any(func(g: Node) -> bool: return g.alert),
+			"spotted: he runs; his bodyguards don't know yet")
 	var queued: int = _soldiers().size() + main.queued_soldiers()
-	await seconds(M.RADIO_DELAY + 0.4)
+	await seconds(maxf(M.RADIO_DELAY, SoldierCfg.RADIO_DELAY.y) + 0.4)
+	check(obj.bodyguards.all(func(g: Node) -> bool: return not is_instance_valid(g) or g.alert),
+			"his radio report alerts his bodyguards a moment later")
 	check(obj.radioed and _soldiers().size() + main.queued_soldiers() >= queued + int(main.mission.radio_count) - 1
 			and obj.vehicle.engine_on, "he radios for help (backup comes, the car starts)")
 	check(c.global_position.distance_to(c.flee_to) < d0 - 1.5, "he runs for his car (%.1f -> %.1f m)" % [d0, c.global_position.distance_to(c.flee_to)])
@@ -717,12 +720,16 @@ func _test_soldier_targets_hostage(hostage: Node) -> void:
 	var space: PhysicsDirectSpaceState3D = main.get_world_3d().direct_space_state
 	var chest: Vector3 = hostage.global_position + Vector3.UP * 0.9
 	var spot: Vector3 = main.snap(hostage.global_position + Vector3(2.5, 0, 0))
-	for a in 12:
-		var p: Vector3 = main.snap(hostage.global_position + Vector3(cos(a * TAU / 12.0), 0, sin(a * TAU / 12.0)) * 2.5)
-		var q := PhysicsRayQueryParameters3D.create(p + Vector3.UP * 1.45, chest, 3)
-		if main.off_navmesh(p, 1) < 0.2 and space.intersect_ray(q).is_empty():
-			spot = p
-			break
+	var ex: Array[RID] = s._sight_exclusions()  # patrolling guards don't count
+	var found := false
+	for r: float in [2.5, 3.5, 2.0]:
+		for a in 12:
+			var p: Vector3 = main.snap(hostage.global_position + Vector3(cos(a * TAU / 12.0), 0, sin(a * TAU / 12.0)) * r)
+			var q := PhysicsRayQueryParameters3D.create(p + Vector3.UP * 1.45, chest, 3, ex)
+			if not found and main.off_navmesh(p, 1) < 0.2 and p.distance_to(hostage.global_position) > 1.6 \
+					and space.intersect_ray(q).is_empty():
+				spot = p
+				found = true
 	s.global_position = spot + Vector3.UP * 0.05
 	var to: Vector3 = hostage.global_position - spot
 	s.rotation.y = atan2(-to.x, -to.z)

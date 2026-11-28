@@ -18,6 +18,8 @@ static func detonate(source: Node3D, pos: Vector3, radius: float, max_damage: in
 	var tree := source.get_tree()
 	var space := source.get_world_3d().direct_space_state
 	var exclude := _exclusions(tree, source, player)
+	# Soldiers in earshot come to look (tactical_soldier.gd hear_explosion).
+	tree.call_group("hears_noise", "hear_explosion", pos)
 
 	# Visuals and sound, with a scorch mark if the floor is just below.
 	var fx := Explosion.new()

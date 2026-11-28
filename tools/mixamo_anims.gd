@@ -32,11 +32,22 @@ const ZOMBIE_SET := {
 	"attack": ["Zombie Attack", false, ""],
 	"death": ["Zombie Death", false, ""],
 }
+## "idle" (the rifle-up pose), "walk", "shoot", "death": the zombie mode's
+## soldier (enemy.gd) uses those. The Combat soldier (tactical_soldier.gd)
+## also blends the rest by velocity (see its "Animation" section).
 const SOLDIER_SET := {
 	"idle": ["Firing Rifle", true, "pose"],
 	"walk": ["Rifle Walk", true, ""],
 	"shoot": ["Firing Rifle", false, ""],
 	"death": ["Dying", false, ""],
+	"relaxed": ["Rifle Idle", true, ""],
+	"aim": ["Rifle Aiming Idle", true, ""],
+	"run": ["Rifle Run", true, ""],
+	"walk_back": ["Walk Backward", true, ""],
+	"walk_left": ["Walk Left", true, ""],
+	"walk_right": ["Walk Right", true, ""],
+	"crouch": ["Idle Crouching", true, ""],
+	"hit": ["Hit Reaction", false, ""],
 }
 ## Combat missions' hostage (missions/hostage.gd) on the Exploder's mesh
 ## (the Ch35 officer, without the glow). Each entry may list a fallback FBX
@@ -91,7 +102,7 @@ func _initialize() -> void:
 				continue
 			var a := _retarget(src, skel, def[1], def[2] == "pose")
 			lib.add_animation(anim_name, a)
-			print("%s %-6s %5.2f s  %3d tracks  ground %.2f m/s  %d steps" % [id, anim_name, a.length, a.get_track_count(), a.get_meta("ground_speed", 0.0), a.get_meta("steps", 0)])
+			print("%s %-10s %5.2f s  %3d tracks  ground %.2f m/s %s  %d steps" % [id, anim_name, a.length, a.get_track_count(), a.get_meta("ground_speed", 0.0), a.get_meta("ground_dir", Vector2.ZERO), a.get_meta("steps", 0)])
 			if anim_name == "attack":
 				print("  strike at %.2f s" % a.get_meta("hit_time"))
 		var path := OUT + id + "_anims.res"
@@ -239,6 +250,10 @@ func _retarget(src: Dictionary, dst: Skeleton3D, loop: bool, pose: bool) -> Anim
 	drift.y = 0.0
 	if loop and not pose:
 		out.set_meta("ground_speed", drift.length() / length)
+		# Which way the clip walks, in the soldier's frame (x = its right,
+		# y = forward; the model faces +Z and is turned round in enemy.gd).
+		var d2 := Vector2(-drift.x, drift.z)
+		out.set_meta("ground_dir", d2.normalized() if d2.length() > 0.01 else Vector2.ZERO)
 	for f in frames:
 		var off := hip_offsets[f]
 		if loop:

@@ -2,8 +2,8 @@ extends "res://missions/objective.gd"
 ## Mission type "Rescue" (missions_config.gd: hostage, guards, extraction,
 ## reinforcements, hostage_target_chance, par_time). The hostage
 ## (missions/hostage.gd) is held with guards around him; guards stand at
-## their posts until they hear / see the player, are shot, hear shots
-## (GUNSHOT_ALERT) or another guard near them is alerted (objective.gd).
+## their posts until they see or hear the player (tactical_soldier.gd
+## perception), are shot, or get a radio report from another (objective.gd).
 ## Hold USE FREE_TIME s next to him to free him; he then follows the player,
 ## and reinforcements arrive. Reach the extraction zone with him alive = win;
 ## he dies = fail. Soldiers sometimes fire their burst at him.
@@ -33,7 +33,6 @@ func setup() -> void:
 	extraction.global_position = mode.snap(mission.extraction.pos)
 	extraction.visible = false
 	spawn_guards(mission.guards, _target_hostage)
-	listen_for_gunshots()
 	mode.add_interactable(hostage, "FREE HOSTAGE", M.FREE_TIME, _free)
 
 

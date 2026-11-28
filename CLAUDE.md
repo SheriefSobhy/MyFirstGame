@@ -99,6 +99,22 @@ Play → choose a mode (`maps.gd` `MODES`) → choose a map. Both modes on all
 - Soldier AI `tactical_soldier.gd` (extends `enemy.gd`); a cover whose peek
   showed nothing is skipped until the player moves. Spawns >= 16 m from the
   player, out of sight if possible. Damage indicator + regen.
+- **Perception** (numbers in `soldiers_config.gd` "Perception"): `awareness`
+  UNAWARE (guards patrol round `guard_post`; wave soldiers sweep round a
+  guess of the player's position) -> SUSPICIOUS "?" (investigates a noise)
+  -> COMBAT "!" (the cover loop) -> SEARCH "?" (lost contact 6 s: last known
+  position + nearby cover, 15 s) -> UNAWARE. Sight = cone + ray, range x
+  `soldiers_mode.visibility_at()` (map light/fog, lamps). Hearing: player
+  shots (`player.fired` -> `hear_gunshot`), sprinting, `Blast` explosions
+  (group `hears_noise`). Radio: going into combat tells soldiers within 25 m
+  1-2 s later. `alert` is a bool view of `awareness` (false = UNAWARE).
+- **Animation**: an `AnimationTree` per soldier (shared tree, `_tree_root`)
+  replaces enemy.gd's AnimationPlayer: velocity BlendSpace2D (relaxed / aim
+  idle, walk, back, strafe L/R, run) at ground-speed playback, crouch / aim /
+  jab / death transition, fire + hit OneShots. Clips from
+  `mixamo_anims.gd -- --only soldier` (`ground_dir` metadata). Turning is
+  rate-limited (one step per physics frame). `tools/soldier_anim_shots.gd`
+  shows every clip.
 - Phone demo: `adb shell "run-as <package> sh -c 'echo town > files/soldiers_demo'"`
   (`soldiers_demo.gd` autopilot, 75 s, FPS report in `files/soldiers_demo.txt`).
 - `test_soldiers` runs all 3 maps (`-- --map town` for one).

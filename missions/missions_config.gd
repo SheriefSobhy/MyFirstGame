@@ -71,11 +71,6 @@ const FOLLOW_STOP := 2.0        # m: closer than this to the player he stands st
 const COWER_TIME := 1.4         # s crouched after a bullet passes near him
 const COWER_NEAR := 2.5         # m: a bullet this close makes him crouch
 const HOSTAGE_WARP := 22.0      # m: stuck further than this behind = moved behind the player
-const GUARD_HEAR := 9.0         # m: guards notice the player this close
-const GUARD_SIGHT := 24.0       # m: ... or seeing them this far (in front of them)
-const GUARD_FOV := 0.2          # dot: "in front" (about 160 degrees)
-const GUARD_ALERT_RADIUS := 20.0  # m: an alerted guard alerts the others this close
-const GUNSHOT_ALERT := 22.0     # m: the player's shots alert guards this close
 
 # --- Sabotage ---------------------------------------------------------------------
 const PLANT_TIME := 4.0         # s holding USE to plant a charge

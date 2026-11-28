@@ -6,6 +6,9 @@ extends "res://main.gd"
 ##  - waves: START_SOLDIERS, +SOLDIERS_PER_WAVE each wave, MAX_ALIVE at once
 ##  - spawns at least SPAWN_MIN_DISTANCE m from the player, out of sight if possible
 ##  - cover points round the map's tall and low objects (get_cover_points)
+##  - soldiers start unaware (tactical_soldier.gd perception): they sweep the
+##    area round a guess of where the player is, hear the player's shots
+##    (_on_player_fired) and see less far in the dark and fog (visibility_at)
 ##  - the player: a red damage direction indicator (damage_indicator.gd) and
 ##    health regen after REGEN_DELAY s without damage
 ## Cash, the shop, XP, missions and achievements count as normal. Best score,
@@ -30,6 +33,8 @@ var indicator: DamageIndicator
 var _since_hit := 0.0
 var _regen_left := 0.0
 var _last_health := 0
+var _lamps: Array[Vector4] = []  # lit spots: position + reach (visibility_at)
+var _lamps_found := false
 
 
 func _ready() -> void:
@@ -49,6 +54,7 @@ func _ready() -> void:
 	_last_health = player.health
 	player.health_changed.connect(_on_health_changed)
 	player.hit_taken.connect(func() -> void: _since_hit = 0.0)
+	player.fired.connect(_on_player_fired)
 	_prewarm_soldier_fx()
 	if SoldiersDemo.requested():
 		add_child(SoldiersDemo.new())
@@ -92,6 +98,7 @@ func start_wave(n: int) -> void:
 func spawn_enemy() -> void:
 	var soldier := SOLDIER_SCENE.instantiate()
 	soldier.kind = "soldier"
+	soldier.alert = false  # unaware: sweeps round a guess of where the player is
 	if not _spawn_queue.is_empty():
 		_spawn_queue.pop_front()
 	var layer := EnemyTypes.nav_layer(soldier.kind)
@@ -134,6 +141,39 @@ func _pick_spawn_point(layer := EnemyTypes.NAV_SMALL) -> Node3D:
 func _on_soldier_shot(from: Vector3, hit: bool) -> void:
 	if hit:
 		indicator.add_hit(from)
+
+
+# Every shot of the player's: the soldiers in earshot hear it.
+func _on_player_fired() -> void:
+	var pos := player.global_position
+	for e in enemies.get_children():
+		if e.has_method("hear_gunshot"):
+			e.hear_gunshot(pos)
+
+
+## How well the player can be seen at `pos` (0..1, x the soldiers' sight
+## range): the map's light and fog (soldiers_config.gd VISIBILITY), at least
+## LAMP_VISIBILITY near a lamp.
+func visibility_at(pos: Vector3) -> float:
+	var base: float = Cfg.VISIBILITY.get(base_map_id, 1.0)
+	if base >= Cfg.LAMP_VISIBILITY:
+		return base
+	if not _lamps_found:
+		_lamps_found = true
+		for n in find_children("*", "Light3D", true, false):
+			var l := n as Light3D
+			var reach := 0.0
+			if l is OmniLight3D:
+				reach = (l as OmniLight3D).omni_range
+			elif l is SpotLight3D:
+				reach = (l as SpotLight3D).spot_range
+			if reach > 0.0 and l.light_energy > 0.3:
+				var p := l.global_position
+				_lamps.append(Vector4(p.x, p.y, p.z, reach * Cfg.LAMP_REACH))
+	for l in _lamps:
+		if pos.distance_to(Vector3(l.x, l.y, l.z)) < l.w:
+			return Cfg.LAMP_VISIBILITY
+	return base
 
 
 # --- Cover -------------------------------------------------------------------
@@ -262,7 +302,7 @@ func time_since_hit() -> float:
 	return _since_hit
 
 
-# The tracer and muzzle flash drawn once, tiny, in front of the camera, so
+# The tracer, muzzle flash and "?" icon drawn once, tiny, in front of the camera, so
 # their shaders compile now and not on the first shot.
 func _prewarm_soldier_fx() -> void:
 	var camera := get_viewport().get_camera_3d()
@@ -279,6 +319,11 @@ func _prewarm_soldier_fx() -> void:
 		mi.global_position = spot
 		mi.scale = Vector3.ONE * 0.01
 		warm.append(mi)
+	var icon := TacticalSoldier.make_icon()
+	add_child(icon)
+	icon.global_position = spot
+	icon.visible = true
+	warm.append(icon)
 	for i in 3:
 		await get_tree().process_frame
 	for mi in warm:

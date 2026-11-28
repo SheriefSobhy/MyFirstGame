@@ -238,11 +238,7 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	_player = get_tree().get_first_node_in_group("player")
 	_recolor()
-	if dummy:
-		_play_dummy_anim(-1.0)
-	else:
-		anim.play(stats.anims.walk, -1, _walk_anim_speed())
-	anim.seek(randf() * 1.0)  # so a group of enemies doesn't walk in sync
+	_start_anim()
 	_growl_timer = randf_range(1.0, 6.0)
 	_sfx = AudioStreamPlayer3D.new()
 	_sfx.unit_size = 8.0
@@ -785,6 +781,39 @@ func _die() -> void:
 func _set_state(new_state: State) -> void:
 	state = new_state
 	_state_time = 0.0
+	if new_state == State.ATTACK:
+		_attack_landed = false
+	_play_state_anim(new_state)
+	match new_state:
+		State.DEAD:
+			# The clip falls backwards: shot from behind, the body spins
+			# round first so it still falls away from the shot.
+			var forward := -global_basis.z
+			forward.y = 0.0
+			if _last_hit_dir.dot(forward.normalized()) > 0.3:
+				var spin := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+				spin.tween_property(self, "rotation:y", rotation.y + PI, 0.3)
+		State.HIT:
+			_hide_laser()
+		State.AIM:
+			_sfx.stream = SOLDIER_WARNING
+			_sfx.pitch_scale = 1.0
+			_sfx.play()
+		State.ARMED:
+			_beep_timer = 0.0
+
+
+## The first clip (a random point in it, so a group doesn't walk in sync).
+func _start_anim() -> void:
+	if dummy:
+		_play_dummy_anim(-1.0)
+	else:
+		anim.play(stats.anims.walk, -1, _walk_anim_speed())
+	anim.seek(randf() * 1.0)
+
+
+## The clip for a new state (tactical_soldier.gd blends its own instead).
+func _play_state_anim(new_state: State) -> void:
 	match new_state:
 		State.CHASE:
 			if dummy:
@@ -792,7 +821,6 @@ func _set_state(new_state: State) -> void:
 			else:
 				anim.play(stats.anims.walk, 0.2, _walk_anim_speed())
 		State.ATTACK:
-			_attack_landed = false
 			# Start the clip so its strike (the "hit_time" found by
 			# tools/mixamo_anims.gd) lands when the damage is dealt.
 			var rate: float = stats.anim_speed.attack
@@ -801,32 +829,19 @@ func _set_state(new_state: State) -> void:
 			anim.seek(maxf(strike - stats.attack_hit_time * rate, 0.0), true)
 		State.HIT:
 			# Stops walking; the flinch (_flinch) is the hit reaction.
-			_hide_laser()
 			_play_idle(0.1)
 		State.DEAD:
 			# A headshot or a big hit drops it a little faster.
 			var quick := 1.25 if _last_headshot or _last_hit_force > 2.5 else 1.0
 			anim.play(stats.anims.death, 0.1, stats.anim_speed.death * quick)
 			anim.seek(0.0, true)
-			# The clip falls backwards: shot from behind, the body spins
-			# round first so it still falls away from the shot.
-			var forward := -global_basis.z
-			forward.y = 0.0
-			if _last_hit_dir.dot(forward.normalized()) > 0.3:
-				var spin := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-				spin.tween_property(self, "rotation:y", rotation.y + PI, 0.3)
 		State.AIM:
 			# Raise the gun and hold it there while the laser shows.
 			_play_from_start(stats.anims.shoot, 0.0)
 			anim.seek(AIM_POSE_TIME, true)
 			anim.pause()
-			_sfx.stream = SOLDIER_WARNING
-			_sfx.pitch_scale = 1.0
-			_sfx.play()
 		State.SHOOT:
 			_play_from_start(stats.anims.shoot, 0.0)
-		State.ARMED:
-			_beep_timer = 0.0
 
 
 func _play_from_start(anim_name: String, blend: float) -> void:

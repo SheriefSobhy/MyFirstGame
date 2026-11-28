@@ -12,6 +12,13 @@ extends SceneTree
 ## reactions, death and rewards; the damage direction indicator and health
 ## regen; best wave / stars / missions saved per mode and map. The zombie
 ## mode keeps its own waves and scenes.
+## Perception: an unaware guard doesn't notice a player behind it (standing
+## or walking), hears them sprint ("?"), turns, sees them ("!"); its radio
+## report reaches a soldier nearby 1-2 s later but not one far away; a far
+## one hears a gunshot; losing the player = search ("?") then patrol again.
+## Animation: the velocity blend (forward / strafe / back, playback speed =
+## ground speed), aiming idle while firing, crouch idle, hit reaction,
+## smooth turning.
 
 const Cfg := preload("res://soldiers/soldiers_config.gd")
 const Maps := preload("res://maps.gd")
@@ -27,6 +34,10 @@ var progress: Node
 var map_id := ""
 var _backup := {}
 var _spawn_distances: Array[float] = []
+var _max_turn := 0.0  # biggest yaw change of a soldier in one physics frame
+var _strafed := 0  # frames a soldier was seen strafing / backing off
+var _yaws := {}
+var _feet := Vector2i.ZERO  # walking / running samples: playback speed matched the ground speed, or not
 
 
 func _initialize() -> void:
@@ -76,6 +87,7 @@ func _run() -> void:
 		await _test_flank()
 		await _test_hits_and_death()
 		await _test_regen()
+		await _test_perception()
 		_test_saved_apart()
 	map_id = ""
 	_test_accuracy()
@@ -229,8 +241,17 @@ func _test_burst() -> void:
 	var seen_indicator := false
 	var burst_ok := false
 	var shooter: Node = null
+	var aim_anim := true
+	var aimed := false
 	for i in 4000:
 		await frames(1)
+		for e: Node in _soldiers():
+			_watch_anim(e, _yaws)
+			var bl: Vector3 = e.anim_blend()
+			var v := Vector2(e.velocity.x, e.velocity.z).length()
+			if e.state == e.State.AIM and e._state_time > 0.3:
+				aimed = true
+				aim_anim = aim_anim and e.anim_action() == "aim"
 		for e: Node in _soldiers():
 			if e.fx_visible():
 				seen_fx = true
@@ -250,6 +271,8 @@ func _test_burst() -> void:
 	check(seen_fx, "tracers and muzzle flash show")
 	check(seen_sound, "gunshot sound plays")
 	check(seen_indicator, "a hit on the player shows the damage direction indicator")
+	check(aimed and aim_anim, "aiming idle while firing")
+	check(_max_turn <= deg_to_rad(Cfg.TURN_RATE) / 60.0 * 1.6, "turns smoothly (at most %.0f deg a frame)" % rad_to_deg(_max_turn))
 	if shooter:
 		await frames(30)
 		check(shooter.tac != Tactical.Tac.OPEN or main.get_cover_points().is_empty(),
@@ -293,11 +316,14 @@ func _test_crouch() -> void:
 		if c != target:
 			c.owner = blocker
 	for e: Node in _soldiers():
+		e.raise_alert()  # they know where the player went
 		if e.cover != target:
 			e._go(Tactical.Tac.FIND)
 	var s: Node = null
 	for i in 1500:
 		await frames(1)
+		for e: Node in _soldiers():
+			_watch_anim(e, _yaws)
 		for e: Node in _soldiers():
 			if e.wants_crouch() and e.crouch_amount() >= 1.0 and e._clear_view_from(e.cover.pos):
 				s = e
@@ -306,6 +332,8 @@ func _test_crouch() -> void:
 	if s == null:
 		check(false, "a soldier crouches behind low cover")
 	else:
+		await seconds(0.3)
+		check(s.anim_action() == "crouch", "the crouch idle clip plays behind low cover")
 		var head_y: float = s.head_sphere().center.y - s.global_position.y
 		var capsule: CapsuleShape3D = s.collision.shape
 		check(capsule.height <= Cfg.CROUCH_HEIGHT + 0.01 and head_y < 1.25,
@@ -339,6 +367,8 @@ func _test_flank() -> void:
 			offsets.append(Vector2(out, side))
 	for i in 1800:
 		await frames(1)
+		for e: Node in _soldiers():
+			_watch_anim(e, _yaws)
 		for e: Node in _soldiers():
 			if e.tac != Tactical.Tac.HIDE:
 				continue
@@ -386,6 +416,8 @@ func _test_accuracy() -> void:
 
 
 func _test_hits_and_death() -> void:
+	print("  %d frames of soldiers strafing / backing off in the fight" % _strafed)
+	_strafed = 0
 	var list := _soldiers().filter(func(e: Node) -> bool: return e.crouch_amount() == 0.0 and e.state != e.State.AIM)
 	if list.is_empty():
 		list = _soldiers()
@@ -401,6 +433,8 @@ func _test_hits_and_death() -> void:
 	check(not s.is_head_hit(from, (chest - from).normalized()), "a chest shot is not a headshot")
 	s.take_damage(1, chest, Vector3.RIGHT, false)
 	check(s.state == s.State.HIT, "a hit staggers the soldier (hit reaction)")
+	await frames(2)
+	check(s.get_node("Model/AnimationTree").get("parameters/hit/active"), "the hit reaction clip plays")
 	var kills: int = main.kills
 	var cash: int = main.economy.cash
 	var xp: int = progress.xp
@@ -425,6 +459,261 @@ func _test_regen() -> void:
 	check(player.health == hurt, "no regen before %.0f s" % Cfg.REGEN_DELAY)
 	await seconds(2.0)
 	check(player.health > hurt, "health comes back after %.0f s without damage (%d -> %d)" % [Cfg.REGEN_DELAY, hurt, player.health])
+
+
+# Largest turn per physics frame (alive, not dying), per soldier id.
+func _watch_anim(e: Node, yaws: Dictionary) -> void:
+	var id := e.get_instance_id()
+	var frame := Engine.get_physics_frames()
+	if yaws.has(id) and frame - (yaws[id] as Vector2).y == 1 and e.state != e.State.DEAD:
+		_max_turn = maxf(_max_turn, absf(wrapf(e.rotation.y - (yaws[id] as Vector2).x, -PI, PI)))
+	yaws[id] = Vector2(e.rotation.y, frame)
+	var bl: Vector3 = e.anim_blend()
+	if e.state == e.State.CHASE and Vector2(e.velocity.x, e.velocity.z).length() > 0.6 and (absf(bl.x) > 0.5 or bl.y < -0.5):
+		_strafed += 1
+
+
+# Walking or running straight ahead: is the clip played at the speed that
+# matches the ground speed (within the playback limits)?
+func _check_feet(e: Node) -> void:
+	var bl: Vector3 = e.anim_blend()
+	var v := Vector2(e.velocity.x, e.velocity.z).length()
+	if e.state != e.State.CHASE or v < 0.5 or absf(bl.x) > 0.1:
+		return
+	var clip := "walk" if absf(bl.y - 1.0) < 0.05 else ("run" if absf(bl.y - 2.0) < 0.05 else "")
+	if clip == "":
+		return
+	var want := clampf(v / (e._clip_speeds[clip] * e.stats.model_scale), Cfg.ANIM_SCALE.x, Cfg.ANIM_SCALE.y)
+	if absf(bl.z - want) < 0.1 * want:
+		_feet.x += 1
+	else:
+		_feet.y += 1
+
+
+# A navmesh point about `dist` m from `from` (at least 7 m from `avoid`), in
+# the open (a clear line at eye height) if need_view, or INF.
+func _open_spot(from: Vector3, dist: float, avoid := Vector3.INF, need_view := true) -> Vector3:
+	var space: PhysicsDirectSpaceState3D = main.get_world_3d().direct_space_state
+	for i in 24:
+		var a := i * TAU / 24.0
+		var p: Vector3 = main._on_navmesh(from + Vector3(cos(a), 0.0, sin(a)) * dist, 1)
+		if main.off_navmesh(p, 1) > 0.3 or absf(_flat(p, from) - dist) > 1.5:
+			continue
+		if avoid != Vector3.INF and _flat(p, avoid) < 7.0:
+			continue
+		var q := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 1.5, p + Vector3.UP * 1.5, 3, [player.get_rid()])
+		if not need_view or space.intersect_ray(q).is_empty():
+			return p
+	return Vector3.INF
+
+
+func _flat(a: Vector3, b: Vector3) -> float:
+	return Vector2(a.x - b.x, a.z - b.z).length()
+
+
+# A guard that stays at `pos` looking away from `away_from` (no patrol).
+func _spawn_guard(pos: Vector3, away_from: Vector3, still := true) -> Node:
+	var s: Node = main.SOLDIER_SCENE.instantiate()
+	s.kind = "soldier"
+	s.alert = false
+	s.guard_post = pos
+	var d := pos - away_from
+	s.guard_yaw = rad_to_deg(atan2(-d.x, -d.z))
+	s.rotation.y = deg_to_rad(s.guard_yaw)
+	s.position = pos + Vector3.UP * 0.1
+	main.enemies.add_child(s)
+	if still:
+		s._route.assign([s.guard_post])
+	return s
+
+
+func _put_player(pos: Vector3) -> void:
+	player.global_position = pos + Vector3.UP * 0.1
+	player.velocity = Vector3.ZERO
+
+
+func _test_perception() -> void:
+	main.spawn_timer.stop()
+	for e: Node in main.enemies.get_children():
+		e.queue_free()
+	await frames(2)
+	player.invincible = true
+	var start: Vector3 = main._player_start
+	# Darkness / fog: the map's visibility, lamps light spots up.
+	var base: float = Cfg.VISIBILITY.get(map_id, 1.0)
+	check(is_equal_approx(main.visibility_at(start + Vector3(0, 0, 500)), base),
+			"sight range x%.2f on this map (light, fog)" % base)
+	if base < Cfg.LAMP_VISIBILITY:
+		var lamps: Array = main._lamps
+		check(not lamps.is_empty() and main.visibility_at(Vector3(lamps[0].x, lamps[0].y, lamps[0].z)) == Cfg.LAMP_VISIBILITY,
+				"lamps light spots up in the dark (%d lamps)" % lamps.size())
+	var a_pos := _open_spot(start, 10.0)
+	if a_pos == Vector3.INF:
+		check(false, "an open spot for the perception test")
+		return
+	_put_player(start)
+	var b_pos := Vector3.INF
+	for d: float in [8.0, 6.0, 11.0, 14.0]:
+		if b_pos == Vector3.INF:
+			b_pos = _open_spot(a_pos, d, start, false)
+	var a := _spawn_guard(a_pos, start)
+	var b: Node = _spawn_guard(b_pos, start) if b_pos != Vector3.INF else null
+	# A far soldier (> RADIO_RANGE from A): the spawn point farthest from A.
+	var far_pos := Vector3.INF
+	for p: Node3D in main._spawn_points_for(1):
+		var q: Vector3 = main._on_navmesh(p.global_position, 1)
+		if _flat(q, a_pos) > Cfg.RADIO_RANGE + 3.0 and _flat(q, start) > 20.0 \
+				and (far_pos == Vector3.INF or _flat(q, a_pos) > _flat(far_pos, a_pos)):
+			far_pos = q
+	var c: Node = _spawn_guard(far_pos, start) if far_pos != Vector3.INF else null
+	if b == null or c == null:
+		print("  debug: no spot for the %s" % ("squad mate" if b == null else "far soldier"))
+	await seconds(1.5)
+	check(a.awareness == Tactical.Aware.UNAWARE and a.icon_text() == "",
+			"an unaware guard doesn't notice a player standing behind it (10 m)")
+	Input.action_press("move_left")
+	await seconds(0.5)
+	Input.action_release("move_left")
+	await frames(3)
+	check(a.awareness == Tactical.Aware.UNAWARE, "walking behind it is silent")
+	# Sprinting 5 m behind it: heard.
+	var behind: Vector3 = main._on_navmesh(a_pos + (start - a_pos).normalized() * 5.0, 1)
+	_put_player(behind)
+	player.rotation.y = atan2(-(a_pos - behind).x, -(a_pos - behind).z)
+	await frames(2)
+	Input.action_press("move_left")
+	Input.action_press("sprint")
+	var suspicious := false
+	for i in 40:
+		await frames(1)
+		if a.awareness == Tactical.Aware.SUSPICIOUS and a.icon_text() == "?":
+			suspicious = true
+			break
+	Input.action_release("move_left")
+	Input.action_release("sprint")
+	check(suspicious, "sprinting close behind it is heard: suspicious, '?' above its head")
+	# It turns, sees the player and goes into combat.
+	var combat := false
+	for i in 240:
+		await frames(1)
+		if a.awareness == Tactical.Aware.COMBAT:
+			combat = true
+			break
+	await frames(1)  # the icon updates in _process
+	check(combat and a.icon_text() == "!" and _flat(a.known_position(), player.global_position) < 1.5,
+			"it turns, sees the player: combat, '!' (%s, '%s')" % [Tactical.Aware.keys()[a.awareness], a.icon_text()])
+	# Radio: the soldier 8 m away hears it 1-2 s later, the far one never.
+	if b:
+		check(b.awareness != Tactical.Aware.COMBAT, "the squad mate isn't told at once")
+		var waited := 0.0
+		while waited < 3.0 and b.awareness != Tactical.Aware.COMBAT:
+			await frames(1)
+			waited += 1.0 / 60.0
+		check(b.awareness == Tactical.Aware.COMBAT and waited >= Cfg.RADIO_DELAY.x - 0.25 and waited <= Cfg.RADIO_DELAY.y + 0.3,
+				"a radio report brings the squad mate %.0f m away in %.1f s" % [_flat(a_pos, b_pos), waited])
+		check(a.radio_reports >= 1, "the guard radioed the player's position")
+	if c:
+		check(c.awareness == Tactical.Aware.UNAWARE, "a soldier %.0f m away gets no report (not map-wide)" % _flat(far_pos, a_pos))
+	# Shots: a far soldier hears one within GUNSHOT_HEAR m with a clear line.
+	if c:
+		var shot_pos := _open_spot(far_pos, 20.0)
+		if shot_pos != Vector3.INF:
+			_put_player(shot_pos)
+			await frames(2)
+			player.fired.emit()
+			await frames(2)
+			check(c.awareness == Tactical.Aware.SUSPICIOUS, "a gunshot 20 m away makes a soldier suspicious")
+			c._calm_down()
+	# Lost: the player gone (far away under the map) -> search, then patrol.
+	var seen_at: Vector3 = a.known_position()
+	var gone := a_pos + (a_pos - (far_pos if c else start)).normalized() * 80.0 + Vector3.DOWN * 30.0
+	player.set_physics_process(false)
+	player.global_position = gone
+	var searched := false
+	for i in int((Cfg.LOSE_CONTACT + 3.0) * 60):
+		await frames(1)
+		if a.awareness == Tactical.Aware.SEARCH:
+			searched = true
+			break
+	await frames(1)
+	check(searched and a.icon_text() == "?", "out of sight for %.0f s: it searches ('?')" % Cfg.LOSE_CONTACT)
+	check(_flat(a.known_position(), seen_at) < 3.0 or a.known_position().distance_to(gone) > 30.0,
+			"it searches where it last saw / heard the player")
+	# A guard left to patrol where the player was (they are gone now).
+	var d: Node = _spawn_guard(start, a_pos, false)
+	var calm := false
+	var patrolled := false
+	for i in int((Cfg.SEARCH_TIME + 2.0) * 60):
+		await frames(1)
+		_check_feet(a)
+		_check_feet(d)
+		if _flat(d.global_position, start) > 1.5 and d.awareness == Tactical.Aware.UNAWARE:
+			patrolled = true
+		if a.awareness == Tactical.Aware.UNAWARE:
+			calm = true
+			break
+	await frames(1)
+	check(calm and a.icon_text() == "", "after %.0f s of searching it goes back to patrol" % Cfg.SEARCH_TIME)
+	check(_feet.x > 30 and _feet.y <= _feet.x / 10,
+			"walk / run playback speed follows the ground speed (%d ok, %d off)" % [_feet.x, _feet.y])
+	check(d._route.size() > 1 and patrolled, "unaware guards patrol round their post (%d points)" % d._route.size())
+	player.set_physics_process(true)
+	_put_player(start)
+	player.invincible = false
+	await _test_strafe()
+
+
+# A soldier in combat moving back to its cover with the player in view keeps
+# facing them: sideways = the strafe clips, away = walking backwards.
+func _test_strafe() -> void:
+	var start: Vector3 = main._player_start
+	_put_player(start)
+	player.invincible = true
+	var e_pos := _open_spot(start, 8.0)
+	if e_pos == Vector3.INF:
+		return
+	var to_player := (start - e_pos).normalized()
+	var side := to_player.cross(Vector3.UP).normalized()
+	for way: String in ["side", "back"]:
+		var dir: Vector3 = side if way == "side" else -to_player
+		var goal := Vector3.INF
+		for d: float in [4.0, 3.0, 2.0]:
+			for sgn: float in [1.0, -1.0]:
+				var p: Vector3 = main._on_navmesh(e_pos + dir * d * sgn, 1)
+				if goal == Vector3.INF and main.off_navmesh(p, 1) < 0.2 and _flat(p, e_pos) > d - 0.5 \
+						and (way == "side" or _flat(p, start) > _flat(e_pos, start) + 1.0):
+					goal = p
+		if goal == Vector3.INF:
+			continue
+		var e: Node = main.SOLDIER_SCENE.instantiate()
+		e.kind = "soldier"
+		e.position = e_pos + Vector3.UP * 0.1
+		e.rotation.y = atan2(-to_player.x, -to_player.z)
+		main.enemies.add_child(e)
+		await frames(2)
+		e.cover = {"pos": goal, "peek": goal, "normal": -to_player, "object": "test", "low": false, "eye": Cfg.EYE_HEIGHT, "owner": e}
+		e._peeks_left = 2
+		e._go(Tactical.Tac.RETURN)
+		e._seen_time = 0.0
+		var frames_ok := 0
+		var facing := true
+		for i in 90:
+			await frames(1)
+			if e.tac != Tactical.Tac.RETURN or e.state != e.State.CHASE:
+				break
+			var bl: Vector3 = e.anim_blend()
+			var v := Vector2(e.velocity.x, e.velocity.z).length()
+			if v > 0.6 and ((way == "side" and absf(bl.x) > 0.5) or (way == "back" and bl.y < -0.5)):
+				frames_ok += 1
+			var fwd: Vector3 = -e.global_basis.z
+			var look: Vector3 = (player.global_position - e.global_position) * Vector3(1, 0, 1)
+			if i > 20 and v > 0.6 and fwd.dot(look.normalized()) < cos(deg_to_rad(25.0)):
+				facing = false
+		check(frames_ok > 15 and facing, "moving %s in combat it faces the player (%s clip, %d frames)" %
+				[way, "strafe" if way == "side" else "walk back", frames_ok])
+		e.queue_free()
+		await frames(2)
+	player.invincible = false
 
 
 # Best wave (stars) and the best score go to "combat_<map>", not the map's zombie entry.

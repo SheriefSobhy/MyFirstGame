@@ -13,10 +13,12 @@ extends Node
 ## mode gives: mission (its missions_config.gd entry), player, ui, elapsed,
 ## snap(), spawn_soldier_at(), queue_soldiers(), add_interactable(), finish().
 ##
-## Guards (shared): spawn_guard() places a soldier at a post that hasn't
-## noticed the player (tactical_soldier.gd alert = false); an alerted guard
-## alerts the others within GUARD_ALERT_RADIUS, and the player's shots alert
-## the guards within GUNSHOT_ALERT (listen_for_gunshots()).
+## Guards (shared): spawn_guard() places a soldier that hasn't noticed the
+## player (tactical_soldier.gd alert = false): it patrols round its post
+## until it sees or hears the player (its own perception: sight cone, the
+## player's shots, sprinting, explosions), and one that does radios the
+## soldiers near it a moment later. make_noise() is a noise from the player
+## (planting C4...), alert_all_guards() a mission alarm.
 
 const Cfg := preload("res://missions/missions_config.gd")
 
@@ -56,7 +58,6 @@ func spawn_guard(post: Vector3, yaw: float, configure := Callable()) -> Node:
 		s.rotation.y = deg_to_rad(yaw)
 		if configure.is_valid():
 			configure.call(s))
-	s.alerted.connect(_on_guard_alerted.bind(s))
 	guards.append(s)
 	return s
 
@@ -67,16 +68,13 @@ func spawn_guards(list: Array, configure := Callable()) -> void:
 		spawn_guard(g[0], g[1], configure)
 
 
-func listen_for_gunshots() -> void:
-	mode.player.fired.connect(_on_player_fired)
-
-
-## Wakes the unalerted guards within `radius` m of `pos` (noise).
-func alert_guards_near(pos: Vector3, radius: float) -> void:
-	for g in guards:
-		if is_instance_valid(g) and not g.alert and g.state != g.State.DEAD \
-				and g.global_position.distance_to(pos) <= radius:
-			g.raise_alert()
+## A noise the player makes at `pos`: the soldiers within `radius` m come to
+## look (suspicious; ones already fighting learn where the player is).
+func make_noise(pos: Vector3, radius: float) -> void:
+	for s in mode.enemies.get_children():
+		if s.has_method("hear_noise") and s.state != s.State.DEAD \
+				and s.global_position.distance_to(pos) <= radius:
+			s.hear_noise(pos)
 
 
 func alert_all_guards() -> void:
@@ -85,19 +83,15 @@ func alert_all_guards() -> void:
 			g.raise_alert()
 
 
-func _on_guard_alerted(guard: Node) -> void:
-	if not is_instance_valid(guard):
-		return
-	alert_guards_near(guard.global_position, Cfg.GUARD_ALERT_RADIUS)
-
-
-func _on_player_fired() -> void:
-	alert_guards_near(mode.player.global_position, Cfg.GUNSHOT_ALERT)
-
-
-## Guards that have noticed the player (for tests).
+## Guards that have noticed the player (fighting or searching; for tests).
 func alerted_count() -> int:
 	return guards.filter(func(g: Node) -> bool: return is_instance_valid(g) and g.alert).size()
+
+
+## Guards that are at least suspicious (for tests).
+func noticed_count() -> int:
+	return guards.filter(func(g: Node) -> bool:
+		return is_instance_valid(g) and g.state != g.State.DEAD and g.awareness != g.Aware.UNAWARE).size()
 
 
 ## Guards still alive.

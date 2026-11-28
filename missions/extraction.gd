@@ -44,7 +44,6 @@ func setup() -> void:
 	board_ring.global_position = lz.global_position
 	board_ring.visible = false
 	spawn_guards(mission.guards)
-	listen_for_gunshots()
 
 
 func tick(delta: float) -> void:

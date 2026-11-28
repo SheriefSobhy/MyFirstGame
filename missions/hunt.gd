@@ -5,8 +5,8 @@ extends "res://missions/objective.gd"
 ## uniform, red beret, a vest that halves non-headshot damage, more health)
 ## stands at one of `spots` (random) with his bodyguards around him, all
 ## guards (objective.gd). An intel ring marks his rough area (off-centre).
-## Once he is alerted (sees / hears the player, shots, a bodyguard alerted
-## near him) he runs for his escape car (missions/escape_vehicle.gd), and
+## Once he is alerted (sees / hears the player, is shot, a bodyguard's radio
+## report) he runs for his escape car (missions/escape_vehicle.gd), and
 ## RADIO_DELAY s later radios for help: radio_count soldiers come in and
 ## the car's engine starts. He reaches the car = fail (it drives off);
 ## killed = win.
@@ -64,7 +64,6 @@ func setup() -> void:
 	_radio.max_distance = 60.0
 	commander.add_child(_radio)
 	_radio.position.y = 1.6
-	listen_for_gunshots()
 
 
 func tick(_delta: float) -> void:

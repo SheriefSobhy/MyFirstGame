@@ -4,7 +4,8 @@ extends "res://missions/objective.gd"
 ## (missions/sabotage_target.gd: generator, fuel tank, truck) with guards
 ## around them. Hold USE PLANT_TIME s next to a target to plant a charge;
 ## the player stands still and exposed meanwhile, and after
-## PLANT_NOISE_AFTER s the guards within PLANT_NOISE m hear it.
+## PLANT_NOISE_AFTER s the soldiers within PLANT_NOISE m hear it and come to
+## look.
 ## Reinforcements come after the n-th charge. After the last one the
 ## countdown starts and the exit zone shows: when it ends every target blows
 ## up (BLAST_STAGGER s apart); the player inside the exit zone at that
@@ -42,7 +43,6 @@ func setup() -> void:
 	exit_zone.global_position = mode.snap(mission.exit.pos)
 	exit_zone.visible = false
 	spawn_guards(mission.guards)
-	listen_for_gunshots()
 
 
 func tick(delta: float) -> void:
@@ -79,7 +79,7 @@ func _planting_noise() -> void:
 		return
 	var it: Dictionary = mode.interactable_in_reach()
 	if not it.is_empty() and it.node is Target:
-		alert_guards_near(mode.player.global_position, M.PLANT_NOISE)
+		make_noise(mode.player.global_position, M.PLANT_NOISE)
 
 
 func _plant(target: Target) -> void:
