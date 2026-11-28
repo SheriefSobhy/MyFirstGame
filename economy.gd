@@ -55,15 +55,18 @@ const ARMOR_ABSORB := 0.7
 
 # --- Shop: weapons ----------------------------------------------------------------
 
-## The weapons you start every match with (weapon_stats.gd names). Settings
+## The weapons you start every match with, in every mode (weapon_stats.gd
+## names): the AK as primary plus the pistol as secondary. Settings
 ## "Debug: all weapons" gives every weapon instead.
-const START_WEAPONS := ["Pistol", "Assault Rifle"]
+const START_WEAPONS := ["AK Rifle", "Pistol"]
+## The start weapon in hand when a match begins.
+const START_PRIMARY := "AK Rifle"
 ## Price of the other weapons (weapon_stats.gd names).
 const WEAPON_PRICES := {
 	"Shotgun": 1000,
 	"Revolver": 1000,
 	"SMG": 1250,
-	"AK Rifle": 1750,
+	"Assault Rifle": 1500,
 	"Sniper": 2000,
 	"LMG": 3000,
 }

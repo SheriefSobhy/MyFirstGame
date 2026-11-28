@@ -165,8 +165,10 @@ Best scores stay in `user://save.cfg` (Settings).
 - **XP / level 1-50**: kills (per enemy type, + headshot), wave clears, match
   end. XP counts immediately, so level-ups pop up mid-match (`hud.show_level_up`).
   Each level-up also pays `LEVEL_UP_COINS`.
-- **Unlocks**: shop weapons by level (SMG 2, Shotgun 3, Revolver 5, AK 7,
-  Sniper 10, LMG 15); maps (Town 4, Warehouse 8). Locked items show the level.
+- **Start loadout** (every mode): AK Rifle in hand + Pistol (`economy.gd`
+  START_WEAPONS / START_PRIMARY); the Assault Rifle is sold in the shop.
+- **Unlocks**: shop weapons by level (SMG 2, Shotgun 3, Revolver 5,
+  Sniper 10, LMG 15; AK, Pistol, Assault Rifle from level 1); maps (Town 4, Warehouse 8). Locked items show the level.
   `Settings.debug_unlock_all` ("Debug: all weapons") gives every weapon and
   unlocks every weapon and map.
 - **Coins**: match end (`match_coins(waves, kills)`), missions, login streak,
@@ -241,6 +243,28 @@ Tests: `test_progression`, `test_economy`, `test_game_loop`, `test_maps`,
 - `test_navigation` counts an enemy as stuck as soon as its own 2 s stuck
   check fires; enemies that can't reach the player (too tight for their size)
   must *wait* at the end of their path, or behind one already waiting there.
+
+## Industrial Yard (`main.tscn`, built by `tools/build_level.gd`)
+
+About 2.3x the old 24x24 m yard. `_build_expansion` makes everything but the
+hand-placed centre: the centre yard (gate north, alley gap west, depot door
+east), the storage depot (east, 7 m walls, racks, roof outside the navmesh
+region, bake-only lamps), the back lot (north: trucks, containers, a 44 m
+lane) with the blockhouse (roof at 2.8 m, stairs = wedge collider), the side
+alley (west). Box occluders (`Occluders`, occlusion culling is on in
+project.godot), zones (`Zones`: rect + neighbours; `main.gd _near_player`
+spawns zombies near the player's zone; soldiers still spawn >= 16 m away).
+
+- Yard navmeshes: one cell of climb and no ledge filter (`bake_navmesh.gd`
+  MAX_CLIMB) so the stairs connect; props under 0.3 m get a navmesh-only box
+  (layer 20, `_nav_blocks`). Enemies treat walkable slopes as floor
+  (`enemy.gd` WALKABLE_NORMAL_Y). Other maps keep climb 0.
+- Missions may use the roof: positions with y > 0.5 keep their height (`snap`).
+- Lightmap `texel_scale 0.7` (main.exr ~3.9 MB). build_level keeps
+  `main.lmbake` on the LightmapGI so `rebake.bat yard` bakes in place.
+- Phone FPS: `adb shell run-as <package> touch files/map_bench`, start the app:
+  `map_bench.gd` holds the player in each zone at Low/Medium/High, writes
+  `files/map_bench.txt` and zone screenshots to `files/bench/`, then quits.
 
 ## Level kit (Blender)
 

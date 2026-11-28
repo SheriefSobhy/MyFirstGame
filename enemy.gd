@@ -60,6 +60,7 @@ const GHOST_TIME := 1.5           # seconds it walks through other enemies to br
 const WAIT_NEAR_END := 3.0        # m: this close to the end of a path that can't reach the
                                   # player, and blocked by another enemy = wait there
 const OFF_MESH_RELOCATE := 0.6    # m off its navmesh while stuck = relocate it right away
+const WALKABLE_NORMAL_Y := 0.7    # a surface tilted less than ~45 degrees (stairs) is floor, not a wall
 
 # Soldier.
 const SOLDIER_MIN_RANGE := 7.0    # backs away if the player is closer
@@ -443,6 +444,8 @@ func _static_normal(motion: Vector3) -> Vector3:
 	var hit := KinematicCollision3D.new()
 	if test_move(global_transform.translated(Vector3.UP * 0.05), motion, hit) and hit.get_collider() is StaticBody3D:
 		var n := hit.get_normal()
+		if n.y > WALKABLE_NORMAL_Y:
+			return Vector3.ZERO  # stairs / a ramp it walks up, not a wall
 		n.y = 0.0
 		return n.normalized() if n.length_squared() > 0.01 else Vector3.ZERO
 	return Vector3.ZERO

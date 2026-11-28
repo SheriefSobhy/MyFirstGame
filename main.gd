@@ -11,6 +11,7 @@ extends Node3D
 ## player gets a short break (and some health back) before the next one.
 
 const WeaponTour := preload("res://weapon_tour.gd")
+const MapBench := preload("res://map_bench.gd")
 const ENEMY_SCENE := preload("res://enemy.tscn")
 const MENU_SCENE := "res://ui/main_menu.tscn"
 const START_ENEMIES := 5
@@ -29,6 +30,10 @@ const PHONE_MAX_ENEMIES := 8
 const SPAWN_SPREAD := 1.0    # random offset around a spawn point
 const SPAWN_OFF_MESH := 0.3  # m: further than this from its navmesh = not a place to spawn
 const SAFE_SPAWN_DISTANCE := 10.0  # no spawning closer than this to the player
+## Maps with zones (a "Zones" node, see _zone_at): zombies spawn in the
+## player's zone or the zones next to it, at most this far from the player
+## (further ones only when nothing nearer is free).
+const NEAR_SPAWN_DISTANCE := 30.0
 const BULLET_HOLE_SCENE := preload("res://effects/bullet_hole.tscn")
 const SPARKS_SCENE := preload("res://effects/impact_sparks.tscn")
 const BLOOD_SCENE := preload("res://effects/blood_hit.tscn")
@@ -109,6 +114,8 @@ func _ready() -> void:
 	_player_start = player.global_position
 	if WeaponTour.requested():  # debug builds: an automatic weapon tour (weapon_tour.gd)
 		add_child(WeaponTour.new())
+	if MapBench.requested():  # debug builds: a phone FPS benchmark (map_bench.gd)
+		add_child(MapBench.new())
 
 	# Looping ambient wind, and the gameplay music.
 	wind.stream.loop = true
@@ -357,12 +364,43 @@ func spawn_enemy() -> void:
 
 
 # A random spawn point that isn't right next to the player, and that enemies
-# on navigation `layer` can walk out of.
+# on navigation `layer` can walk out of. On maps with zones, one near the
+# player's zone (see _near_player).
 func _pick_spawn_point(layer := EnemyTypes.NAV_SMALL) -> Node3D:
 	var usable := _spawn_points_for(layer)
 	var far := usable.filter(func(p: Node3D) -> bool:
 		return p.global_position.distance_to(player.global_position) > SAFE_SPAWN_DISTANCE)
+	var near := _near_player(far)
+	if not near.is_empty():
+		return near.pick_random()
 	return (far if not far.is_empty() else usable).pick_random()
+
+
+## The zone (a child of the map's "Zones" node, meta "rect": Rect2 over x/z)
+## that `pos` is in, or "" (no zones on this map, or outside them all).
+func _zone_at(pos: Vector3) -> String:
+	var zones := get_node_or_null("Zones")
+	if zones == null:
+		return ""
+	for z: Node in zones.get_children():
+		if (z.get_meta("rect") as Rect2).has_point(Vector2(pos.x, pos.z)):
+			return String(z.name)
+	return ""
+
+
+## The spawn points among `points` in the player's zone or a zone next to it
+## (the zone's meta "near") and within NEAR_SPAWN_DISTANCE of the player.
+## Empty on maps without zones.
+func _near_player(points: Array) -> Array:
+	var zone := _zone_at(player.global_position)
+	if zone == "":
+		return []
+	var ok: Array = [zone]
+	ok.append_array(get_node("Zones/" + zone).get_meta("near", PackedStringArray()))
+	var from := player.global_position
+	return points.filter(func(p: Node3D) -> bool:
+		return p.global_position.distance_to(from) <= NEAR_SPAWN_DISTANCE \
+				and _zone_at(p.global_position) in ok)
 
 
 # Spawn points connected to the player's start on that layer's navmesh (some
@@ -466,7 +504,10 @@ func _on_enemy_stuck(enemy: Node3D) -> void:
 	var layer := EnemyTypes.nav_layer(enemy.kind)
 	var hidden: Array[Node3D] = []
 	var furthest: Node3D = null
-	for p: Node3D in _spawn_points_for(layer):
+	var points: Array = _near_player(_spawn_points_for(layer))
+	if points.size() < 2:
+		points = _spawn_points_for(layer)
+	for p: Node3D in points:
 		var d := p.global_position.distance_to(player.global_position)
 		if d < SAFE_SPAWN_DISTANCE:
 			continue

@@ -15,6 +15,14 @@ const MAPS := ["res://main.tscn", "res://maps/town.tscn", "res://maps/warehouse.
 ## rounds radius and height up to whole cells).
 const CELL_SIZE := 0.125
 const CELL_HEIGHT := 0.1      # 0.25 lost the 0.3-0.46 m crates, jerrycans and tyres
+## Maps with stairs (the Yard's rooftop): one cell of climb, so the cells of
+## a slope (a few cm higher than the last) connect. Still less than a pallet
+## (0.14 m = 2 cells over the floor), which stays an obstacle. Other maps: 0.
+const MAX_CLIMB := {"res://main.tscn": 0.15}
+## The ledge filter marks every cell of a slope as a ledge (its neighbours
+## are one cell up and one down, more than the climb apart), so maps with
+## stairs go without it. Edges are still eroded by the agent radius, and the
+## tops of crates and containers stay islands (_keep_connected drops them).
 
 var done := false
 
@@ -47,13 +55,14 @@ func _bake_map(scene_path: String) -> void:
 	for m: Dictionary in Types.NAV_MESHES:
 		# The first is re-baked into the scene's own resource (keeps its uid).
 		var nm := base if m.suffix == "" else NavigationMesh.new()
-		_bake(region, nm, m.radius, m.height, start, base_path.get_basename() + m.suffix + ".res")
+		_bake(region, nm, m.radius, m.height, MAX_CLIMB.get(scene_path, 0.0), start, base_path.get_basename() + m.suffix + ".res")
 	region.free()
 
 
-func _bake(region: NavigationRegion3D, nm: NavigationMesh, radius: float, height: float,
+func _bake(region: NavigationRegion3D, nm: NavigationMesh, radius: float, height: float, climb: float,
 		start: Vector3, path: String) -> void:
-	_configure(nm, radius, height)
+	_configure(nm, radius, height, climb)
+	nm.filter_ledge_spans = climb <= 0.0
 	region.navigation_mesh = nm
 	region.bake_navigation_mesh(false)
 	var before := nm.get_polygon_count()
@@ -63,15 +72,15 @@ func _bake(region: NavigationRegion3D, nm: NavigationMesh, radius: float, height
 			nm.get_polygon_count(), before - nm.get_polygon_count(), path, error_string(err)])
 
 
-func _configure(nm: NavigationMesh, radius: float, height: float) -> void:
+func _configure(nm: NavigationMesh, radius: float, height: float, climb := 0.0) -> void:
 	nm.clear()
 	nm.cell_size = CELL_SIZE
 	nm.cell_height = CELL_HEIGHT
 	nm.agent_radius = radius
 	nm.agent_height = height
-	# No steps: the floors are flat, and even a pallet (0.14 m, 1 cell over the
-	# floor) stops the smaller enemies, so it must be an obstacle too.
-	nm.agent_max_climb = 0.0
+	# No steps (MAX_CLIMB: one cell on maps with stairs): even a pallet (0.14 m)
+	# stops the smaller enemies, so it must be an obstacle too.
+	nm.agent_max_climb = climb
 	nm.agent_max_slope = 30.0
 	# Every static collider under the region, on any layer.
 	nm.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS

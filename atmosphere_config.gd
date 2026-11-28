@@ -38,7 +38,10 @@ const MAPS := {
 		"fog": {"color": Color(0.9, 0.78, 0.62), "density": 0.0085, "sky_affect": 0.12, "sun_scatter": 0.45},
 		"dust": {"color": Color(1.0, 0.86, 0.62, 0.5), "amount": 110, "size": 0.035, "box": Vector3(18, 7, 18), "lifetime": 10.0},
 		"shafts": [],
-		"probes": [{"pos": Vector3(0, 2.5, 0), "size": Vector3(26, 8, 26), "interior": false}],
+		"probes": [{"pos": Vector3(0, 2.5, 0), "size": Vector3(26, 8, 26), "interior": false},
+			# The expansion: the storage depot (inside), the back lot.
+			{"pos": Vector3(20.25, 3.5, -3.25), "size": Vector3(15, 7, 19.5), "interior": true},
+			{"pos": Vector3(6.0, 2.5, -18.75), "size": Vector3(45, 8, 12), "interior": false}],
 		"lights": [
 			{"name": "WorkLamp", "pos": Vector3(4.0, 2.7, 11.2), "color": Color(1.0, 0.74, 0.44), "energy": 1.8, "range": 7.0, "strong": true},
 		],

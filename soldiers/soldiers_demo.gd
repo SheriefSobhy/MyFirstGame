@@ -14,7 +14,7 @@ extends Node
 const FLAG := "user://soldiers_demo"
 const REPORT := "user://soldiers_demo.txt"
 const DURATION := 75.0
-const RIFLE := 1   # weapon_stats.gd LIST: the Assault Rifle
+const RIFLE := 5   # weapon_stats.gd LIST: the AK Rifle (a start weapon)
 const WAYPOINTS := [Vector3(0, 0, 8), Vector3(6, 0, 7), Vector3(9, 0, 1), Vector3(1, 0, -0.5),
 		Vector3(-2.5, 0, 6.5), Vector3(-9.5, 0, 8.5), Vector3(-9, 0, -1), Vector3(-1, 0, 9)]
 

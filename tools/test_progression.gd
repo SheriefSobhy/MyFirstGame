@@ -92,7 +92,7 @@ func _test_config() -> void:
 		rising = rising and Config.level_for_xp(Config.xp_for_level(lv + 1) - 1) == lv
 	check(rising, "every level needs more XP than the last, levels 1-50 line up")
 	check(Config.level_for_xp(100000000) == 50, "level is capped at 50")
-	var expected := {"SMG": 2, "Shotgun": 3, "Revolver": 5, "AK Rifle": 7, "Sniper": 10, "LMG": 15}
+	var expected := {"SMG": 2, "Shotgun": 3, "Revolver": 5, "Sniper": 10, "LMG": 15}
 	check(Config.WEAPON_UNLOCK_LEVEL == expected, "weapon unlock levels %s" % [Config.WEAPON_UNLOCK_LEVEL])
 	var names := Weapons.LIST.map(func(w: Dictionary) -> String: return w.name)
 	var known := true
@@ -138,11 +138,11 @@ func _test_levels() -> void:
 func _test_unlocks() -> void:
 	print("--- Unlocks")
 	progress.reset_all()
-	check(progress.is_weapon_unlocked("Pistol") and progress.is_weapon_unlocked("Assault Rifle")
+	check(progress.is_weapon_unlocked("Pistol") and progress.is_weapon_unlocked("AK Rifle") and progress.is_weapon_unlocked("Assault Rifle")
 			and not progress.is_weapon_unlocked("SMG"), "level 1: only the start weapons")
 	check(progress.is_map_unlocked("yard") and not progress.is_map_unlocked("town"), "level 1: only the yard")
 	progress.xp = Config.xp_for_level(5)
-	check(progress.is_weapon_unlocked("Revolver") and not progress.is_weapon_unlocked("AK Rifle")
+	check(progress.is_weapon_unlocked("Revolver") and not progress.is_weapon_unlocked("Sniper")
 			and progress.is_map_unlocked("town") and not progress.is_map_unlocked("warehouse"), "level 5: revolver and the town")
 	settings.debug_unlock_all = true
 	check(progress.is_weapon_unlocked("LMG") and progress.is_map_unlocked("warehouse"), "Debug: all weapons unlocks everything")
@@ -462,7 +462,7 @@ func _test_permanent_upgrades_in_game() -> void:
 	var mean := total / 400.0
 	check(rolls.keys().all(func(d: int) -> bool: return d == 2 or d == 3) and absf(mean - 2.8) < 0.15,
 			"fractional damage: 2 or 3, average %.2f" % mean)
-	check(player.mag_size(0) == ceili(w.mag_size * (1.0 + 2 * Config.PERM_MAG)) and player.ammo() == player.mag_size(0),
+	check(player.mag_size(0) == ceili(w.mag_size * (1.0 + 2 * Config.PERM_MAG)) and player._mag[0] == player.mag_size(0),
 			"magazine %d and the match starts with it full" % player.mag_size(0))
 	check(is_equal_approx(player.reload_time(0), w.reload_time * (1.0 - Config.PERM_RELOAD)), "reload %.2f s" % player.reload_time(0))
 	# The shop's upgrades stack on top.

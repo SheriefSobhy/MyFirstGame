@@ -239,7 +239,7 @@ func _ready() -> void:
 			_arms_sets[set_name] = a
 	for i in Weapons.LIST.size():
 		var w: Dictionary = Weapons.LIST[i]
-		# Pistol and Assault Rifle; the rest are bought in the shop (economy.gd).
+		# AK Rifle and Pistol; the rest are bought in the shop (economy.gd).
 		_owned.append(w.name in Economy.START_WEAPONS or Settings.debug_unlock_all)
 		_upgrades.append({"damage": 0, "mag": 0, "reload": 0})
 		_mag.append(mag_size(i))
@@ -248,7 +248,7 @@ func _ready() -> void:
 	_casings = Casings.new()
 	_casings.name = "Casings"
 	add_child(_casings)
-	_show_weapon(0)
+	_show_weapon(start_weapon_index())
 	_build_throw_preview()
 	# On touch devices the mouse is never captured; touch controls are used instead.
 	if not DisplayServer.is_touchscreen_available():
@@ -870,6 +870,14 @@ func give_weapon(index: int) -> bool:
 	message.emit("Picked up %s" % w.name)
 	switch_to(index)
 	return true
+
+
+## The weapon in hand when a match starts (economy.gd START_PRIMARY).
+static func start_weapon_index() -> int:
+	for i in Weapons.LIST.size():
+		if Weapons.LIST[i].name == Economy.START_PRIMARY:
+			return i
+	return 0
 
 
 ## Training Arena: every weapon, magazines full.

@@ -204,8 +204,10 @@ func _on_missions() -> void:
 ## `pos` on the soldiers' navmesh (unchanged until the navmesh is ready, or
 ## when nothing is near), on the ground.
 func snap(pos: Vector3) -> Vector3:
-	var p := _on_navmesh(Vector3(pos.x, 0.0, pos.z), EnemyTypes.NAV_SMALL)
-	return Vector3(p.x, 0.0, p.z)
+	# The height is kept: 0 on the ground, or a roof's (the Yard's blockhouse).
+	var y := pos.y if pos.y > 0.5 else 0.0
+	var p := _on_navmesh(Vector3(pos.x, y, pos.z), EnemyTypes.NAV_SMALL)
+	return Vector3(p.x, y, p.z)
 
 
 ## A Combat soldier at `pos`; `configure` is called before it enters the scene.

@@ -13,6 +13,7 @@ const ArmoryMenu := preload("res://ui/armory_menu.gd")
 const LoadingScreen := preload("res://ui/loading_screen.gd")
 const WeaponTour := preload("res://weapon_tour.gd")
 const SoldiersDemo := preload("res://soldiers/soldiers_demo.gd")
+const MapBench := preload("res://map_bench.gd")
 const Maps := preload("res://maps.gd")
 const AchievementsMenu := preload("res://ui/achievements_menu.gd")
 const COLOR_GOLD := Color(1.0, 0.8, 0.35)
@@ -52,6 +53,10 @@ func _ready() -> void:
 	# A web page can't close itself, so there's no Quit button in the browser.
 	quit_button.visible = not OS.has_feature("web")
 	if WeaponTour.requested():  # debug builds: weapon_tour.gd
+		LoadingScreen.go.call_deferred(get_tree(), Maps.LIST[0])
+		return
+	if MapBench.requested():  # debug builds: map_bench.gd (the Yard, Zombies mode)
+		Settings.tutorial_done = true  # not saved
 		LoadingScreen.go.call_deferred(get_tree(), Maps.LIST[0])
 		return
 	if SoldiersDemo.requested():  # debug builds: soldiers/soldiers_demo.gd

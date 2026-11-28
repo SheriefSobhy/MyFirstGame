@@ -9,6 +9,8 @@ extends SceneTree
 
 const Economy := preload("res://economy.gd")
 const Weapons := preload("res://weapon_stats.gd")
+## Index of the AK Rifle (the start primary) in weapon_stats.gd LIST.
+const AK := 5
 
 var main: Node
 var player: Node
@@ -105,7 +107,8 @@ func _test_config() -> void:
 func _test_start() -> void:
 	check(eco.cash == Economy.START_CASH and hud.cash_label.text == "$%d" % Economy.START_CASH,
 			"starts with $%d on the HUD (%s)" % [Economy.START_CASH, hud.cash_label.text])
-	check(player.has_weapon(0) and player.has_weapon(1) and not player.has_weapon(2), "starts with pistol + rifle")
+	check(player.has_weapon(0) and player.has_weapon(AK) and not player.has_weapon(1) and not player.has_weapon(2),
+			"starts with pistol + AK")
 	check(not hud.shop_button.visible, "no SHOP button during a wave")
 	check(not hud.armor_bar.visible, "no armor bar without armor")
 	await _screenshot("hud")
@@ -196,11 +199,11 @@ func _test_supplies() -> void:
 	eco.cash = 10000
 	shop.refresh()
 	# Ammo: spend some first.
-	player._mag[1] = 3
-	player._reserve[1] = 10
+	player._mag[AK] = 3
+	player._reserve[AK] = 10
 	shop._supply_buttons.ammo.pressed.emit()
-	check(player._mag[1] == player.mag_size(1) and player._reserve[1] == Weapons.LIST[1].max_reserve,
-			"Ammo Refill fills the rifle (%d / %d)" % [player._mag[1], player._reserve[1]])
+	check(player._mag[AK] == player.mag_size(AK) and player._reserve[AK] == Weapons.LIST[AK].max_reserve,
+			"Ammo Refill fills the AK (%d / %d)" % [player._mag[AK], player._reserve[AK]])
 	check(eco.cash == 10000 - Economy.AMMO_PRICE, "ammo costs $%d" % Economy.AMMO_PRICE)
 	var cash: int = eco.cash
 	shop._supply_buttons.ammo.pressed.emit()
@@ -225,7 +228,7 @@ func _test_weapons_and_upgrades() -> void:
 	shop.show_tab(1)
 	await frames(1)
 	await _screenshot("shop_weapons")
-	check(shop._weapon_buttons[1].disabled and shop._weapon_buttons[1].text.contains("Owned"), "owned weapons show Owned")
+	check(shop._weapon_buttons[AK].disabled and shop._weapon_buttons[AK].text.contains("Owned"), "owned weapons show Owned")
 	shop._weapon_buttons[2].pressed.emit()
 	check(player.has_weapon(2) and eco.cash == 20000 - Economy.WEAPON_PRICES.Shotgun, "buys the shotgun for $%d" % Economy.WEAPON_PRICES.Shotgun)
 	check(shop._weapon_buttons[2].disabled, "bought weapon shows Owned")
@@ -282,8 +285,8 @@ func _test_ready_and_close() -> void:
 func _test_powerups() -> void:
 	_put_player(Vector3(0, 0, 10))
 	# Max Ammo.
-	player._mag[1] = 0
-	player._reserve[1] = 0
+	player._mag[AK] = 0
+	player._reserve[AK] = 0
 	player.grenades = 0
 	var collected := []
 	eco.powerup_collected.connect(func(k: String) -> void: collected.append(k))
@@ -294,7 +297,7 @@ func _test_powerups() -> void:
 	_put_player(p.global_position)
 	await frames(3)
 	check(not is_instance_valid(p) or p.is_queued_for_deletion(), "walking into it picks it up")
-	check(player._reserve[1] == Weapons.LIST[1].max_reserve and player.grenades == player.MAX_GRENADES, "Max Ammo refills ammo and grenades")
+	check(player._reserve[AK] == Weapons.LIST[AK].max_reserve and player.grenades == player.MAX_GRENADES, "Max Ammo refills ammo and grenades")
 	check(hud.message_label.text == "MAX AMMO!", "announces it (%s)" % hud.message_label.text)
 	check(eco._jingle.stream != null and collected.has("max_ammo"), "plays the power-up sound (and tells the HUD)")
 	# Double Points: on the HUD with a timer.

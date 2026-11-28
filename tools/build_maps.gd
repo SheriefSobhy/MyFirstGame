@@ -1176,10 +1176,11 @@ func _save_map(map_root: Node3D, id: String) -> void:
 	root.add_child(region)
 	var yard: NavigationMesh = load("res://level_navmesh.res")
 	var nm := NavigationMesh.new()
-	for p in ["cell_size", "cell_height", "agent_radius", "agent_height", "agent_max_climb", "agent_max_slope",
+	for p in ["cell_size", "cell_height", "agent_radius", "agent_height", "agent_max_slope",
 			"geometry_parsed_geometry_type", "geometry_collision_mask", "region_min_size", "edge_max_error",
 			"filter_walkable_low_height_spans", "filter_ledge_spans", "filter_low_hanging_obstacles"]:
 		nm.set(p, yard.get(p))
+	nm.agent_max_climb = 0.0  # flat maps (the yard has a climb for its stairs)
 	region.navigation_mesh = nm
 	region.bake_navigation_mesh(false)
 	ResourceSaver.save(nm, nav_path)

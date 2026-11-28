@@ -15,6 +15,10 @@ const VIEWS := {
 		["start", Vector3(4.0, 1.7, 8.0), Vector3(-4.0, 1.8, -6.0)],
 		["shed", Vector3(4.5, 1.7, 3.0), Vector3(-7.0, 2.5, -9.0)],
 		["walls", Vector3(-3.0, 1.7, 6.0), Vector3(12.5, 2.0, -10.0)],
+		["storage", Vector3(14.5, 1.7, 1.5), Vector3(25.0, 2.0, -6.0)],
+		["backlot", Vector3(26.0, 1.7, -14.5), Vector3(-10.0, 2.0, -19.0)],
+		["alley", Vector3(-14.5, 1.7, 2.5), Vector3(-14.5, 1.8, -14.0)],
+		["roof", Vector3(-9.5, 4.5, -21.0), Vector3(6.0, 1.0, -8.0)],
 	],
 	"town": [
 		["start", Vector3(0.0, 1.7, 7.0), Vector3(0.0, 1.8, -6.0)],

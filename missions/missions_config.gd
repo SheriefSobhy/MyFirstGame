@@ -9,7 +9,8 @@ extends RefCounted
 ## "Coming soon". Missions unlock in order per map: slot n needs slot n-1
 ## cleared (and the map unlocked by level, as in Waves).
 ##
-## Positions are map coordinates (metres, y ignored: snapped to the navmesh).
+## Positions are map coordinates (metres, snapped to the navmesh; y is 0 on the
+## ground, or a roof height: the Yard blockhouse roof is at 2.8 m).
 ##
 ## Common fields:
 ##  id, map, slot (1..SLOTS), type (a TYPE_NAMES key), name, objective
@@ -108,26 +109,28 @@ const LIST := [
 	# --- Yard ---------------------------------------------------------------------
 	{
 		"id": "yard_defend", "map": "yard", "slot": 1, "type": "defend",
-		"name": "Hold the Yard",
-		"objective": "Hold the supply point for 2 minutes. Don't let the soldiers take it.",
-		"tip": "Stand inside the ring: soldiers can't capture it while you're in it.",
-		"player_start": Vector3(1.0, 0, -1.5), "player_yaw": 0.0,
-		"zone": {"pos": Vector3(1.0, 0, -1.5), "radius": 3.5},
+		"name": "Hold the Depot",
+		"objective": "Hold the supply point inside the storage depot for 2 minutes. Don't let the soldiers take it.",
+		"tip": "They come through the yard door and the loading door. Stay in the ring and watch both.",
+		"player_start": Vector3(16.8, 0, -0.4), "player_yaw": 90.0,
+		"zone": {"pos": Vector3(16.8, 0, -0.4), "radius": 3.0},
 		"duration": 120.0, "capture_time": 12.0, "pusher_share": 0.6,
 		"waves": [{"at": 2.0, "count": 3}, {"at": 30.0, "count": 3}, {"at": 60.0, "count": 4}, {"at": 90.0, "count": 4}],
 		"first": {"coins": 150, "xp": 300}, "repeat": {"coins": 40, "xp": 80},
 	},
 	{
 		"id": "yard_rescue", "map": "yard", "slot": 2, "type": "rescue",
-		"name": "Pen Break",
-		"objective": "A captured officer is held in the fenced pen. Free him and bring him to the extraction point.",
-		"tip": "Hold USE for 3 seconds next to the hostage. Keep him behind you on the way out.",
-		"player_start": Vector3(-1.0, 0, -10.5), "player_yaw": 200.0,
-		"hostage": {"pos": Vector3(10.0, 0, 10.0), "yaw": -135.0},
-		"guards": [[Vector3(5.5, 0, 9.0), 180.0], [Vector3(9.0, 0, 5.5), 0.0], [Vector3(3.0, 0, 5.0), 160.0]],
+		"name": "Rooftop",
+		"objective": "A captured officer is held on the blockhouse roof in the back lot. Free him and bring him to the extraction point in the yard.",
+		"tip": "Come up the side alley. Hold USE for 3 seconds next to the hostage, then lead him down the stairs.",
+		"player_start": Vector3(-14.5, 0, 1.5), "player_yaw": 0.0,
+		# y 2.8: on the blockhouse roof (tools/build_level.gd BH_H).
+		"hostage": {"pos": Vector3(-7.5, 2.8, -22.6), "yaw": 180.0},
+		"guards": [[Vector3(-4.6, 2.8, -21.8), 200.0], [Vector3(-1.5, 0, -16.0), 160.0], [Vector3(9.0, 0, -15.5), 120.0],
+				[Vector3(-14.0, 0, -18.5), 30.0]],
 		"extraction": {"pos": Vector3(-9.5, 0, 9.0), "radius": 2.5},
-		"reinforcements": [{"after": 6.0, "count": 2}],
-		"hostage_target_chance": 0.2, "par_time": 100.0,
+		"reinforcements": [{"after": 6.0, "count": 3}],
+		"hostage_target_chance": 0.2, "par_time": 120.0,
 		"first": {"coins": 200, "xp": 400}, "repeat": {"coins": 50, "xp": 100},
 	},
 	# --- Town ---------------------------------------------------------------------
@@ -190,13 +193,14 @@ const LIST := [
 	{
 		"id": "yard_sabotage", "map": "yard", "slot": 3, "type": "sabotage",
 		"name": "Lights Out",
-		"objective": "Plant C4 on the generator by the depot and on the fuel tank, then get to the exit before they blow.",
+		"objective": "Plant C4 on the generator inside the storage depot and on the fuel tank in the back lot, then get to the side alley before they blow.",
 		"tip": "Planting takes 4 seconds and the guards hear it: clear the area first.",
-		"player_start": Vector3(-9.0, 0, 9.5), "player_yaw": 20.0,
-		"targets": [{"kind": "generator", "pos": Vector3(-1.2, 0, -7.6), "yaw": 0.0},
-				{"kind": "fuel", "pos": Vector3(10.9, 0, -3.8), "yaw": 90.0}],
-		"guards": [[Vector3(-1.0, 0, -4.8), 180.0], [Vector3(8.6, 0, -1.6), 200.0], [Vector3(3.0, 0, -8.6), 160.0]],
-		"exit": {"pos": Vector3(-9.0, 0, 9.5), "radius": 2.5},
+		"player_start": Vector3(-9.0, 0, 9.5), "player_yaw": -45.0,
+		"targets": [{"kind": "generator", "pos": Vector3(24.6, 0, 2.0), "yaw": 90.0},
+				{"kind": "fuel", "pos": Vector3(16.0, 0, -19.0), "yaw": 0.0}],
+		"guards": [[Vector3(22.0, 0, 1.2), 270.0], [Vector3(19.5, 0, -6.8), 180.0], [Vector3(15.5, 0, -16.6), 200.0],
+				[Vector3(6.5, 0, -14.6), 90.0]],
+		"exit": {"pos": Vector3(-14.5, 0, -7.0), "radius": 2.5},
 		"countdown": 25.0,
 		"reinforcements": [{"after_plant": 1, "count": 2}, {"after_plant": 2, "count": 2}],
 		"par_time": 120.0,
@@ -205,25 +209,26 @@ const LIST := [
 	{
 		"id": "yard_extraction", "map": "yard", "slot": 4, "type": "extraction",
 		"name": "Dust Off",
-		"objective": "Fight across the yard to the landing zone and hold it until the helicopter lands. Then get on board.",
+		"objective": "Fight from the far end of the back lot into the yard to the landing zone and hold it until the helicopter lands. Then get on board.",
 		"tip": "Stay inside the landing zone: the clock stops while you are out of it.",
-		"player_start": Vector3(9.5, 0, -10.0), "player_yaw": 200.0,
-		"guards": [[Vector3(4.0, 0, -1.5), 20.0], [Vector3(-1.2, 0, 3.6), 30.0], [Vector3(6.0, 0, 5.0), 10.0],
-				[Vector3(-3.5, 0, -3.0), 45.0]],
+		"player_start": Vector3(22.5, 0, -23.0), "player_yaw": 90.0,
+		"guards": [[Vector3(10.0, 0, -15.0), 90.0], [Vector3(-1.0, 0, -18.0), 60.0], [Vector3(3.5, 0, -10.0), 0.0],
+				[Vector3(-3.5, 0, -3.0), 45.0], [Vector3(6.0, 0, 5.0), 10.0]],
 		"lz": {"pos": Vector3(0.0, 0, 8.0), "radius": 4.5, "yaw": 90.0},
 		"hold": 30.0,
 		"hold_waves": [{"at": 2.0, "count": 2}, {"at": 14.0, "count": 3}],
-		"par_time": 150.0,
+		"par_time": 170.0,
 		"first": {"coins": 240, "xp": 500}, "repeat": {"coins": 60, "xp": 120},
 	},
 	{
 		"id": "yard_hunt", "map": "yard", "slot": 5, "type": "hunt",
 		"name": "Red Beret",
-		"objective": "An enemy Commander is in the yard with his bodyguards. Find him and take him out before he escapes.",
-		"tip": "If he spots you, he calls for help and runs for his car. A headshot goes through his vest.",
+		"objective": "An enemy Commander is somewhere in the yard compound with his bodyguards: on the blockhouse roof, in the depot or in the alley. Find him and take him out before he escapes.",
+		"tip": "If he spots you, he calls for help and runs for his car in the yard. A headshot goes through his vest.",
 		"player_start": Vector3(-6.0, 0, 10.0), "player_yaw": 20.0,
-		"spots": [[Vector3(-4.0, 0, -5.4), 0.0], [Vector3(-10.3, 0, -3.0), 90.0], [Vector3(8.6, 0, -8.6), 45.0]],
-		"bodyguards": [[Vector3(1.6, 0, 1.0), 180.0], [Vector3(-1.6, 0, 1.2), 180.0]],
+		# The first spot is on the blockhouse roof (y 2.8).
+		"spots": [[Vector3(-6.5, 2.8, -22.2), 180.0], [Vector3(21.5, 0, -6.8), 90.0], [Vector3(-14.5, 0, -6.0), 180.0]],
+		"bodyguards": [[Vector3(1.0, 0, 1.4), 180.0], [Vector3(-1.0, 0, -1.4), 180.0]],
 		"vehicle": {"pos": Vector3(2.5, 0, 10.6), "yaw": 90.0, "drive": 8.0},
 		"commander_hp": 10, "radio_count": 2, "intel_radius": 6.0,
 		"par_time": 120.0,

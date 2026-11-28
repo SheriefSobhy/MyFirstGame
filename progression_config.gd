@@ -34,12 +34,12 @@ const LEVEL_UP_COINS := 50
 # --- Unlocks -------------------------------------------------------------------
 
 ## The level a weapon becomes available in the in-match shop (weapon_stats.gd
-## names; missing = level 1). Settings "Debug: all weapons" ignores this.
+## names; missing = level 1: the start weapons AK Rifle + Pistol, and the
+## Assault Rifle). Settings "Debug: all weapons" ignores this.
 const WEAPON_UNLOCK_LEVEL := {
 	"SMG": 2,
 	"Shotgun": 3,
 	"Revolver": 5,
-	"AK Rifle": 7,
 	"Sniper": 10,
 	"LMG": 15,
 }

@@ -73,10 +73,23 @@ func _run() -> void:
 
 
 func _test_start_state() -> void:
-	check(player.weapon_index == 0, "starts with the pistol")
-	check(player.has_weapon(0) and player.has_weapon(1), "starts with the pistol and the assault rifle")
-	for idx in range(2, Weapons.LIST.size()):
-		check(not player.has_weapon(idx), "%s has to be bought in the shop" % Weapons.LIST[idx].name)
+	var ak: int = player.start_weapon_index()
+	check(Weapons.LIST[ak].name == "AK Rifle" and player.weapon_index == ak, "starts with the AK Rifle in hand")
+	check(player.has_weapon(0) and player.has_weapon(ak), "starts with the AK Rifle and the pistol")
+	for idx in Weapons.LIST.size():
+		if idx != 0 and idx != ak:
+			check(not player.has_weapon(idx), "%s has to be bought in the shop" % Weapons.LIST[idx].name)
+	check(hud.weapon_label.text == "AK Rifle" and hud.ammo_label.text == "30 / 90",
+			"HUD shows AK Rifle 30 / 90 (got '%s' '%s')" % [hud.weapon_label.text, hud.ammo_label.text])
+	# The rest of this file tests the guns one by one from a pistol + assault
+	# rifle loadout (the AK is picked up later in _test_new_weapons).
+	player._owned[ak] = false
+	player._owned[1] = true
+	player._mag[1] = player.mag_size(1)
+	player._reserve[1] = Weapons.LIST[1].reserve
+	player.switch_to(0)
+	await frames(40)
+	check(player.weapon_index == 0, "switches to the pistol")
 	check(Weapons.LIST.size() == 8, "8 weapons in total")
 	check(player.grenades == 3, "starts with 3 grenades")
 	check(hud.grenade_label.text == "Grenades: 3", "HUD shows grenade count (got '%s')" % hud.grenade_label.text)

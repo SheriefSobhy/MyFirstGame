@@ -9,6 +9,9 @@ const Maps := preload("res://maps.gd")
 const SIZE := Vector2i(480, 270)
 ## Extra look per map: [yaw offset (deg), pitch (deg)] from the start view.
 const VIEWS := {"yard": [10.0, -4.0], "town": [0.0, 2.0], "warehouse": [0.0, 0.0], "training": [8.0, -2.0]}
+## Maps shot from somewhere else than the start: [player position, look-at point].
+## The Yard: down the back lot past the open depot.
+const SPOTS := {"yard": [Vector3(26.0, 0.0, -14.5), Vector3(-10.0, 1.6, -19.0)]}
 
 
 func _initialize() -> void:
@@ -33,9 +36,15 @@ func _run() -> void:
 		main.get_node("HUD").visible = false
 		var player: Node3D = main.get_node("Player")
 		player.get_node("Head/Camera3D/ViewModel").visible = false
-		var view: Array = VIEWS.get(m.id, [0.0, 0.0])
-		player.rotation.y += deg_to_rad(view[0])
-		player.get_node("Head").rotation.x = deg_to_rad(view[1])
+		if SPOTS.has(m.id):
+			player.global_position = SPOTS[m.id][0]
+			for i in 5:
+				await physics_frame
+			player._turn_towards(SPOTS[m.id][1], 1.0)
+		else:
+			var view: Array = VIEWS.get(m.id, [0.0, 0.0])
+			player.rotation.y += deg_to_rad(view[0])
+			player.get_node("Head").rotation.x = deg_to_rad(view[1])
 		for i in 90:
 			await process_frame
 		var img := root.get_texture().get_image()
