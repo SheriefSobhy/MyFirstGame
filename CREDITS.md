@@ -195,12 +195,13 @@ Kenney's own license files are kept in `assets/sounds/kenney_*_License.txt`.
 
 ## Music
 
-All tracks are by yd on OpenGameArt, released as CC0. They're kept as uploaded (Ogg Vorbis, about 160 kbps) and loop in-game.
+All tracks are from OpenGameArt, released as CC0, and by yd unless noted. They're kept as uploaded and loop in-game.
 
 | File | Used for | Track | Source |
 | --- | --- | --- | --- |
 | `assets/music/menu_menace.ogg` | Main menu | "Menace" by yd | https://opengameart.org/content/menace |
 | `assets/music/game_zombies_march.ogg` | Gameplay, Industrial Yard | "Zombies' March" by yd (`ZombiesAreComing.ogg`) | https://opengameart.org/content/zombies-march |
+| `assets/music/combat_the_rush.mp3` | Combat mode (waves and missions) | "The Rush" by tebruno99 | https://opengameart.org/content/the-rush |
 | `assets/music/town_empty_city.ogg` | Gameplay, Abandoned Town | "EmptyCity" by yd | https://opengameart.org/content/emptycity-background-music |
 | `assets/music/warehouse_insistent.ogg` | Gameplay, Warehouse Night | "Insistent" by yd | https://opengameart.org/content/insistent-background-loop |
 
@@ -215,5 +216,5 @@ These were made for this project, so no license applies:
 - The pallets, electricity poles, wires, chain-link fences and grime quads in `level/generated/`. `tools/build_level.gd` builds them from boxes and cylinders.
 - The baked lighting (`main.lmbake`, `main.exr`), made with Godot's LightmapGI.
 - The map pictures on the map selection screen (`ui/thumbnails/`), rendered from the game by `tools/make_thumbnails.gd`.
-- The hit marker tick, headshot ring, kill sound and heartbeat, and the missions' C4 beep, radio call, helicopter rotor and car engine, are synthesized in code by `effects/synth_sounds.gd` (no audio files).
+- The hit marker tick, headshot ring, kill sound and heartbeat, the Combat soldiers' radio blip, and the missions' C4 beep, radio call, helicopter rotor and car engine, are synthesized in code by `effects/synth_sounds.gd` (no audio files).
 - The modular level kit (`assets/models/kit/kit.glb`: walls, pillars, shed, containers, barriers, crates, dumpsters, roof trusses, pipes, signs) and its textures (`assets/textures/kit/`), made in Blender by `tools/blender/build_kit.py`. The atlas cells are resized copies of the CC0 Poly Haven textures listed above (factory brick, concrete wall 008, rusty corrugated iron, rusty metal 02, rough wood); the sign faces and the baked ambient occlusion are generated.

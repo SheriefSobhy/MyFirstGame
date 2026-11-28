@@ -215,6 +215,9 @@ func _ready() -> void:
 	_radio_sfx.volume_db = -6.0
 	_radio_sfx.position.y = stats.height * 0.85
 	add_child(_radio_sfx)
+	# No creature voice in Combat: enemy.gd's voice player holds a radio blip.
+	growl_player.stream = Synth.radio_alert()
+	growl_player.volume_db = -6.0
 	_icon = make_icon()
 	_icon.position.y = stats.height + Cfg.ICON_HEIGHT
 	add_child(_icon)
@@ -491,6 +494,8 @@ func _contact(pos: Vector3, seen: bool) -> void:
 # Into the cover fight, and radio it (unless it heard it on the radio).
 func _enter_combat(pos: Vector3, radio := true) -> void:
 	var seen := _player != null and pos.distance_to(_player.global_position) < 0.5 and _notice >= 1.0
+	if radio:
+		growl_player.play()  # spotted the player itself: a radio blip
 	awareness = Aware.COMBAT
 	_mode_time = 0.0
 	_notice = 1.0
@@ -543,6 +548,15 @@ func _calm_down() -> void:
 	_goal = Vector3.INF
 	_wait_left = 0.0
 	_release_cover()
+
+
+# enemy.gd's idle growls and death groan: soldiers have neither.
+func _update_growl(_delta: float) -> void:
+	pass
+
+
+func _growl(_pitch: float) -> void:
+	pass
 
 
 func _send_radio() -> void:

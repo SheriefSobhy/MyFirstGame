@@ -81,6 +81,7 @@ func _run() -> void:
 			continue
 		_test_setup()
 		await _test_spawns_and_cover()
+		_test_audio()
 		await _test_burst()
 		if map_id != "warehouse":
 			await _test_crouch()
@@ -180,6 +181,19 @@ func _test_setup() -> void:
 
 func _soldiers() -> Array:
 	return main.enemies.get_children().filter(func(e: Node) -> bool: return e.state != e.State.DEAD)
+
+
+func _test_audio() -> void:
+	var music: AudioStream = root.get_node("Music")._player.stream
+	check(music == Mode.COMBAT_TRACK and music.loop, "Combat plays its own looping music")
+	check(main.distant_fire != null, "distant gunfire ambience")
+	var s: Node = _soldiers()[0]
+	var voice: AudioStreamPlayer3D = s.growl_player
+	voice.stop()
+	s._growl_timer = 0.0
+	s._update_growl(1.0)
+	s._growl(1.0)
+	check(not voice.playing and voice.stream is AudioStreamWAV, "soldiers never growl or groan (the voice is a radio blip)")
 
 
 func _test_spawns_and_cover() -> void:
@@ -317,8 +331,15 @@ func _test_crouch() -> void:
 			c.owner = blocker
 	for e: Node in _soldiers():
 		e.raise_alert()  # they know where the player went
-		if e.cover != target:
-			e._go(Tactical.Tac.FIND)
+		e._go(Tactical.Tac.FIND)
+	# One soldier starts just behind that cover and holds it. From wherever the
+	# burst test left them, the way there can lead past the player, where the
+	# soldier stops to jab and never arrives.
+	var runner: Node = _soldiers()[0]
+	runner.global_position = main._on_navmesh(target.pos + (target.normal as Vector3) * 1.5, 1) + Vector3.UP * 0.1
+	runner.velocity = Vector3.ZERO
+	runner._no_view.clear()
+	target.owner = runner
 	var s: Node = null
 	for i in 1500:
 		await frames(1)
@@ -507,6 +528,17 @@ func _open_spot(from: Vector3, dist: float, avoid := Vector3.INF, need_view := t
 	return Vector3.INF
 
 
+# True if the soldiers' navmesh path from `a` to `b` is about a straight line.
+func _walks_straight(a: Vector3, b: Vector3) -> bool:
+	var path := NavigationServer3D.map_get_path(main.get_world_3d().navigation_map, a, b, true, 1)
+	if path.is_empty() or _flat(path[path.size() - 1], b) > 0.3:
+		return false
+	var length := 0.0
+	for i in range(1, path.size()):
+		length += _flat(path[i - 1], path[i])
+	return length < _flat(a, b) * 1.05
+
+
 func _flat(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x - b.x, a.z - b.z).length()
 
@@ -552,12 +584,18 @@ func _test_perception() -> void:
 		check(false, "an open spot for the perception test")
 		return
 	_put_player(start)
+	# Where the player will sprint, 5 m behind A. The squad mate B must neither
+	# hear that nor see the player there (it faces away), so that only A's radio
+	# can tell it.
+	var behind: Vector3 = main._on_navmesh(a_pos + (start - a_pos).normalized() * 5.0, 1)
 	var b_pos := Vector3.INF
-	for d: float in [8.0, 6.0, 11.0, 14.0]:
+	for d: float in [8.0, 11.0, 14.0, 17.0, 20.0]:
 		if b_pos == Vector3.INF:
-			b_pos = _open_spot(a_pos, d, start, false)
+			var p := _open_spot(a_pos, d, start, false)
+			if p != Vector3.INF and _flat(p, behind) > Cfg.SPRINT_HEAR + 3.5:
+				b_pos = p
 	var a := _spawn_guard(a_pos, start)
-	var b: Node = _spawn_guard(b_pos, start) if b_pos != Vector3.INF else null
+	var b: Node = _spawn_guard(b_pos, behind) if b_pos != Vector3.INF else null
 	# A far soldier (> RADIO_RANGE from A): the spawn point farthest from A.
 	var far_pos := Vector3.INF
 	for p: Node3D in main._spawn_points_for(1):
@@ -577,7 +615,6 @@ func _test_perception() -> void:
 	await frames(3)
 	check(a.awareness == Tactical.Aware.UNAWARE, "walking behind it is silent")
 	# Sprinting 5 m behind it: heard.
-	var behind: Vector3 = main._on_navmesh(a_pos + (start - a_pos).normalized() * 5.0, 1)
 	_put_player(behind)
 	player.rotation.y = atan2(-(a_pos - behind).x, -(a_pos - behind).z)
 	await frames(2)
@@ -669,6 +706,10 @@ func _test_strafe() -> void:
 	var start: Vector3 = main._player_start
 	_put_player(start)
 	player.invincible = true
+	# The perception test's soldiers would block the rays and the way.
+	for e: Node in main.enemies.get_children():
+		e.queue_free()
+	await frames(2)
 	var e_pos := _open_spot(start, 8.0)
 	if e_pos == Vector3.INF:
 		return
@@ -680,10 +721,13 @@ func _test_strafe() -> void:
 		for d: float in [4.0, 3.0, 2.0]:
 			for sgn: float in [1.0, -1.0]:
 				var p: Vector3 = main._on_navmesh(e_pos + dir * d * sgn, 1)
+				# A straight walk there: round an obstacle it would head another way.
 				if goal == Vector3.INF and main.off_navmesh(p, 1) < 0.2 and _flat(p, e_pos) > d - 0.5 \
+						and _walks_straight(e_pos, p) \
 						and (way == "side" or _flat(p, start) > _flat(e_pos, start) + 1.0):
 					goal = p
 		if goal == Vector3.INF:
+			check(false, "a straight %s walk to test" % way)
 			continue
 		var e: Node = main.SOLDIER_SCENE.instantiate()
 		e.kind = "soldier"

@@ -22,6 +22,14 @@ const TacticalSoldier := preload("res://soldiers/tactical_soldier.gd")
 const DamageIndicator := preload("res://soldiers/damage_indicator.gd")
 const SoldiersDemo := preload("res://soldiers/soldiers_demo.gd")
 const MapList := preload("res://maps.gd")
+## Combat has its own music (every map and mission), not the map's track.
+const COMBAT_TRACK := preload("res://assets/music/combat_the_rush.mp3")
+## Far-off firefights over the wind: bursts of these, quiet and pitched down.
+const DISTANT_SHOTS: Array[AudioStream] = [
+	preload("res://assets/sounds/guns/ak_shot.wav"),
+	preload("res://assets/sounds/guns/lmg_shot.wav"),
+	preload("res://assets/sounds/guns/rifle_shot.wav"),
+]
 
 ## The map's own id ("yard", "town", "warehouse"); map_id becomes the save key.
 var base_map_id := ""
@@ -35,6 +43,9 @@ var _regen_left := 0.0
 var _last_health := 0
 var _lamps: Array[Vector4] = []  # lit spots: position + reach (visibility_at)
 var _lamps_found := false
+var distant_fire: AudioStreamPlayer
+var _distant_wait := 4.0   # s until the next far-off shot
+var _distant_shots := 0    # shots left in the burst
 
 
 func _ready() -> void:
@@ -43,7 +54,12 @@ func _ready() -> void:
 	# The scene's map_id ("town") picks the map's lighting mood in main.gd;
 	# the scores are saved under the Combat key from here on.
 	base_map_id = map_id
+	music = COMBAT_TRACK
 	super._ready()
+	distant_fire = AudioStreamPlayer.new()
+	distant_fire.name = "DistantFire"
+	distant_fire.max_polyphony = 4
+	add_child(distant_fire)
 	map_id = MapList.save_key(base_map_id, MapList.COMBAT)
 	max_enemies = Cfg.MAX_ALIVE
 	spawn_timer.wait_time = Cfg.SPAWN_INTERVAL
@@ -71,6 +87,21 @@ func _setup_progress() -> void:
 func _process(delta: float) -> void:
 	super._process(delta)
 	_update_regen(delta)
+	_update_distant_fire(delta)
+
+
+func _update_distant_fire(delta: float) -> void:
+	_distant_wait -= delta
+	if _distant_wait > 0.0:
+		return
+	if _distant_shots <= 0:  # a new burst, from another gun and distance
+		_distant_shots = randi_range(2, 7)
+		distant_fire.stream = DISTANT_SHOTS.pick_random()
+		distant_fire.volume_db = randf_range(-28.0, -21.0)
+	distant_fire.pitch_scale = randf_range(0.55, 0.65)
+	distant_fire.play()
+	_distant_shots -= 1
+	_distant_wait = randf_range(0.09, 0.14) if _distant_shots > 0 else randf_range(3.0, 9.0)
 
 
 # --- Waves -------------------------------------------------------------------

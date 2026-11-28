@@ -133,7 +133,7 @@ const STAR_WAVES := [5, 10, 15]
 ## reward: coins.
 const ACHIEVEMENTS := [
 	{"id": "first_blood", "name": "First Blood", "text": "Kill your first enemy", "stat": "kills", "target": 1, "reward": 25},
-	{"id": "slayer", "name": "Zombie Slayer", "text": "Kill 500 enemies", "stat": "kills", "target": 500, "reward": 150},
+	{"id": "slayer", "name": "Slayer", "text": "Kill 500 enemies", "stat": "kills", "target": 500, "reward": 150},
 	{"id": "exterminator", "name": "Exterminator", "text": "Kill 5000 enemies", "stat": "kills", "target": 5000, "reward": 600},
 	{"id": "sharpshooter", "name": "Sharpshooter", "text": "Get 100 headshots", "stat": "headshots", "target": 100, "reward": 150},
 	{"id": "head_hunter", "name": "Head Hunter", "text": "Get 1000 headshots", "stat": "headshots", "target": 1000, "reward": 500},

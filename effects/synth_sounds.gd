@@ -85,6 +85,14 @@ static func radio() -> AudioStreamWAV:
 		return band * 1.6 * gate * minf(t / 0.01, 1.0) + squelch, 0.75)
 
 
+## Combat: a short radio blip (two beeps in static) when a soldier alerts.
+static func radio_alert() -> AudioStreamWAV:
+	return _build("radio_alert", func(t: float) -> float:
+		var beep := sin(TAU * (1250.0 if t < 0.09 else 950.0) * t) * 0.45
+		var gap := 0.0 if t > 0.07 and t < 0.1 else 1.0
+		return (beep * gap + (randf() - 0.5) * 0.25) * minf(t / 0.005, 1.0), 0.18)
+
+
 ## Missions: the helicopter, a seamless 1 s loop: blade thumps 11 times a
 ## second (low-passed noise + a low tone) over a quiet turbine whine.
 static func rotor_loop() -> AudioStreamWAV:
