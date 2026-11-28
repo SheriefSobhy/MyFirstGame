@@ -236,7 +236,7 @@ Each test is a SceneTree script that prints PASS/FAIL and exits 1 on failure:
 
 Tests: `test_progression`, `test_economy`, `test_game_loop`, `test_maps`,
 `test_weapons`, `test_combat_feel`, `test_enemies`, `test_mobile`,
-`test_training`, `test_soldiers`, `test_missions`, `test_navigation` (run that one with `--fixed-fps 60`). Most accept `-- --shots <folder>`
+`test_training`, `test_touch`, `test_soldiers`, `test_missions`, `test_navigation` (run that one with `--fixed-fps 60`). Most accept `-- --shots <folder>`
 (without `--headless`) to save screenshots for a visual check.
 
 - Under a tool script, `Progress` starts empty and saves to

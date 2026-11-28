@@ -87,6 +87,15 @@ func _process(delta: float) -> void:
 	train_button.visible = training.hud.pause_button.visible and not panel.visible
 
 
+# GUI buttons only hear the first finger (as an emulated mouse), so TAKE with
+# another finger (while walking) is handled here.
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and event.pressed and event.index > 0 and take_index >= 0 \
+			and take_button.is_visible_in_tree() and not get_tree().paused \
+			and take_button.get_global_rect().has_point(event.position):
+		training.take_weapon(take_index)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if panel.visible and (event.is_action_pressed("release_mouse")
 			or (event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_T)):

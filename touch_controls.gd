@@ -71,11 +71,15 @@ const REMAP_DISTANCE := 250.0
 ## Safety cap on how far a single drag event may turn the view (pixels).
 const MAX_LOOK_STEP := 120.0
 
-# Which finger is doing what: role ("joy", "look" or "shoot") -> {index, pos}.
+# Which finger is doing what: role ("joy", "look", "shoot", "switch",
+# "grenade", or "idle<n>" for one that holds nothing: a tap button, a touch left
+# to another control) -> {index, pos}. Every finger on the screen is listed, so
+# lifting one never lets go of another's role.
 # Fingers are matched by position as well as by touch index, because web
 # browsers renumber the remaining touches when one finger lifts. Trusting the
 # index alone made the view jump (often up into the sky) when you let go of Shoot.
 var _fingers := {}
+var _idle_count := 0
 var _joy_center := Vector2.ZERO
 var _joy_knob := Vector2.ZERO
 var _wheel_open := false
@@ -114,26 +118,39 @@ func _input(event: InputEvent) -> void:
 
 
 func _touch_down(index: int, pos: Vector2) -> void:
+	var role := _press(pos)
+	if role == "":
+		_idle_count += 1
+		role = "idle%d" % _idle_count
+	_fingers[role] = {"index": index, "pos": pos}
+
+
+# Acts on a new touch and returns the role its finger now holds, "" for none.
+# A role another finger already holds is never taken over.
+func _press(pos: Vector2) -> String:
 	for blocker in blockers:
 		if is_instance_valid(blocker) and blocker.is_visible_in_tree() and blocker.get_global_rect().has_point(pos):
-			return
-	match _button_at(pos):
+			return ""
+	var button := _button_at(pos)
+	if _fingers.has(button):
+		return ""
+	match button:
 		"shoot":
-			_fingers["shoot"] = {"index": index, "pos": pos}
 			player.touch_shoot = true
+			return button
 		"jump":
 			player.request_jump()
 		"reload":
 			player.start_reload()
 		"switch":
-			_fingers["switch"] = {"index": index, "pos": pos}
 			_switch_start = pos
 			_switch_time = 0.0
 			_wheel_open = false
 			_wheel_pick = -1
+			return button
 		"grenade":
-			_fingers["grenade"] = {"index": index, "pos": pos}
 			player.start_grenade()
+			return button
 		"aim":
 			player.toggle_aim()
 		_:
@@ -141,13 +158,14 @@ func _touch_down(index: int, pos: Vector2) -> void:
 			# (including the left half of the screen) is for aiming.
 			if _movement_enabled() and not _fingers.has("joy") \
 					and pos.distance_to(_joy_home()) <= JOY_RADIUS * JOY_TOUCH_SCALE:
-				_fingers["joy"] = {"index": index, "pos": pos}
 				_joy_center = _joy_home()
 				var offset := (pos - _joy_center).limit_length(JOY_RADIUS)
 				_joy_knob = _joy_center + offset
 				player.touch_move = offset / JOY_RADIUS
+				return "joy"
 			elif not _fingers.has("look"):
-				_fingers["look"] = {"index": index, "pos": pos}
+				return "look"
+	return ""
 
 
 ## Forgets every finger and lets go of the stick and trigger (used when
@@ -216,7 +234,8 @@ func _role_for(index: int, pos: Vector2) -> Array:
 	var nearest_dist := INF
 	for role: String in _fingers:
 		var finger: Dictionary = _fingers[role]
-		if finger.index == index:
+		if finger.index == index and (by_index == ""
+				or pos.distance_to(finger.pos) < pos.distance_to(_fingers[by_index].pos)):
 			by_index = role
 		var dist := pos.distance_to(finger.pos)
 		if dist < nearest_dist:
@@ -225,7 +244,7 @@ func _role_for(index: int, pos: Vector2) -> Array:
 	if by_index != "" and (by_index == nearest
 			or pos.distance_to(_fingers[by_index].pos) < REMAP_DISTANCE):
 		return [by_index, true]
-	return [nearest, false]
+	return [nearest if nearest_dist < REMAP_DISTANCE else "", false]
 
 
 # --- Weapon wheel -------------------------------------------------------------

@@ -23,6 +23,7 @@ const THEME := preload("res://ui/theme.tres")
 const GOLD := Color(1.0, 0.8, 0.35)
 const MARKER_COLOR := Color(1.0, 0.85, 0.3)
 const USE_RADIUS := 64.0
+const USE_DRIFT := 250.0   # a held USE finger may slide this far before lifting
 
 ## Interactable in reach: text on the USE button ("" = hidden).
 var use_text := ""
@@ -93,7 +94,10 @@ func _input(event: InputEvent) -> void:
 		if event.pressed and rect.has_point(event.position) and _use_touch < 0:
 			_use_touch = event.index
 			use_held = true
-		elif not event.pressed and (event.index == _use_touch or rect.has_point(event.position)):
+		# By position too: browsers renumber fingers when one lifts, so a
+		# far-away finger with USE's old index must not let go of it.
+		elif not event.pressed and (rect.has_point(event.position) or (event.index == _use_touch
+				and rect.get_center().distance_to(event.position) < USE_DRIFT)):
 			_use_touch = -1
 			use_held = false
 	elif event is InputEventMouseButton and not _touch and event.button_index == MOUSE_BUTTON_LEFT \
